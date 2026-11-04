@@ -1,0 +1,9 @@
+# Install: uv pip install -r requirements.txt  (CPU-only torch)
+--extra-index-url https://download.pytorch.org/whl/cpu
+gymnasium==1.4.0
+imageio==2.38.1
+numpy==2.5.4
+pygame-ce==2.5.8
+pytest==9.2.0
+stable-baselines3==2.9.2
+torch==2.15.0+cpu

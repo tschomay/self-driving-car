@@ -31,3 +31,19 @@ This repo is a learning project that runs phase by phase. When the owner says **
 10. **Stay low touch.** Do research yourself. Bring the owner only predictions, explanations, learner-owned code, and decisions that are genuinely theirs: money, time, scope, interest.
 
 Compute: the cloud container has 4 CPU, 15 GB RAM, and no GPU, which is enough for Phases 0–1. Modal (free $30/month) needs an account and an API token, requested via the credential form when Phase 2 needs it. Budget ceiling: $0 until then, $30/month after.
+
+## Git workflow: merge when a body of work is done
+
+The owner has given standing permission: **when you complete a body of work, open a pull request to `main` and merge it without asking.** A body of work is a finished phase step, for example:
+
+- a completed experiment with its log entry
+- a gate check
+- docs or plan updates
+- a working feature
+
+Before merging:
+
+- Run the repo's fast checks (tests or lint, once they exist).
+- Don't merge broken or half-finished work; push it to the branch and say what's left.
+
+Don't ask "should I open a PR / merge?" in these cases. Just do it and report the merged PR.

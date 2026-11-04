@@ -32,11 +32,11 @@ Then the gate check.
 
 ### E1 — Random policy vs. out-of-the-box PPO
 
-- **Prediction (owner, before the run):** _pending_
+- **Prediction (owner, before the run):** Random policy averages about 110 steps. PPO reaches ≥ 475 within 100k steps, late in training, with a smooth curve.
 - **Setup:** `python -m sdc.phase0.train --preset random --out runs/e1-random`; `python -m sdc.phase0.train --preset default --steps 100000 --seed 0 --out runs/e1-ppo --label "PPO default"`
 - **Result:** _pending_
-- **Explanation (owner, after the run):** _pending_
-- **Takeaway:** _pending_
+- **Explanation (owner, after the run):** (1) From the GIF it appears the pole counts as fallen once it reaches a few degrees of tilt, not fully horizontal. That's part of it, but mostly I knew nothing about the physics and guessed that random motion would average out to doing nothing, and that it probably takes about 1 second for a broom to fall. (2) It's more effective than I expected!
+- **Takeaway:** Random pushes don't cancel out. Each one adds velocity, so the errors pile up like a random walk, and the episode ends at 12°. Even out-of-the-box PPO solves CartPole in about 25k steps (under 30 s on CPU).
 
 ## Gate check
 

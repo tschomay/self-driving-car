@@ -32,7 +32,7 @@ Then the gate check.
 
 ### E1 — Random policy vs. out-of-the-box PPO
 
-- **Prediction (owner, before the run):** _pending_
+- **Prediction (owner, before the run):** Random policy averages about 110 steps. PPO reaches ≥ 475 within 100k steps, late in training, with a smooth curve.
 - **Setup:** `python -m sdc.phase0.train --preset random --out runs/e1-random`; `python -m sdc.phase0.train --preset default --steps 100000 --seed 0 --out runs/e1-ppo --label "PPO default"`
 - **Result:** _pending_
 - **Explanation (owner, after the run):** _pending_

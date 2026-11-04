@@ -11,7 +11,10 @@ Status: **confirmed 2026-11-04** ([Confirm learning style, budget, and phase pla
 - **Decisions deferred to phase exits:**
   - Phase 2 entry: how long runs survive ephemeral sessions (checkpoint-and-push vs. detached Modal jobs).
   - Phase 3 exit: whether to do Phase 4, and if so which 3D engine (MuJoCo/MJX, Isaac Lab, Genesis, ...).
-Purpose: learn CNNs and reinforcement learning (RL) by building toward a car that races itself, starting in cheap simulation. The project is a learning vehicle. Lap times are secondary.
+
+## Purpose
+
+Learn CNNs and reinforcement learning (RL) by building toward a car that races itself, starting in cheap simulation. The project is a learning vehicle. Lap times are secondary.
 
 ## Feasibility findings (2026-11-04)
 

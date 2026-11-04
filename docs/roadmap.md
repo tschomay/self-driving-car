@@ -1,6 +1,16 @@
-# Self-driving RC car — learning roadmap (draft)
+# Self-driving RC car — learning roadmap
 
-Status: **draft, pending confirmation** in the wayfinder map's grilling ticket.
+Status: **confirmed 2026-11-04** ([Confirm learning style, budget, and phase plan](https://github.com/tschomay/self-driving-car/issues/2)).
+
+## Working agreements
+
+- **Learning depth: hybrid.** Phase 0 uses Stable-Baselines3 to validate the pipeline. In Phase 1 you write a minimal PPO yourself and benchmark it against the library. Phase 2 uses a CNN encoder you write.
+- **Budget: $0 to start.** Phases 0–1 run on the cloud container's CPU. Modal (free $30/month) gets set up at the start of Phase 2, and only if run lengths need it.
+- **Cadence: ~2–4 h/week.** Every experiment gets a 1–2 sentence written prediction before the run and a short explanation after it.
+- **Gates** as listed below. Phase 4 is an explicit go/no-go decision at the Phase 3 exit.
+- **Decisions deferred to phase exits:**
+  - Phase 2 entry: how long runs survive ephemeral sessions (checkpoint-and-push vs. detached Modal jobs).
+  - Phase 3 exit: whether to do Phase 4, and if so which 3D engine (MuJoCo/MJX, Isaac Lab, Genesis, ...).
 Purpose: learn CNNs and reinforcement learning (RL) by building toward a car that races itself, starting in cheap simulation. The project is a learning vehicle. Lap times are secondary.
 
 ## Feasibility findings (2026-11-04)

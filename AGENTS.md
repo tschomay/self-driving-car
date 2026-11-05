@@ -32,6 +32,17 @@ This repo is a learning project that runs phase by phase. When the owner says **
 
 Compute: the cloud container has 4 CPU, 15 GB RAM, and no GPU, which is enough for Phases 0–1. Modal (free $30/month) needs an account and an API token, requested via the credential form when Phase 2 needs it. Budget ceiling: $0 until then, $30/month after.
 
+## Lessons from working with the owner
+
+Collected as they come up (first batch: Phase 0, E1–E2). Apply them in every phase.
+
+- **Give context before asking for a prediction.** Before the first experiment on a new environment or method, explain in plain terms what the task is, what the agent sees and controls, what ends an episode, how reward and return are counted, and how the experiment is set up. Include rules that change the answer (CartPole ends at 12°, not when the pole falls flat). The prediction should test intuition about learning, not knowledge of hidden rules. Never reveal the results.
+- **Explain the mechanism, not just the name.** The owner wants to know *how* the algorithm works (how PPO decides an action was good, how it generalizes to unseen states). Expand every acronym the first time it appears and link it to the concept being taught. Offer this up front for each new method.
+- **Make every visual self-explanatory.** GIFs carry overlays: who is driving, which episode or seed, step out of the cap, return so far, the last action, the quantity that ends the episode, a progress bar, and an end card saying why it ended and that it loops (`sdc/gifs.py`). Report captions say what one GIF covers: one episode, which seed, real speed.
+- **Flag surprises before the owner finds them.** When a result looks odd (an untrained policy scoring 416), check it and explain it in the report instead of leaving the owner to wonder.
+- **Keep runs reproducible.** Pin the torch thread count (default 1) and record seeds. A different thread count changes results even with the same seed.
+- **Phone-sized messages.** Short sections, tables for prediction vs. result, one question at a time where possible.
+
 ## Git workflow: merge when a body of work is done
 
 The owner has given standing permission: **when you complete a body of work, open a pull request to `main` and merge it without asking.** A body of work is a finished phase step, for example:
@@ -47,3 +58,5 @@ Before merging:
 - Don't merge broken or half-finished work; push it to the branch and say what's left.
 
 Don't ask "should I open a PR / merge?" in these cases. Just do it and report the merged PR.
+
+PRs are squash-merged, so afterwards bring `main` into the working branch with `git merge origin/main` (not rebase plus force-push, which the session's permissions block).

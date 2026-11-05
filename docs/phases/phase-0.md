@@ -43,8 +43,8 @@ Then the gate check.
 - **Prediction (owner, before the run):** All 5 seeds solve it. They solve at different points, but since this seems fairly easy to solve, maybe not a lot of spread.
 - **Setup:** `python -m sdc.phase0.train --preset default --steps 100000 --seed S --out runs/e2-s$S --label "PPO default"` for S = 0..4, run in parallel (1 torch thread each).
 - **Result:** [report](https://claude.ai/artifact/Ko9EenCyMWQxSJLbFP5gSg). All 5 seeds: **500.0** held-out mean (5/5 solved), about 130 s each running 5 in parallel. First held-out eval ≥ 475: 15k steps (seeds 1, 3), 20k (seeds 0, 2, 4). 20-episode training average first ≥ 475 between 27.6k and 35.1k steps. Untrained greedy scores varied widely (416, 9, 9, 146, 9) but the runs converged within about 5k steps of each other. Seed 0 here solved at 20k vs. 25k in E1: E2 used 1 torch thread per job, and different thread counts change floating-point summation order, so the same seed is only bit-identical on the same setup.
-- **Explanation (owner, after the run):** _pending_
-- **Takeaway:** _pending_
+- **Explanation (owner, after the run):** I suspect there isn't much variation in successful strategies, so all starting seeds eventually converge to the same place. But the order of the building blocks that get you there can change, and that order shapes each seed's curve. With a harder task, I expect more building blocks and more possible solutions, which means more variance.
+- **Takeaway:** On an easy task with essentially one good strategy, seeds converge tightly despite very different starts. Expect a wider spread on harder tasks, so judge configs over several seeds. Runs now pin 1 torch thread so a seed reproduces exactly.
 
 ## Gate check
 

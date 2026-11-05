@@ -260,9 +260,13 @@ def build(run_dirs: list[str | Path], title: str, question: str, out: str | Path
             if uri and len(figs) < max_gifs:
                 figs.append(f'<figure><img src="{uri}" alt="Rollout of {html.escape(label)}">'
                             f'<figcaption><span class="sw" style="display:inline-block;background: var(--s{color[label] % N_SERIES + 1})"></span> '
-                            f'{html.escape(label)}: one held-out episode, return {m["gif_return"]:.0f}</figcaption></figure>')
+                            f'{html.escape(label)}{f", seed {m['seed']}" if len(ms) > 1 else ""}: return {m["gif_return"]:.0f}</figcaption></figure>')
     if figs:
-        sections.append(f'<section><h2>Rollouts</h2><div class="gifs">{"".join(figs)}</div></section>')
+        sections.append('<section><h2>Rollouts</h2><p class="caption">Each GIF is one held-out episode by the '
+                        'final policy, played at real speed until it ends. The bar along the bottom fills toward '
+                        'the 500-step cap. An end card says why the episode stopped, then the GIF loops. '
+                        'Where a row has several seeds, the GIF shows the first one.</p>'
+                        f'<div class="gifs">{"".join(figs)}</div></section>')
 
     if notes:
         sections.append('<section class="notes"><h2>Notes</h2>' + "".join(f"<p>{html.escape(n)}</p>" for n in notes) + "</section>")

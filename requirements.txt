@@ -7,3 +7,4 @@ pygame-ce==2.5.8
 pytest==9.2.0
 stable-baselines3==2.9.2
 torch==2.15.0+cpu
+pillow==13.0.0

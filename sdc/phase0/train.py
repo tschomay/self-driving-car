@@ -84,24 +84,62 @@ def evaluate(policy_fn, n_episodes: int, seed_base: int = EVAL_SEED_BASE) -> lis
     return returns
 
 
-def record_gif(policy_fn, path: Path, seed: int = EVAL_SEED_BASE + 999, every: int = 2) -> float:
-    """Save one held-out episode as a GIF (every `every`-th frame, downscaled 2x)."""
-    import imageio.v2 as imageio
+ANGLE_LIMIT_DEG = 12.0
+TRACK_LIMIT = 2.4
+
+
+def record_gif(policy_fn, path: Path, label: str, seed: int = EVAL_SEED_BASE + 999, every: int = 2) -> float:
+    """Save ONE held-out episode as an annotated GIF, played until it ends, at real speed."""
+    from sdc.gifs import annotate, save_gif
 
     env = gym.make(ENV_ID, render_mode="rgb_array")
+    max_steps = env.spec.max_episode_steps
     obs, _ = env.reset(seed=seed)
-    frames, done, total, t = [], False, 0.0, 0
+    title = label
+    frames, done, total, t, action = [], False, 0.0, 0, None
+
+    def readout():
+        ang = float(np.degrees(obs[2]))
+        push = "—" if action is None else ("push ←" if action == 0 else "push →")
+        return [f"step {t} / {max_steps}   ·   return so far {total:.0f}",
+                f"one held-out episode (reset seed {seed}), real speed",
+                f"last action {push}   ·   pole {ang:+.1f}° (limit ±{ANGLE_LIMIT_DEG:g}°)   ·   cart x {obs[0]:+.2f} (±{TRACK_LIMIT})"]
+
     while not done:
         if t % every == 0:
-            frames.append(env.render()[::2, ::2])
-        obs, r, term, trunc, _ = env.step(policy_fn(obs))
+            frames.append(annotate(env.render(), title, readout(), t / max_steps))
+        action = policy_fn(obs)
+        obs, r, term, trunc, _ = env.step(action)
         total += r
         done = term or trunc
         t += 1
-    frames.append(env.render()[::2, ::2])
+    if trunc and not term:
+        end, good = f"Reached the {max_steps}-step cap: return {total:.0f}", True
+    elif abs(obs[0]) > TRACK_LIMIT:
+        end, good = f"Cart left the track at step {t}: return {total:.0f}", False
+    else:
+        end, good = f"Pole passed {ANGLE_LIMIT_DEG:g}° at step {t}: return {total:.0f}", False
+    frames.append(annotate(env.render(), title, readout(), t / max_steps, end=end, end_good=good))
     env.close()
-    imageio.mimsave(path, frames, duration=1000 * every / 50, loop=0)  # CartPole runs at 50 Hz
+    save_gif(frames, path, frame_ms=1000 * every / 50)  # CartPole runs at 50 Hz, so this is real speed
     return total
+
+
+def regif(run_dir: str | Path) -> float:
+    """Re-record a finished run's rollout GIF from its saved model (or a fresh random policy)."""
+    run_dir = Path(run_dir)
+    m = json.loads((run_dir / "metrics.json").read_text())
+    if m["preset"] == "random":
+        rng = np.random.default_rng(m["seed"])
+        fn = lambda obs: int(rng.integers(2))  # noqa: E731
+        label = "random policy"
+    else:
+        model = PPO.load(run_dir / "model.zip", device="cpu")
+        fn = lambda obs: int(model.predict(obs, deterministic=True)[0])  # noqa: E731
+        label = f"{m['label']}, seed {m['seed']}"
+    m["gif_return"] = record_gif(fn, run_dir / "rollout.gif", label)
+    (run_dir / "metrics.json").write_text(json.dumps(m, indent=1))
+    return m["gif_return"]
 
 
 class MetricsCallback(BaseCallback):
@@ -163,7 +201,11 @@ def train(
     stop_when_solved: bool = False,
     gif: bool = True,
     label: str | None = None,
+    threads: int = 1,
 ) -> dict:
+    import torch
+
+    torch.set_num_threads(threads)  # fixed thread count, so a seed reproduces the same run
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     cfg = json.loads(json.dumps(PRESETS[preset]))  # deep copy
@@ -183,13 +225,14 @@ def train(
         return int(model.predict(obs, deterministic=True)[0])
 
     final = evaluate(policy, final_eval_episodes)
-    gif_return = record_gif(policy, out / "rollout.gif") if gif else None
+    gif_return = record_gif(policy, out / "rollout.gif", f"{label or out.name}, seed {seed}") if gif else None
 
     metrics = dict(
         label=label or out.name,
         env=ENV_ID,
         preset=preset,
         seed=seed,
+        threads=threads,
         n_envs=n_envs,
         ppo={k: v for k, v in cfg["ppo"].items()},
         total_timesteps=total_timesteps,
@@ -219,7 +262,7 @@ def random_baseline(out: str | Path = "runs/random", n_episodes: int = 100, seed
     out.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(seed)
     rets = evaluate(lambda obs: int(rng.integers(2)), n_episodes)
-    gif_return = record_gif(lambda obs: int(rng.integers(2)), out / "rollout.gif")
+    gif_return = record_gif(lambda obs: int(rng.integers(2)), out / "rollout.gif", "random policy")
     metrics = dict(
         label="random policy",
         env=ENV_ID,
@@ -253,7 +296,12 @@ def main():
                    help="override a PPO kwarg, e.g. --set learning_rate=3e-3 --set gamma=0.9")
     p.add_argument("--stop-when-solved", action="store_true")
     p.add_argument("--label", default=None)
+    p.add_argument("--threads", type=int, default=1, help="torch threads (fixed so seeds reproduce)")
+    p.add_argument("--regif", metavar="RUN_DIR", help="only re-record RUN_DIR's rollout GIF")
     a = p.parse_args()
+    if a.regif:
+        print(f"{a.regif}: GIF episode return {regif(a.regif):.0f}")
+        return
     out = a.out or f"runs/{a.preset}-s{a.seed}"
     if a.preset == "random":
         m = random_baseline(out, seed=a.seed)
@@ -262,7 +310,8 @@ def main():
         for kv in a.set:
             k, v = kv.split("=", 1)
             overrides[k] = json.loads(v)
-        m = train(a.preset, a.seed, a.steps, out, overrides, stop_when_solved=a.stop_when_solved, label=a.label)
+        m = train(a.preset, a.seed, a.steps, out, overrides, stop_when_solved=a.stop_when_solved, label=a.label,
+                  threads=a.threads)
     fe = m["final_eval"]
     print(f"{m['label']}: held-out mean return {fe['mean']:.1f} ± {fe['std']:.1f} over {fe['episodes']} eps"
           + (f", trained {m['trained_timesteps']} steps in {m['train_wall_s']:.0f}s" if "train_wall_s" in m else ""))

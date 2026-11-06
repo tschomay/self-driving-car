@@ -56,9 +56,9 @@ Then the gate check.
 
 ### E3b — Does the policy need a neural network at all? (added at owner's request)
 
-- **Prediction (owner, before the run):** _pending_
+- **Prediction (owner, before the run):** Yes, it solves it, and faster than the default network. The learned rule weights the pole angle most heavily.
 - **Setup:** default PPO with a linear actor (logistic-regression policy: 4 inputs → push-right probability, no hidden layers) and the default 64×64 critic: `--set policy_kwargs='{"net_arch": {"pi": [], "vf": [64, 64]}}'`, 3 seeds, 100k steps.
-- **Result:** _pending_
+- **Result:** [report](https://claude.ai/artifact/Y1dgGdF2tev69pMTE3T6H8). Linear actor solved **3/3** (held-out 500, 500, 500) but **slower** than the default: first held-out eval ≥ 475 at 30k–45k steps (default: 15k–20k), and its 20-episode training average peaked at 395–408 without reaching 475. Learned rule P(right) = sigmoid(w·obs + b), nearly identical across seeds: angle 5.5/rad, spin 3.6 per rad/s, velocity 0.7, position about 0.1, bias about 0.05. Weighted by how much each input actually varies while balancing (angle spread only 0.01 rad), spin dominates (about 0.7) over velocity (0.12), position (0.1) and angle (0.05).
 - **Explanation (owner, after the run):** _pending_
 - **Takeaway:** _pending_
 

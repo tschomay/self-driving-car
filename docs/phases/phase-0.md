@@ -67,8 +67,8 @@ Then the gate check.
 - **Prediction (owner, before the run):** It needs to see far enough ahead to notice a fall and react, and from prior sims the reaction has to be very fast, so I guess it needs to see about 15 frames ahead before it can learn; otherwise it never has a chance to save it. (1) By that logic only the biggest (0.99) solves it, but I'm hopeful 0.9 might work. (2) If "better than the critic" means longer until the fall (rather than a binary fall / no fall), I could see a failing γ learning some balance but not enough to prevent a fall.
 - **Setup:** `python -m sdc.phase0.train --preset default --steps 100000 --seed S --set gamma=G --out runs/e4-gG-sS --label "γ G"` for G ∈ {0.5, 0.9, 0.99}, S ∈ {0, 1, 2}; 1 torch thread each, 4 in parallel.
 - **Result:** [report](https://claude.ai/artifact/9HgBTaGDFSH33a6xHFP4r7). Solved at the end: **γ 0.99: 3/3**; **γ 0.9: 2/3** (488, 261, 498); **γ 0.5: 0/3**, but 407, 407 and 426, far above random (21). How the 100 held-out episodes ended: at γ 0.5 the cart left the track in 40–64 episodes and the pole tipped past 12° in only 0–7; at γ 0.9 the cart left the track in 6, 16 and 96 episodes, the pole tipped in 0–2; at γ 0.99, 100/100 reached the cap. Even about 2 steps of lookahead keeps the pole up; short horizons fail on slow drift off the track.
-- **Explanation (owner, after the run):** _pending_
-- **Takeaway:** _pending_
+- **Explanation (owner, after the run):** (1) Cart drift is much longer-term than keeping the pole up, so the policy misses it. It's also less strict about keeping the pole up, so it has to play catch-up. (2) The racer will need to see through to the next corner or obstacle, if there is one.
+- **Takeaway:** γ sets which consequences the agent can learn about: about 1/(1−γ) steps ahead. Fast reflexes (the pole) need only a few steps; slow consequences (drift off the track) need a horizon as long as the drift. For Phase 1, the horizon must at least cover the time from seeing a corner to reaching it.
 
 ## Gate check
 

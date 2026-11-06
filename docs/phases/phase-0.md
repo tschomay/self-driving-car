@@ -46,6 +46,22 @@ Then the gate check.
 - **Explanation (owner, after the run):** I suspect there isn't much variation in successful strategies, so all starting seeds eventually converge to the same place. But the order of the building blocks that get you there can change, and that order shapes each seed's curve. With a harder task, I expect more building blocks and more possible solutions, which means more variance.
 - **Takeaway:** On an easy task with essentially one good strategy, seeds converge tightly despite very different starts. Expect a wider spread on harder tasks, so judge configs over several seeds. Runs now pin 1 torch thread so a seed reproduces exactly.
 
+### E3 — What does the learning rate do?
+
+- **Prediction (owner, before the run):** All but the biggest solve it. The smallest grows very slowly; the biggest is erratic.
+- **Setup:** `python -m sdc.phase0.train --preset default --steps 100000 --seed S --set learning_rate=LR --out runs/e3-lrLR-sS --label "lr LR"` for LR ∈ {3e-5, 3e-4, 3e-3, 3e-2}, S ∈ {0, 1, 2}; 1 torch thread each, 4 in parallel.
+- **Result:** [report](https://claude.ai/artifact/N1p8Mc4qhYFmJDRibGUKCF). Solved at the end (held-out mean ≥ 475): **3e-5: 1/3** (499, 455, 441; 20-episode training average peaked at 276–378); **3e-4: 3/3** (first solved eval 15k–20k); **3e-3: 3/3**, fastest (first solved eval 5k–15k); **3e-2: 0/3** (471, 9, 9). At 3e-2, seeds 1 and 2 reached about 500 on the 10k-step eval, then collapsed to 9–10 (always pushing one way) by 20k and never recovered; seed 0 swung between 20 and 425.
+- **Explanation (owner, after the run):** (1) Once it overshoots, the weights are too big and it never even tries pushing the other direction. (2) Bigger is faster until you stop exploring.
+- **Takeaway:** The learning rate trades speed against stability. Too small crawls. Too big can jump to a near-deterministic policy that stops exploring: every episode then looks the same (about 9 steps), so there is nothing left to learn from and the collapse is permanent. The default is a safe middle, not the optimum for every task.
+
+### E3b — Does the policy need a neural network at all? (added at owner's request)
+
+- **Prediction (owner, before the run):** _pending_
+- **Setup:** default PPO with a linear actor (logistic-regression policy: 4 inputs → push-right probability, no hidden layers) and the default 64×64 critic: `--set policy_kwargs='{"net_arch": {"pi": [], "vf": [64, 64]}}'`, 3 seeds, 100k steps.
+- **Result:** _pending_
+- **Explanation (owner, after the run):** _pending_
+- **Takeaway:** _pending_
+
 ## Gate check
 
 - **Run:** _pending_

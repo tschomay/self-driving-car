@@ -236,6 +236,8 @@ def build(run_dirs: list[str | Path], title: str, question: str, out: str | Path
                                         color=color[label], width=2 if len(ms) == 1 else 1.5,
                                         opacity=1 if len(ms) == 1 else .75, dot=True))
 
+    gaps = [m["evals"][2]["timesteps"] - m["evals"][1]["timesteps"] for m in runs if len(m.get("evals", [])) > 2]
+    eval_gap = float(np.median(gaps)) if gaps else 5000.0
     sections = []
     sections.append(f'<section><h2>Results</h2><p class="caption">Big number: mean return on 100 held-out '
                     f'episodes (reset seeds the training never used). CartPole caps an episode at 500; '
@@ -250,7 +252,7 @@ def build(run_dirs: list[str | Path], title: str, question: str, out: str | Path
         sections.append(
             '<section><h2>Held-out evaluation during training</h2>'
             f'<div class="chart">{line_chart(eval_series, "environment steps", "mean eval return", floor=random_floor)}</div>'
-            '<p class="caption">Every 5k steps: mean of 10 held-out episodes with the greedy (deterministic) policy.</p>'
+            f'<p class="caption">Every {_fmt_steps(eval_gap)} steps: mean of 10 held-out episodes with the greedy (deterministic) policy.</p>'
             '</section>')
 
     figs = []

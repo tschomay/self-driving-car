@@ -70,6 +70,14 @@ Then the gate check.
 - **Explanation (owner, after the run):** (1) Cart drift is much longer-term than keeping the pole up, so the policy misses it. It's also less strict about keeping the pole up, so it has to play catch-up. (2) The racer will need to see through to the next corner or obstacle, if there is one.
 - **Takeaway:** γ sets which consequences the agent can learn about: about 1/(1−γ) steps ahead. Fast reflexes (the pole) need only a few steps; slow consequences (drift off the track) need a horizon as long as the drift. For Phase 1, the horizon must at least cover the time from seeing a corner to reaching it.
 
+### E5 — Why do the tuned settings solve it faster?
+
+- **Prediction (owner, before the run):** Tuned solves it in both fewer steps and fewer seconds than default. The learning rate is the change that matters most.
+- **Setup:** (a) `--preset default` vs. `--preset tuned`, seeds 0–2, 100k steps, evals every 2.5k steps, each run alone on 1 thread so wall-clock times are comparable. (b) Ablation: tuned with one change reverted to its default at a time (parallel envs 8→1 keeping 256 steps per update; steps per update 256→2,048; epochs 20→10; learning rate 1e-3 decaying → 3e-4 fixed; γ 0.98→0.99; λ 0.8→0.95), seeds 0–2, `--stop-when-solved`, measured in steps to first held-out eval ≥ 475.
+- **Result:** [report](https://claude.ai/artifact/Pmthm9FscNNvkGJiQAbHbY). Both 3/3 solved (500 held-out). Steps to first eval ≥ 475: default 20k, 15k, 20k; tuned 20k, 10k, 15k (slightly fewer). Seconds to that point: default 12.6–17.0 s; tuned 3.9–10.9 s (about 2× faster). Full 100k steps: 90–97 s vs. 52–59 s. Ablation, median steps to first eval ≥ 475 (3 seeds): tuned 15k; lr reverted to 3e-4 fixed **25k** (largest slowdown); γ 0.99 20k; 10 epochs 17.5k; 2,048 steps per update 17.5k; λ 0.95 15k; 1 env (same 256 steps per update) 10k. Ranges overlap with 3 seeds; only the learning rate stands out, modestly. Several early-stopped ablation policies scored 440–490 on the full 100-episode test: a 10-episode eval is noisy.
+- **Explanation (owner, after the run):** _pending_
+- **Takeaway:** _pending_
+
 ## Gate check
 
 - **Run:** _pending_

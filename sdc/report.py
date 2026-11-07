@@ -106,7 +106,8 @@ def _fmt_steps(x: float) -> str:
 
 
 def line_chart(series: list[dict], x_label: str, y_label: str, y_max: float = 520, threshold: float | None = 475,
-               floor: float | None = None) -> str:
+               floor: float | None = None, threshold_label: str = "solved ≥ {:g}", floor_label: str = "random ≈ {:.0f}",
+               y_fmt: str = "{:g}") -> str:
     """series: [{x: [...], y: [...], color: idx, width: float, opacity: float}] drawn on one shared scale."""
     W, H, L, R, T, B = 440, 260, 44, 10, 14, 40
     xs = [x for s in series for x in s["x"]]
@@ -124,7 +125,7 @@ def line_chart(series: list[dict], x_label: str, y_label: str, y_max: float = 52
     parts = [f'<svg viewBox="0 0 {W} {H}" role="img" aria-label="{html.escape(y_label)} vs {html.escape(x_label)}">']
     for t in y_ticks:
         parts.append(f'<line class="ax" x1="{L}" x2="{W - R}" y1="{sy(t):.1f}" y2="{sy(t):.1f}" stroke-opacity=".6"/>')
-        parts.append(f'<text class="tick" x="{L - 6}" y="{sy(t) + 4:.1f}" text-anchor="end">{t:g}</text>')
+        parts.append(f'<text class="tick" x="{L - 6}" y="{sy(t) + 4:.1f}" text-anchor="end">{y_fmt.format(t)}</text>')
     for t in x_ticks:
         parts.append(f'<text class="tick" x="{sx(t):.1f}" y="{H - B + 16}" text-anchor="middle">{_fmt_steps(t)}</text>')
     parts.append(f'<line class="ax" x1="{L}" x2="{W - R}" y1="{sy(0):.1f}" y2="{sy(0):.1f}"/>')
@@ -133,11 +134,11 @@ def line_chart(series: list[dict], x_label: str, y_label: str, y_max: float = 52
                  f'transform="rotate(-90 12 {(T + H - B) / 2})">{html.escape(y_label)}</text>')
     if threshold is not None:
         parts.append(f'<line class="thr" x1="{L}" x2="{W - R}" y1="{sy(threshold):.1f}" y2="{sy(threshold):.1f}"/>')
-        parts.append(f'<text class="thrlabel" x="{W - R}" y="{sy(threshold) - 5:.1f}" text-anchor="end">solved ≥ {threshold:g}</text>')
+        parts.append(f'<text class="thrlabel" x="{W - R}" y="{sy(threshold) - 5:.1f}" text-anchor="end">{threshold_label.format(threshold)}</text>')
     if floor is not None:
         parts.append(f'<line class="ax" x1="{L}" x2="{W - R}" y1="{sy(floor):.1f}" y2="{sy(floor):.1f}" '
                      f'stroke-dasharray="2 3" style="stroke: var(--s6)"/>')
-        parts.append(f'<text class="tick" x="{W - R}" y="{sy(floor) - 5:.1f}" text-anchor="end">random ≈ {floor:.0f}</text>')
+        parts.append(f'<text class="tick" x="{W - R}" y="{sy(floor) - 5:.1f}" text-anchor="end">{floor_label.format(floor)}</text>')
     for s in series:
         if len(s["x"]) == 0:
             continue

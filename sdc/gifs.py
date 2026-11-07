@@ -5,7 +5,7 @@ Overlays:
   - top bar: who is driving and which held-out episode this is
   - live readout: step / max steps, return so far, the action just taken, the
     quantity that ends the episode (e.g. pole angle vs. its limit)
-  - bottom progress bar: how far through the step cap the episode got
+  - bottom progress bar: how far through the episode got (step cap, or lap distance)
   - end card (held ~2 s): why the episode ended, then "↻ replays from step 0"
 """
 
@@ -38,7 +38,7 @@ def _font(size: int, bold: bool = False):
 
 
 def annotate(frame: np.ndarray, title: str, lines: list[str], progress: float, end: str | None = None,
-             end_good: bool = True, width: int = 480) -> np.ndarray:
+             end_good: bool = True, width: int = 480, end_y: int | None = None) -> np.ndarray:
     """Return `frame` scaled to `width` with a header band, readout lines and a progress bar."""
     img = Image.fromarray(frame)
     h = round(img.height * width / img.width)
@@ -59,7 +59,8 @@ def annotate(frame: np.ndarray, title: str, lines: list[str], progress: float, e
     d.rectangle([0, y0, round(width * min(progress, 1.0)), y0 + foot], fill=color)
     if end:
         box_w, box_h = width - 60, 64
-        x0, yb = 30, head + 66  # sits in the empty sky, clear of the cart and pole
+        x0 = 30
+        yb = head + 66 if end_y is None else end_y  # default: CartPole's empty sky, clear of cart and pole
         d.rounded_rectangle([x0, yb, x0 + box_w, yb + box_h], radius=8, fill=(255, 255, 255),
                             outline=color, width=3)
         d.text((width // 2, yb + 22), end, font=_font(15, bold=True), fill=color, anchor="mm")

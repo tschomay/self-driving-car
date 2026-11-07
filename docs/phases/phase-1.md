@@ -73,6 +73,20 @@ Then the gate check.
 - **Explanation (owner, after the run):** Over fitting. And not enough exposure to new situations to learn new tricks.
 - **Takeaway:** The policy learns the situations it's trained on, nothing more. One track gives a specialist: fastest at home, lost on mirror-image corners, and getting worse elsewhere the longer it trains (overfitting). Variety in training is what makes a driver generalize, and more variety (fresh tracks) beat 10 fixed tracks even on those 10. Judge generalization on held-out tracks, never on the training ones.
 
+### E4 — Planning horizon (γ)
+
+- **Prediction (owner, before the run):** .9 will fly off the track. .97 will finish some, maybe enough? The others will be fine.
+- **Setup:** E1 setup with `--set gamma=G`, G ∈ {0.9, 0.97, 0.995}, seeds 0–2, 300k steps. The γ 0.99 arm reuses E1.
+- **Result:** [report](https://claude.ai/artifact/5VnQn7MxxP9NV5DMurPZpR).
+  - **γ 0.9: 90%, 90%, 80% held-out (gate fail).** All 8 failures were crashes at 7–16 m/s in 6–8 m corners: it braked too late.
+  - **Training crash rate at the end: 64–93% of episodes for γ 0.9** (6–15% for the others). The noise-free policy mostly survives, but it has no safety margin: a crash more than about 1 s away barely counts.
+  - **γ 0.97: 100%, 100%, 95%. γ 0.99: 95%, 100%, 100%. γ 0.995: 100%, 95%, 95%.** All pass, at 0.94–0.96× pure pursuit.
+  - γ 0.995 drove slightly slower (13.8–14.0 m/s mean held-out speed vs. 14.0–14.3) and was no better.
+  - Held-out track 10000 (6.9 m corner at 40% of the lap) caused every failure at γ ≥ 0.97 (4 of 4) and 3 of γ 0.9's 8.
+- **Explanation (owner, after the run):** (1) It has 40 m of vision. And it might be rare to approach the sharpest corner from top speed. (2) [Asked what kind of noise.] I assume it barely gets by, so it can drive but the noise just pushes it over the edge to failure.
+- **Noise (agent's answer to the owner's question):** PPO's policy outputs a *mean* steering and throttle plus a learned spread (standard deviation). In training each action is drawn at random around the mean: that's how it explores. Test laps use the mean only. At the end of training the spread was about 0.5 (on the −1…1 action scale) for every γ (0.43–0.63), so γ 0.9 wasn't noisier. It just drove with no margin, so the same noise pushed it off.
+- **Takeaway:** The horizon has to cover how far ahead consequences arrive. Here that's braking distance: about 1.5 s from top speed. A 1 s planner can react to what its rays already show, but it can't brake early for the tightest corners. And it learns no safety margin, because a crash beyond its horizon barely counts. 3 s was enough; longer bought nothing.
+
 ## Gate check
 
 _pending_

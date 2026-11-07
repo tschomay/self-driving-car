@@ -19,6 +19,7 @@ from pathlib import Path
 
 import numpy as np
 
+from sdc.racer import track as trk
 from sdc.report import CSS, FONTS, N_SERIES, _fmt_steps, _gif_uri, _smooth, _thin, line_chart
 
 EXTRA_CSS = """
@@ -121,7 +122,8 @@ def build(run_dirs, title: str, question: str, out, eyebrow: str = "Phase 1", no
                    else f"{'left the road' if g['crashed'] else 'timed out'} at {100 * g['laps']:.0f}% of the lap")
             who = f"{label}{f', seed {m['seed']}' if len(ms) > 1 else ''}"
             figs.append(f'<figure><img src="{uri}" alt="Lap by {html.escape(who)} on track {g["track"]}">'
-                        f'<figcaption>{_sw(color[label])} {html.escape(who)} · held-out track {g["track"]}: '
+                        f'<figcaption>{_sw(color[label])} {html.escape(who)} · '
+                        f'{"held-out" if g["track"] >= trk.HELD_OUT_BASE else "its own training"} track {g["track"]}: '
                         f'{res}</figcaption></figure>')
     if figs:
         sections.append('<section><h2>Laps</h2><p class="caption">Each GIF is one lap attempt on one held-out '

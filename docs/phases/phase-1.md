@@ -83,8 +83,9 @@ Then the gate check.
   - **γ 0.97: 100%, 100%, 95%. γ 0.99: 95%, 100%, 100%. γ 0.995: 100%, 95%, 95%.** All pass, at 0.94–0.96× pure pursuit.
   - γ 0.995 drove slightly slower (13.8–14.0 m/s mean held-out speed vs. 14.0–14.3) and was no better.
   - Held-out track 10000 (6.9 m corner at 40% of the lap) caused every failure at γ ≥ 0.97 (4 of 4) and 3 of γ 0.9's 8.
-- **Explanation (owner, after the run):** _pending_
-- **Takeaway:** _pending_
+- **Explanation (owner, after the run):** (1) It has 40 m of vision. And it might be rare to approach the sharpest corner from top speed. (2) [Asked what kind of noise.] I assume it barely gets by, so it can drive but the noise just pushes it over the edge to failure.
+- **Noise (agent's answer to the owner's question):** PPO's policy outputs a *mean* steering and throttle plus a learned spread (standard deviation). In training each action is drawn at random around the mean: that's how it explores. Test laps use the mean only. At the end of training the spread was about 0.5 (on the −1…1 action scale) for every γ (0.43–0.63), so γ 0.9 wasn't noisier. It just drove with no margin, so the same noise pushed it off.
+- **Takeaway:** The horizon has to cover how far ahead consequences arrive. Here that's braking distance: about 1.5 s from top speed. A 1 s planner can react to what its rays already show, but it can't brake early for the tightest corners. And it learns no safety margin, because a crash beyond its horizon barely counts. 3 s was enough; longer bought nothing.
 
 ## Gate check
 

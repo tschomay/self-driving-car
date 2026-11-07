@@ -73,6 +73,19 @@ Then the gate check.
 - **Explanation (owner, after the run):** Over fitting. And not enough exposure to new situations to learn new tricks.
 - **Takeaway:** The policy learns the situations it's trained on, nothing more. One track gives a specialist: fastest at home, lost on mirror-image corners, and getting worse elsewhere the longer it trains (overfitting). Variety in training is what makes a driver generalize, and more variety (fresh tracks) beat 10 fixed tracks even on those 10. Judge generalization on held-out tracks, never on the training ones.
 
+### E4 — Planning horizon (γ)
+
+- **Prediction (owner, before the run):** .9 will fly off the track. .97 will finish some, maybe enough? The others will be fine.
+- **Setup:** E1 setup with `--set gamma=G`, G ∈ {0.9, 0.97, 0.995}, seeds 0–2, 300k steps. The γ 0.99 arm reuses E1.
+- **Result:** [report](https://claude.ai/artifact/5VnQn7MxxP9NV5DMurPZpR).
+  - **γ 0.9: 90%, 90%, 80% held-out (gate fail).** All 8 failures were crashes at 7–16 m/s in 6–8 m corners: it braked too late.
+  - **Training crash rate at the end: 64–93% of episodes for γ 0.9** (6–15% for the others). The noise-free policy mostly survives, but it has no safety margin: a crash more than about 1 s away barely counts.
+  - **γ 0.97: 100%, 100%, 95%. γ 0.99: 95%, 100%, 100%. γ 0.995: 100%, 95%, 95%.** All pass, at 0.94–0.96× pure pursuit.
+  - γ 0.995 drove slightly slower (13.8–14.0 m/s mean held-out speed vs. 14.0–14.3) and was no better.
+  - Held-out track 10000 (6.9 m corner at 40% of the lap) caused every failure at γ ≥ 0.97 (4 of 4) and 3 of γ 0.9's 8.
+- **Explanation (owner, after the run):** _pending_
+- **Takeaway:** _pending_
+
 ## Gate check
 
 _pending_

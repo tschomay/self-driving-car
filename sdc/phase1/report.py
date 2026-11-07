@@ -104,7 +104,7 @@ def build(run_dirs, title: str, question: str, out, eyebrow: str = "Phase 1", no
                         'episodes start at a random point and end on leaving the road or after 100 s, using the '
                         'exploring (random-noise) policy.</p></section>')
     if eval_series:
-        gaps = [m["evals"][1]["timesteps"] - m["evals"][0]["timesteps"] for m in runs if len(m.get("evals", [])) > 1]
+        gaps = [m["evals"][2]["timesteps"] - m["evals"][1]["timesteps"] for m in runs if len(m.get("evals", [])) > 2]
         sections.append('<section><h2>Held-out lap completion during training</h2>'
                         f'<div class="chart">{line_chart(eval_series, "environment steps", "held-out completion (%)", y_max=105, threshold=95, threshold_label="gate ≥ {:g}%")}</div>'
                         f'<p class="caption">Every {_fmt_steps(float(np.median(gaps)) if gaps else 0)} steps: one lap '

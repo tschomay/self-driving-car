@@ -70,8 +70,8 @@ Then the gate check.
   - Overfitting over time: seeds 1 and 2 hit 100% held-out at 75k steps, then slid to 65–70% by 300k while staying at 100% on track 0.
   - Some failures were timeouts: on unfamiliar corners the car crawled or stopped.
   - **10 tracks:** 100% held-out (all seeds) at 0.97× pure pursuit (E1: 0.94–0.96×). On its own 10 tracks it averaged 21.1–21.3 s, slower than the E1 policies on those same tracks (20.6–20.9 s).
-- **Explanation (owner, after the run):** _pending_
-- **Takeaway:** _pending_
+- **Explanation (owner, after the run):** Over fitting. And not enough exposure to new situations to learn new tricks.
+- **Takeaway:** The policy learns the situations it's trained on, nothing more. One track gives a specialist: fastest at home, lost on mirror-image corners, and getting worse elsewhere the longer it trains (overfitting). Variety in training is what makes a driver generalize, and more variety (fresh tracks) beat 10 fixed tracks even on those 10. Judge generalization on held-out tracks, never on the training ones.
 
 ## Gate check
 

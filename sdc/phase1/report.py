@@ -31,7 +31,7 @@ def _sw(i):
 
 
 def build(run_dirs, title: str, question: str, out, eyebrow: str = "Phase 1", notes: list[str] | None = None,
-          max_gifs: int = 6, curve: str = "laps") -> Path:
+          max_gifs: int = 6, curve: str = "laps", gifs_per_group: int = 2) -> Path:
     runs = []
     for d in run_dirs:
         m = json.loads((Path(d) / "metrics.json").read_text())
@@ -113,7 +113,7 @@ def build(run_dirs, title: str, question: str, out, eyebrow: str = "Phase 1", no
     figs = []
     for label, ms in groups.items():
         m = ms[0]
-        for g in m.get("gifs", []):
+        for g in m.get("gifs", [])[:gifs_per_group]:
             uri = _gif_uri(m["_dir"] / g["file"])
             if not uri or len(figs) >= max_gifs:
                 continue
@@ -187,9 +187,10 @@ def main():
     p.add_argument("--eyebrow", default="Phase 1")
     p.add_argument("--note", action="append", default=[])
     p.add_argument("--curve", default="laps", choices=["laps", "return", "speed"])
+    p.add_argument("--gifs-per-group", type=int, default=2)
     p.add_argument("--out", required=True)
     a = p.parse_args()
-    print(build(a.runs, a.title, a.question, a.out, a.eyebrow, a.note, curve=a.curve))
+    print(build(a.runs, a.title, a.question, a.out, a.eyebrow, a.note, curve=a.curve, gifs_per_group=a.gifs_per_group))
 
 
 if __name__ == "__main__":

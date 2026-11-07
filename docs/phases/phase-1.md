@@ -52,6 +52,14 @@ Then the gate check.
 - **Explanation (owner, after the run):** Oh, so it is optimizing for speed.
 - **Takeaway:** The reward defines the goal, including the parts you didn't spell out. "Metres per step" already means "go fast," so PPO found a racing line on its own and beat a map-reading driver by about 5%. With rays plus speed and perfect grip, library PPO meets the Phase 1 gate numbers in under 2 minutes of CPU. Learned policies can also lose a track between two nearby updates.
 
+### E2 — Reward hacking: survival, center, crash penalty
+
+- **Prediction (owner, before the run):** Survival tips the scale towards safe driving over fast driving, so I expect it to be a little slower. Center forces middle of road rather than the fastest line, so again slower. Crashes are already penalized because they stop progress; adding the crash penalty might make learning faster.
+- **Setup:** E1 setup with `--env crash_penalty=10`, `--env reward='"survival"'` or `--env reward='"center"'`, seeds 0–2, 300k steps each, 4 in parallel on 1 thread each. The progress arm reuses the E1 runs.
+- **Result:** [report](https://claude.ai/artifact/DniTgbXm6p2EWCJw2iRvqR). **Survival: 0/20 laps (all 3 seeds). Center: 0/20 laps (all 3 seeds).** The car learned to park: mean speed at the end of training 0.01–0.12 m/s, almost every training episode lasted the full 1,000 steps, and all 120 held-out attempts timed out before reaching 1% of the lap. Standing still earns the maximum return under survival (+1 × 1,000) and nearly the maximum under center. **Crash penalty: no faster.** First ≥ 95% held-out eval at 50k, 50k, 75k steps (plain progress: 75k, 50k, 50k). Early on it was more cautious: mean training speed around 50k steps was 8.5, 7.3, 4.0 m/s, against 9.4, 8.8, 9.2 for plain progress. It caught up by 150k steps (about 14 m/s). Final 95%, 100%, 100% at 0.95–0.96× pure pursuit, the same as plain progress.
+- **Explanation (owner, after the run):** _pending_
+- **Takeaway:** _pending_
+
 ## Gate check
 
 _pending_

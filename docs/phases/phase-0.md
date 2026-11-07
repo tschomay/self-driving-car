@@ -1,6 +1,6 @@
 # Phase 0 — Environment and loop
 
-- **Status:** in progress
+- **Status:** gate passed (2026-11-07)
 - **Goal / gate:** a reproducible Python env and a published training report, built on PPO on a toy task. **Gate:** a single command trains PPO to solve `CartPole-v1` (avg return ≥ 475) in under 10 min, and a report page with curve + GIF is viewable on your phone.
 - **Learn:** agent/env loop, returns, policy gradient intuition, what a learning curve tells you.
 - **Code:** `sdc/phase0/train.py` (training + held-out eval + GIF), `sdc/report.py` (report page), `sdc/phase0/gate.py` (gate), `tests/test_smoke.py`
@@ -70,12 +70,48 @@ Then the gate check.
 - **Explanation (owner, after the run):** (1) Cart drift is much longer-term than keeping the pole up, so the policy misses it. It's also less strict about keeping the pole up, so it has to play catch-up. (2) The racer will need to see through to the next corner or obstacle, if there is one.
 - **Takeaway:** γ sets which consequences the agent can learn about: about 1/(1−γ) steps ahead. Fast reflexes (the pole) need only a few steps; slow consequences (drift off the track) need a horizon as long as the drift. For Phase 1, the horizon must at least cover the time from seeing a corner to reaching it.
 
+### E5 — Why do the tuned settings solve it faster?
+
+- **Prediction (owner, before the run):** Tuned solves it in both fewer steps and fewer seconds than default. The learning rate is the change that matters most.
+- **Setup:** (a) `--preset default` vs. `--preset tuned`, seeds 0–2, 100k steps, evals every 2.5k steps, each run alone on 1 thread so wall-clock times are comparable. (b) Ablation: tuned with one change reverted to its default at a time (parallel envs 8→1 keeping 256 steps per update; steps per update 256→2,048; epochs 20→10; learning rate 1e-3 decaying → 3e-4 fixed; γ 0.98→0.99; λ 0.8→0.95), seeds 0–2, `--stop-when-solved`, measured in steps to first held-out eval ≥ 475.
+- **Result:** [report](https://claude.ai/artifact/Pmthm9FscNNvkGJiQAbHbY). Both 3/3 solved (500 held-out). Steps to first eval ≥ 475: default 20k, 15k, 20k; tuned 20k, 10k, 15k (slightly fewer). Seconds to that point: default 12.6–17.0 s; tuned 3.9–10.9 s (about 2× faster). Full 100k steps: 90–97 s vs. 52–59 s. Ablation, median steps to first eval ≥ 475 (3 seeds): tuned 15k; lr reverted to 3e-4 fixed **25k** (largest slowdown); γ 0.99 20k; 10 epochs 17.5k; 2,048 steps per update 17.5k; λ 0.95 15k; 1 env (same 256 steps per update) 10k. Ranges overlap with 3 seeds; only the learning rate stands out, modestly. Several early-stopped ablation policies scored 440–490 on the full 100-episode test: a 10-episode eval is noisy.
+- **Explanation (owner, after the run):** (1) Learn fast when there's a lot to learn, so broad strokes help; learn slowly when it's nuanced and you don't want big changes. (2) Parallelization helps, but not linearly.
+- **Takeaway:** Tuning bought about 2× in wall clock and a little in steps. Most of the step savings come from the decaying, larger learning rate; parallel envs buy seconds, not sample efficiency, and with diminishing returns (8 envs gave about 2×, not 8×). Measure both steps and seconds.
+
 ## Gate check
 
-- **Run:** _pending_
-- **Result vs. threshold:** _pending_
-- **Verdict:** _pending_
+- **Run:** 2026-11-07, `python -m sdc.phase0.gate`, commit 9d7d92d (tuned preset, seed 0, 100k steps, 1 torch thread) on the cloud container (4 CPU, no GPU). [Gate report](https://claude.ai/artifact/G2BK9kKgaFAofYUW8HPK5W).
+- **Result vs. threshold:**
+  - Held-out mean return **500.0 ± 0.0** over 100 episodes (reset seeds 10,000–10,099, never used in training) vs. ≥ 475: pass.
+  - Wall clock **70 s** for the whole command (imports, training, 100-episode eval, GIF, report; 55 s excluding Python start-up) vs. < 600 s: pass.
+  - Report with learning curve + GIF viewable on a phone: pass. The owner has read the E1–E5 reports on their phone; the gate report uses the same template, checked at 400 px wide in light and dark.
+  - Reproducible env: a fresh `uv venv` + `uv pip install -r requirements.txt` + `pytest` took 21 s and passed.
+- **Verdict:** **PASS.**
 
 ## Handoff to next phase
 
-_Pending._
+**Built and reusable in Phase 1**
+- `sdc/phase0/train.py`: SB3 PPO training with presets, `--set` overrides (JSON values, including `policy_kwargs` and `n_envs`), periodic held-out evals, `--stop-when-solved`, `--threads` (default 1), `--regif`.
+- `sdc/report.py`: self-contained phone report (summary rows grouped by label, learning curve, eval curve, GIFs, notes, configs). It is CartPole-flavored in places (eyebrow, "solved ≥ 475", 500 cap, "random ≈" floor); generalize those for the racer's metrics (lap completion, lap time).
+- `sdc/gifs.py`: annotated GIF frames (title, readout lines, progress bar, end card with reason). The racer needs its own readout (speed, progress, lap time, termination reason).
+- Workflow: 4 runs in parallel on 1 thread each fits the 4-CPU container well.
+
+**What the owner learned (in their words, condensed)**
+- Random actions don't cancel out; termination rules matter (E1).
+- With one good strategy, seeds converge; harder tasks will spread more (E2).
+- Too big a learning rate stops exploration and collapses permanently; bigger is faster until then (E3).
+- A 5-number linear policy can balance CartPole; reacting to spin (momentum) beats angle (E3b).
+- γ sets the horizon: short horizons keep the pole up but drift off the track; the racer must see to the next corner (E4).
+- Decaying learning rate: broad strokes early, fine changes late; parallelism helps, not linearly (E5).
+
+**Surprises worth remembering**
+- An untrained network's greedy policy can score 416 by luck (seed 0). Always compare against the stochastic training curve and several seeds.
+- The same seed with a different torch thread count gives a different run. Threads are pinned to 1.
+- A 10-episode eval can say "solved" when the 100-episode test says 440–490. Gate checks use ≥ 100 episodes.
+- The SB3 default learning rate (3e-4) wasn't the best here; 3e-3 was faster on all 3 seeds.
+
+**For Phase 1**
+- The owner writes their own minimal PPO (learner-owned code): scaffold with TODOs, explain each piece, owner dictates core logic. The SB3 runs here are the benchmark to compare against.
+- Pick γ so the horizon covers the time from seeing a corner to reaching it (E4).
+- Report both steps and seconds; check several seeds before trusting a config.
+- No open questions or deferred decisions from Phase 0.

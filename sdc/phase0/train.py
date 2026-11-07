@@ -295,6 +295,7 @@ def main():
     p.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
                    help="override a PPO kwarg, e.g. --set learning_rate=3e-3 --set gamma=0.9")
     p.add_argument("--stop-when-solved", action="store_true")
+    p.add_argument("--eval-every", type=int, default=5_000, help="steps between held-out evals")
     p.add_argument("--label", default=None)
     p.add_argument("--threads", type=int, default=1, help="torch threads (fixed so seeds reproduce)")
     p.add_argument("--regif", metavar="RUN_DIR", help="only re-record RUN_DIR's rollout GIF")
@@ -311,6 +312,7 @@ def main():
             k, v = kv.split("=", 1)
             overrides[k] = json.loads(v)
         m = train(a.preset, a.seed, a.steps, out, overrides, stop_when_solved=a.stop_when_solved, label=a.label,
+                  eval_every=a.eval_every,
                   threads=a.threads)
     fe = m["final_eval"]
     print(f"{m['label']}: held-out mean return {fe['mean']:.1f} ± {fe['std']:.1f} over {fe['episodes']} eps"

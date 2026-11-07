@@ -87,6 +87,13 @@ Then the gate check.
 - **Noise (agent's answer to the owner's question):** PPO's policy outputs a *mean* steering and throttle plus a learned spread (standard deviation). In training each action is drawn at random around the mean: that's how it explores. Test laps use the mean only. At the end of training the spread was about 0.5 (on the −1…1 action scale) for every γ (0.43–0.63), so γ 0.9 wasn't noisier. It just drove with no margin, so the same noise pushed it off.
 - **Takeaway:** The horizon has to cover how far ahead consequences arrive. Here that's braking distance: about 1.5 s from top speed. A 1 s planner can react to what its rays already show, but it can't brake early for the tightest corners. And it learns no safety margin, because a crash beyond its horizon barely counts. 3 s was enough; longer bought nothing.
 
+### E5 — Your own PPO vs. the library
+
+- **Code:** `sdc/phase1/my_ppo.py`. Plumbing (agent): networks, rollouts, bootstrapping at the time limit, minibatch loop, Adam, evaluation and metrics. Three OWNER TODOs: `compute_advantages`, `policy_loss`, `value_loss`. Known-answer tests in `tests/test_my_ppo.py` skip until each piece exists.
+- **Plumbing check (agent, 2026-11-07):** with throwaway reference stand-ins for the three TODOs, kept in the agent's scratchpad and never committed, the plumbing reached 100% held-out at 300k steps in 82 s (seed 0). So once the owner's pieces are in, any gap against SB3 comes from them.
+- **Progress:** _TODO 1 (advantages): pending · TODO 2 (policy loss): pending · TODO 3 (value loss): pending_
+- **Prediction / result / explanation:** _after the TODOs_
+
 ## Gate check
 
 _pending_

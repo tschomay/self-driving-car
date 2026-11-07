@@ -60,6 +60,19 @@ Then the gate check.
 - **Explanation (owner, after the run):** Nothing in those two rewards progress. And for the crash penalty: once the car learns to drive well, it isn't going to crash anyway, so it reaches the same end result.
 - **Takeaway:** An agent optimizes exactly what you reward, not what you meant. "Don't crash" and "stay centered" both have a trivial optimum: don't move. Penalties shape the early, clumsy phase of learning (here: more caution, slower to speed up), but once the policy rarely triggers them they stop mattering. Reward what you actually want (progress), and add penalties only for behavior the main reward fails to discourage.
 
+### E3 — One track vs. many
+
+- **Prediction (owner, before the run):** One track might not be enough variation (e.g., it might never have a right turn), so that might not work. 10 tracks will probably do well enough, but not as good as E1.
+- **Setup:** E1 setup with `--env tracks='[0]'` (1 track) or `--env tracks='[0,1,...,9]'` (10 tracks), seeds 0–2, 300k steps. The fresh-track arm reuses the E1 runs. Each policy also gets one lap per own training track.
+- **Result:** [report](https://claude.ai/artifact/BXZQg1M1HpqMaD4wHL6aRg).
+  - **1 track:** 100% on its own track (all seeds) and the fastest there: 20.3–20.5 s, against 21.0–21.2 s for the E1 policies and 22.3 s for pure pursuit. **Held-out: 55%, 65%, 70%.**
+  - Track 0 runs clockwise (mostly right-hand corners; left-hand bends on only 4% of it, none tighter than 17 m). On the 9 counter-clockwise held-out tracks, 16 of 27 attempts failed; on the 11 clockwise ones, 6 of 33.
+  - Overfitting over time: seeds 1 and 2 hit 100% held-out at 75k steps, then slid to 65–70% by 300k while staying at 100% on track 0.
+  - Some failures were timeouts: on unfamiliar corners the car crawled or stopped.
+  - **10 tracks:** 100% held-out (all seeds) at 0.97× pure pursuit (E1: 0.94–0.96×). On its own 10 tracks it averaged 21.1–21.3 s, slower than the E1 policies on those same tracks (20.6–20.9 s).
+- **Explanation (owner, after the run):** Over fitting. And not enough exposure to new situations to learn new tricks.
+- **Takeaway:** The policy learns the situations it's trained on, nothing more. One track gives a specialist: fastest at home, lost on mirror-image corners, and getting worse elsewhere the longer it trains (overfitting). Variety in training is what makes a driver generalize, and more variety (fresh tracks) beat 10 fixed tracks even on those 10. Judge generalization on held-out tracks, never on the training ones.
+
 ## Gate check
 
 _pending_

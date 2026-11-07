@@ -99,7 +99,7 @@ def lap_gif(track_seed: int, traj: list[dict], row: dict, label: str, path: str 
         if k % every and not last:
             continue
         lines = [f"time {s['t'] * sim.DT:5.1f} s   ·   lap {100 * s['progress']:3.0f}% done",
-                 f"held-out track {track_seed}, start line, standstill, real speed",
+                 f"{'held-out' if track_seed >= trk.HELD_OUT_BASE else 'training'} track {track_seed}, start line, standstill, real speed",
                  f"speed {s['v'] * 3.6:3.0f} km/h   ·   steer {s['steer']:+.2f}   ·   throttle {s['throttle']:+.2f}"]
         end, good = None, True
         if last:

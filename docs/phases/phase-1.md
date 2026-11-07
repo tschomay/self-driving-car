@@ -37,7 +37,9 @@ Each experiment is predict → run → explain. Runs are 1–5 min on 1 thread, 
 | E4 | How far ahead must the agent look to brake for corners? | γ ∈ {0.9, 0.97, 0.99, 0.995} (horizon about 1, 3, 10, 20 s) | Discounting and braking horizon (follows Phase 0's E4) |
 | E5 | Can your own PPO match the library's? | Owner-written PPO (learner-owned, scaffolded piece by piece) on the E1 setup, against the SB3 result | How PPO works inside: rollouts, advantages (GAE), clipped objective, value loss |
 
-Then the gate check. Plan: run it with the owner's own PPO, and report SB3 alongside.
+Then the gate check.
+
+**Decision (owner, 2026-11-07, after E1):** the Phase 1 gate counts only for the owner's own PPO. SB3 already meets the gate numbers (E1), so the sim and gate stay unchanged, and E2–E4 run quickly on SB3. E5 (own PPO) is the real hurdle. The gate report shows SB3 alongside for reference.
 
 ## Experiments
 

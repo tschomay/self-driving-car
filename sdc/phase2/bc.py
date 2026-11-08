@@ -8,6 +8,7 @@ Data: `cars` cars on random training tracks (seeds < 10000), `steps` steps each.
 step we record the camera image, the speed, and the expert's action for that state (the
 expert itself reads rays). The car then executes the expert's action plus Gaussian noise
 of std `noise` (0 = the expert drives itself). Labels never contain the noise.
+With `shift`, each training image is slid by a random ±shift pixels every time it is used (DrQ-style).
 
 Training: the network is SB3's PPO camera policy (NatureCNN + actor MLP), so a cloned
 policy can be fine-tuned with PPO afterwards (`python -m sdc.phase2.train --init <dir>/model.zip`).
@@ -28,7 +29,7 @@ from pathlib import Path
 import numpy as np
 
 from sdc.phase2.train import ENV_DEFAULTS, gifs, policy_of
-from sdc.racer import evaluate, pursuit, sim
+from sdc.racer import camera, evaluate, pursuit, sim
 
 EXPERT = "runs/p1-e1-s1/model.zip"   # Phase 1 SB3 PPO on rays: 100% held-out, 0.94× pure pursuit
 
@@ -55,7 +56,7 @@ def collect(expert, cars: int, steps: int, noise: float, seed: int):
 
 def train(seed: int = 0, out: str | Path = "runs/p2-bc", noise: float = 0.0, cars: int = 16, steps: int = 4000,
           epochs: int = 20, lr: float = 3e-4, batch: int = 256, init_std: float = 0.5, label: str | None = None,
-          expert_path: str = EXPERT, threads: int = 1, gif: bool = True) -> dict:
+          expert_path: str = EXPERT, threads: int = 1, gif: bool = True, shift: int = 0) -> dict:
     import torch
     from stable_baselines3 import PPO
 
@@ -85,6 +86,7 @@ def train(seed: int = 0, out: str | Path = "runs/p2-bc", noise: float = 0.0, car
         return pol.action_net(pol.mlp_extractor.forward_actor(feats))
 
     Xt, Vt, Yt = torch.from_numpy(X), torch.from_numpy(V), torch.from_numpy(Y)
+    aug_rng = np.random.default_rng(seed + 7)
     n = len(Xt)
     hist = []
     t1 = time.perf_counter()
@@ -94,7 +96,8 @@ def train(seed: int = 0, out: str | Path = "runs/p2-bc", noise: float = 0.0, car
         pol.train()
         for i in range(0, n, batch):
             j = perm[i:i + batch]
-            loss = (mean_action(Xt[j], Vt[j]) - Yt[j]).pow(2).mean()
+            xb = Xt[j] if not shift else torch.from_numpy(camera.random_shift(X[j.numpy()], shift, aug_rng))
+            loss = (mean_action(xb, Vt[j]) - Yt[j]).pow(2).mean()
             opt.zero_grad()
             loss.backward()
             opt.step()
@@ -112,7 +115,7 @@ def train(seed: int = 0, out: str | Path = "runs/p2-bc", noise: float = 0.0, car
     final = evaluate.run_laps(policy_of(model, env_cfg))
     m = dict(label=label or out.name, preset="bc", seed=seed, threads=threads, n_envs=cars,
              ppo=dict(method="behavior cloning", epochs=epochs, lr=lr, batch=batch, init_std=init_std),
-             env=dict(noise=noise, expert=expert_path, samples=int(n), cars=cars, steps_per_car=steps),
+             env=dict(noise=noise, shift=shift, expert=expert_path, samples=int(n), cars=cars, steps_per_car=steps),
              total_timesteps=int(n), trained_timesteps=int(n), train_wall_s=round(collect_s + train_s, 1),
              collect_wall_s=round(collect_s, 1), data_crashes=crashes, bc_epochs=hist, episodes=[], evals=[],
              final_eval=final, baseline=baseline, compare=evaluate.compare(final, baseline))
@@ -133,9 +136,10 @@ def main():
     p.add_argument("--init-std", type=float, default=0.5)
     p.add_argument("--label", default=None)
     p.add_argument("--expert", default=EXPERT)
+    p.add_argument("--shift", type=int, default=0, help="DrQ random shift of training images, ±pixels")
     a = p.parse_args()
     m = train(a.seed, a.out, a.noise, a.cars, a.steps, a.epochs, a.lr, init_std=a.init_std, label=a.label,
-              expert_path=a.expert)
+              expert_path=a.expert, shift=a.shift)
     fe = m["final_eval"]
     print(f"{m['label']}: held-out completion {fe['completion']:.0%}, mean lap {fe['mean_lap_time']} s, "
           f"ratio {m['compare']['lap_time_ratio']}; {m['trained_timesteps']} expert samples, "

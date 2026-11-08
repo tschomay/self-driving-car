@@ -28,7 +28,7 @@ PRESETS: dict[str, dict] = {
     # Phase 1's "base" PPO settings, with SB3's default image network (NatureCNN).
     "base": dict(n_envs=8, ppo=dict(n_steps=256, batch_size=256)),
 }
-ENV_DEFAULTS = dict(tracks="random", reward="progress", crash_penalty=0.0, max_steps=1000, n_frames=1, speed=True)
+ENV_DEFAULTS = dict(tracks="random", reward="progress", crash_penalty=0.0, max_steps=1000, n_frames=1, speed=True, shift=0)
 CAM_KEYS = ("n_frames", "speed")
 
 

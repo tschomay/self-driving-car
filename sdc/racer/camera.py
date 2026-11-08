@@ -105,3 +105,23 @@ class FrameStack:
     def push(self, imgs):
         self.frames = np.concatenate([self.frames[:, 1:], imgs[:, None]], axis=1)
         return self.frames
+
+
+def random_shift(imgs: np.ndarray, pad: int, rng: np.random.Generator) -> np.ndarray:
+    """DrQ-style augmentation: slide each image by a random -pad..pad pixels in x and y.
+
+    imgs (..., H, W); each leading index gets its own offset. The border is filled by
+    repeating edge pixels, as in DrQ (Kostrikov et al., 2020).
+    """
+    if pad <= 0:
+        return imgs
+    lead = imgs.shape[:-2]
+    flat = imgs.reshape(-1, *imgs.shape[-2:])
+    h, w = flat.shape[1:]
+    padded = np.pad(flat, ((0, 0), (pad, pad), (pad, pad)), mode="edge")
+    dy = rng.integers(0, 2 * pad + 1, len(flat))
+    dx = rng.integers(0, 2 * pad + 1, len(flat))
+    rows = dy[:, None] + np.arange(h)[None]                      # (N, H)
+    cols = dx[:, None] + np.arange(w)[None]                      # (N, W)
+    out = padded[np.arange(len(flat))[:, None, None], rows[:, :, None], cols[:, None, :]]
+    return out.reshape(*lead, h, w)

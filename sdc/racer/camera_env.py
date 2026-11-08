@@ -3,6 +3,7 @@
 Observation (a dict, for SB3's MultiInputPolicy):
   image  (n_frames, 64, 64) uint8, the last n_frames camera images, newest last
   speed  (1,) float32, speed / V_MAX   (only if speed=True)
+With shift > 0, every training image is slid by a random ±shift pixels (DrQ-style augmentation).
 
 Everything else (tracks, physics, reward, episode ends) is the Phase 1 racer.
 `CameraPolicy` wraps a trained model as a policy(batch) for evaluate.run_laps.
@@ -25,8 +26,10 @@ def obs_space(n_frames: int, speed: bool) -> spaces.Dict:
 
 
 class CameraVecEnv(VecEnv):
-    def __init__(self, n_envs: int, n_frames: int = 1, speed: bool = True, **sim_kwargs):
+    def __init__(self, n_envs: int, n_frames: int = 1, speed: bool = True, shift: int = 0, **sim_kwargs):
         self.batch = sim.RacerBatch(n_envs, **sim_kwargs)
+        self.shift = shift   # training-time random shift (DrQ), pixels; lap evaluation never shifts
+        self._shift_rng = np.random.default_rng(sim_kwargs.get("seed", 0) + 7)
         self.cam = camera.Camera()
         self.n_frames, self.use_speed = n_frames, speed
         self.stack = camera.FrameStack(n_envs, n_frames)
@@ -39,9 +42,12 @@ class CameraVecEnv(VecEnv):
             o["speed"] = (np.asarray(v, float) / sim.V_MAX).reshape(-1, 1).astype(np.float32)
         return o
 
+    def _views(self, b):
+        return camera.random_shift(self.cam.batch_views(b), self.shift, self._shift_rng)
+
     def reset(self):
         self.batch.reset()
-        imgs = self.cam.batch_views(self.batch)
+        imgs = self._views(self.batch)
         for i in range(self.num_envs):
             self.stack.reset(i, imgs[i])
         return self._obs(self.stack.frames, self.batch.v)
@@ -53,14 +59,15 @@ class CameraVecEnv(VecEnv):
         _, r, term, trunc, infos = self.batch.step(self._actions)
         done = term | trunc
         b = self.batch
-        imgs = self.cam.batch_views(b)
+        imgs = self._views(b)
         if done.any():
             # finished cars were already reset onto a new episode: render their last view for SB3's
             # bootstrapping, then restart their frame stack from the new episode's first image
             last = self.stack.frames.copy()
             for i in np.flatnonzero(done):
                 fs = infos[i]["final_state"]
-                term_img = self.cam.view(infos[i]["track"], fs["pos"], fs["heading"])
+                term_img = camera.random_shift(self.cam.view(infos[i]["track"], fs["pos"], fs["heading"]),
+                                               self.shift, self._shift_rng)
                 last[i] = np.concatenate([last[i, 1:], term_img[None]])
                 infos[i]["terminal_observation"] = {k: v[0] for k, v in
                                                     self._obs(last[i:i + 1], [fs["v"]]).items()}

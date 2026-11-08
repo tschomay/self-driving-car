@@ -47,3 +47,16 @@ def test_camera_vec_env_frames_and_terminal_obs():
     assert infos[0]["terminal_observation"]["image"].shape == (3, 64, 64)
     assert np.all(o["image"][:, 0] == o["image"][:, 2])        # new episode: stack restarted
     assert not np.array_equal(infos[0]["terminal_observation"]["image"][2], o["image"][0, 2])
+
+
+def test_random_shift():
+    rng = np.random.default_rng(0)
+    imgs = np.arange(2 * 3 * 8 * 8, dtype=np.uint8).reshape(2, 3, 8, 8)
+    assert camera.random_shift(imgs, 0, rng) is imgs
+    out = camera.random_shift(imgs, 2, rng)
+    assert out.shape == imgs.shape and out.dtype == imgs.dtype
+    # each image is a translated copy: some 4x4 window of the original reappears
+    for k in range(6):
+        a, b = imgs.reshape(6, 8, 8)[k], out.reshape(6, 8, 8)[k]
+        assert any(np.array_equal(a[2:6, 2:6], b[2 + dy:6 + dy, 2 + dx:6 + dx])
+                   for dy in range(-2, 3) for dx in range(-2, 3))

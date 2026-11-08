@@ -133,6 +133,17 @@ Then the gate check.
 - A policy can lose a track between two nearby updates (E1 seed 0). Gate checks use the final policy, not the best eval.
 - Held-out track 10000 (a 6.9 m corner 40% into the lap) is the hardest corner in the set and a recurring failure point (E1, E3, E4).
 
+**Post-gate: how close to optimal is 0.96×?** (owner's question, 2026-11-08) `python -m sdc.racer.min_lap <tracks>` estimates the fastest possible lap on each held-out track: optimized racing line plus speed profile, same grip, acceleration and braking limits, standing start.
+
+| | Mean lap, 20 held-out tracks | vs. estimated optimum |
+|---|---|---|
+| estimated optimum (best line) | 18.90 s | 1.00× |
+| best possible on the centerline | 20.14 s | 1.07× |
+| pure pursuit | 20.32 s | 1.08× |
+| owner's PPO (gate) | 19.54 s | **1.03×** |
+
+So about 3% is left. The estimate is good only to a few percent: on one track the policy beat it by 5.5%, because of the sim's 0.1 s steps and local optima in the line search. Per track, the PPO was 3.8% off the estimate (median); the worst was track 10017, at 8%.
+
 **For Phase 2**
 - Phase-entry decision (roadmap): how long runs survive ephemeral sessions (checkpoint-and-push vs. detached Modal jobs). Pixels are sample-hungry, so expect runs 10–100× longer than 300k ray steps. A Modal API token is requested via the credential form only if needed.
 - Owner-written CNN encoder (learner-owned): scaffold with TODOs, the owner dictates the layers. The Phase 1 ray policy is the expert for behavior cloning and the benchmark (Phase 2 gate: ≥ 90% of its held-out completion).

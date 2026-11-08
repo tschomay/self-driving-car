@@ -39,7 +39,12 @@ Then the gate check: the owner's CNN on the 20 held-out tracks, plus a saliency 
 ### E1 — Pixels vs. rays
 
 - **Prediction (owner, before the run):** (1) At 300k steps: none of the 20. It'll just start learning how to control the car. (2) Yes, a longer run closes the gap, maybe around 1M steps. (Added after seeing the 64×64 sample, before any results:) Corners are less resolved, which looks like more noise in training, so it might learn more caution; if it completes the course it'll be slower.
-- **Setup:** `python -m sdc.phase2.train --seed S --steps 2000000 --out runs/p2-e1-sS --label "PPO pixels (NatureCNN)"` for S = 0, 1, 2, 1 torch thread each, in parallel. 1 frame plus speed. Phase 1 base PPO settings (8 cars, 256 steps per update, else SB3 defaults). Held-out eval every 50k steps. Compared with Phase 1 E1 (rays, same settings).
+- **Setup:** `python -m sdc.phase2.train --seed S --steps 2000000 --out runs/p2-e1-sS --label "PPO pixels (NatureCNN)"` for S = 0, 1, 2, 1 torch thread each, in parallel. 1 frame plus speed. Phase 1 base PPO settings (8 cars, 256 steps per update, else SB3 defaults). Held-out eval every 50k steps. Compared with Phase 1 E1 (rays, same settings), re-run here: it reproduced 95%, 100%, 100% exactly. Wall clock 1.5–1.7 h per pixel run (≈340 steps/s against ≈3,300 for rays).
+- **Result:** [report](https://claude.ai/artifact/7yPRhvTsiU6JGNTySK3Emf).
+  - **At 300k steps: 0%, 0%, 60% held-out** (seeds 0, 1, 2). Rays: 95–100% by 50–75k.
+  - **At 2M steps: 0/20 on every seed.** 55 of 60 attempts left the road, 5 timed out, 7–14% of the lap on average. Best moment of any seed: 70% (seed 2 at 250k), then back to 0%. Seeds 0 and 1 never passed 15%.
+  - **Training got worse over time.** Mean return per training episode at 100k: 50, 37, 64; at 2M: 6, 10, 9. Early: about 8 m/s and nearly always crashing. Later, seeds 0 and 2 often sat still (uncrashed episodes averaged < 0.1 m/s); seed 1 crashed within about 4 s every episode.
+  - **Not a bug (agent's checks).** A pipeline check passed: camera, frame handling and lap evaluation work end to end (details held back until E3, since they give away its answer). A diagnostic with separate actor and critic CNNs (SB3 shares one by default) did no better: 0–20% through 900k steps, seed 0. Gradient check on the final models: the critic's gradient is small, so it isn't swamping the policy at the end.
 
 ## Gate check
 

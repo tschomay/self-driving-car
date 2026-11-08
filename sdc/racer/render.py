@@ -109,6 +109,27 @@ def lap_gif(track_seed: int, traj: list[dict], row: dict, label: str, path: str 
                 end, good = f"Off the road at {s['t'] * sim.DT:.1f} s ({100 * row['laps']:.0f}% of the lap)", False
             else:
                 end, good = f"Timed out at {s['t'] * sim.DT:.0f} s ({100 * row['laps']:.0f}% of the lap)", False
-        frames.append(annotate(p.frame(s, trail), label, lines, s["progress"], end=end, end_good=good,
+        img = p.frame(s, trail)
+        if "image" in s:
+            img = camera_inset(img, s["image"])
+        frames.append(annotate(img, label, lines, s["progress"], end=end, end_good=good,
                                end_y=30 + PAD_TOP + SIZE // 2 - 32))
     save_gif(frames, path, frame_ms=1000 * sim.DT * every)
+
+
+def camera_inset(frame: np.ndarray, cam_img: np.ndarray, scale: int = 2) -> np.ndarray:
+    """Paste the car's 64×64 camera image (enlarged, labelled) into the bottom-right corner."""
+    from sdc.gifs import _font
+
+    img = Image.fromarray(frame)
+    c = Image.fromarray(cam_img).resize((cam_img.shape[1] * scale, cam_img.shape[0] * scale), Image.NEAREST)
+    w, h = c.size
+    x, y = img.width - w - 8, img.height - h - 8
+    d = ImageDraw.Draw(img)
+    d.rectangle([x - 3, y - 21, x + w + 2, y + h + 2], fill=(255, 255, 255))
+    d.text((x, y - 19), "what the car sees", fill=(23, 32, 43), font=_font(13))
+    img.paste(c.convert("RGB"), (x, y))
+    from sdc.racer.camera import CAR_PIXEL   # mark where the car sits in its own view
+    cy, cx = y + CAR_PIXEL[0] * scale, x + CAR_PIXEL[1] * scale
+    d.polygon([(cx, cy - 5), (cx - 4, cy + 4), (cx + 4, cy + 4)], fill=CAR)
+    return np.asarray(img)

@@ -79,7 +79,10 @@ Then the gate check: the owner's CNN on the 20 held-out tracks, plus a saliency 
 ### E4 — Does shaking the picture help?
 
 - **Prediction (owner, before the run):** Yes to both (shifts help PPO from scratch, and they rescue the clean copy).
-- **Setup:** DrQ-style random shift (`camera.random_shift`): each training image slid by a random −3…+3 pixels in x and y (±1.9 m), edges filled by repeating edge pixels; lap evaluation never shifts. **A:** PPO from scratch, `--set learning_rate=0.00003 --env shift=3`, seeds 0–2, 1M steps; compared with E1b's learning rate 3e-5 runs (seed 2 added for this comparison). **B:** E3's clean copy with `--shift 3` (a fresh shift every time an image is used), seeds 0–2; compared with E3 A.
+- **Setup:** DrQ-style random shift (`camera.random_shift`): each training image slid by a random −3…+3 pixels in x and y (±1.9 m), edges filled by repeating edge pixels; lap evaluation never shifts. **A:** PPO from scratch, `--set learning_rate=0.00003 --env shift=3`, seeds 0–2, 1M steps; compared with E1b's learning rate 3e-5 runs (seed 2 added for this comparison). **B:** E3's clean copy with `--shift 3` (a fresh shift every time an image is used), seeds 0–2; compared with E3 A. Wall clock: A about 57 min per run; B about 7 min.
+- **Result:** [report](https://claude.ai/artifact/HiYRCWVqQtofHQ6oWrxBYt). **Shifts hurt both.**
+  - **PPO from scratch:** 0%, 0%, 0% held-out at 1M with shifts vs. 0%, 5%, 5% without. Training return (100k-step windows, 200k → 1M): without 25 → 77, 24 → 73, 21 → 77; with 19 → 39, 21 → 34, 21 → 37. Shifted cars crashed in essentially every training episode.
+  - **Clean copy:** 0%, 0%, 0% with shifts vs. 20%, 10%, 25% without. Copy error ended about 10× higher (MSE 0.075–0.078 vs. 0.007): it couldn't fit the expert even on its own training images.
 
 ## Gate check
 

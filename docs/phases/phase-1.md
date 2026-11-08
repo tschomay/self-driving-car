@@ -131,7 +131,7 @@ Then the gate check.
 - The first sim was too easy: nearly flat-out driving. It was tightened before any experiment. Even so, SB3 met the gate numbers in about 85 s. Perfect grip plus rays is an easy MDP.
 - RL beats the map-reading baseline by taking a racing line (about 1.2 m inside in corners).
 - A policy can lose a track between two nearby updates (E1 seed 0). Gate checks use the final policy, not the best eval.
-- Held-out track 10000 (a 6.9 m corner 40% into the lap) is the hardest corner in the set; most failures across experiments happened there.
+- Held-out track 10000 (a 6.9 m corner 40% into the lap) is the hardest corner in the set and a recurring failure point (E1, E3, E4).
 
 **For Phase 2**
 - Phase-entry decision (roadmap): how long runs survive ephemeral sessions (checkpoint-and-push vs. detached Modal jobs). Pixels are sample-hungry, so expect runs 10–100× longer than 300k ray steps. A Modal API token is requested via the credential form only if needed.

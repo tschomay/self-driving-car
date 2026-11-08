@@ -1,11 +1,11 @@
 # Phase 1 — 2D top-down racer with ray sensors
 
-- **Status:** in progress (started 2026-11-07)
+- **Status:** gate passed (2026-11-08); started 2026-11-07
 - **Goal / gate:** our own minimal vectorized sim: kinematic bicycle-model physics with perfect traction, procedural closed tracks, 7–15 ray-cast "lidar" distances plus speed as the observation, and an MLP policy. **Gate:** the RL policy completes ≥ 95% of laps on 20 held-out tracks with mean lap time ≤ 1.1× the pure-pursuit baseline.
 - **Learn:** reward shaping (progress vs. speed vs. penalties), reward hacking, episode design, PPO hyperparameters, overfitting to one track vs. generalizing.
-- **Code:** `sdc/racer/` (sim, tracks, pure-pursuit baseline, lap evaluation, rendering, SB3 adapter), `sdc/phase1/train.py` (training + held-out lap eval + GIFs), `sdc/phase1/report.py` (report page), `tests/test_racer.py`
+- **Code:** `sdc/racer/` (sim, tracks, pure-pursuit baseline, lap evaluation, rendering, SB3 adapter), `sdc/phase1/train.py` (training + held-out lap eval + GIFs), `sdc/phase1/report.py` (report page), `sdc/phase1/my_ppo.py` (owner's PPO), `sdc/phase1/gate.py` (gate), `tests/test_racer.py`, `tests/test_my_ppo.py`
 - **Setup:** same as Phase 0: `uv venv .venv -p 3.12 && source .venv/bin/activate && uv pip install -r requirements.txt`
-- **How to reproduce the gate:** _to be added_
+- **How to reproduce the gate:** `python -m sdc.phase1.gate` (about 2 min)
 - **Phase-entry decisions:** none deferred to Phase 1 in the roadmap. Phase 0's previous gate: passed (2026-11-07).
 
 ### The racer (what the agent sees and controls)
@@ -104,8 +104,36 @@ Then the gate check.
 
 ## Gate check
 
-_pending_
+- **Run:** 2026-11-08, `python -m sdc.phase1.gate`, commit cb2c8ca. The owner's PPO (`sdc/phase1/my_ppo.py`, textbook clipping), seed 0, 301k steps, 1 torch thread, cloud container (4 CPU, no GPU). [Gate report](https://claude.ai/artifact/C818gfNQHoKFKypcUYYPeM).
+- **Result vs. threshold:**
+  - Held-out lap completion **20/20 = 100%** (tracks 10000–10019, never trained on) vs. ≥ 95%: pass.
+  - Mean lap time **19.54 s** vs. pure pursuit 20.32 s = **0.962×** vs. ≤ 1.1×: pass.
+  - Whole command 108 s (95 s training). It reproduced E5's textbook seed 0 exactly (same lap times), so pinned seeds and threads hold.
+  - For reference, SB3 PPO (E1): 95%, 100%, 100% at 0.94–0.96×.
+- **Verdict:** **PASS.**
 
 ## Handoff to next phase
 
-_pending_
+**Built and reusable in Phase 2**
+- `sdc/racer/`: batched numpy racer (`sim.py`), procedural tracks (`track.py`, held-out seeds 10000–10019), pure-pursuit baseline (`pursuit.py`), lap evaluation (`evaluate.py`), top-down rendering and lap GIFs (`render.py`), and the SB3 adapter (`vec_env.py`). Phase 2 needs a camera-image observation. `render.Painter` already draws the track top-down; an ego-centred low-res crop is the natural next step.
+- `sdc/phase1/my_ppo.py`: the owner's PPO (GAE, textbook clipped loss, MSE value loss). Its plumbing takes any (B, obs_dim) observation; Phase 2 swaps the MLP actor and critic for the owner's CNN encoder.
+- `sdc/phase1/train.py` (SB3) and `sdc/phase1/report.py` (phone report: completion, lap-time ratio, learning and eval curves, lap GIFs, per-track table).
+- Speeds: sim about 13k steps/s per core; PPO (both) about 3.5k steps/s on 1 thread; 300k steps ≈ 85 s.
+
+**What the owner learned (in their words, condensed)**
+- The reward is metres per step, so it is optimizing for speed (E1).
+- Survival and center rewards: nothing in them rewards progress, so the car parks. A crash penalty stops mattering once the car drives well (E2).
+- One track overfits; variety teaches new tricks (E3).
+- A 1 s horizon mostly works because the rays see 40 m; noise pushes a no-margin policy off the road (E4).
+- PPO's clip must not block undoing mistakes, or the policy drifts away from a good solution (E5).
+
+**Surprises worth remembering**
+- The first sim was too easy: nearly flat-out driving. It was tightened before any experiment. Even so, SB3 met the gate numbers in about 85 s. Perfect grip plus rays is an easy MDP.
+- RL beats the map-reading baseline by taking a racing line (about 1.2 m inside in corners).
+- A policy can lose a track between two nearby updates (E1 seed 0). Gate checks use the final policy, not the best eval.
+- Held-out track 10000 (a 6.9 m corner 40% into the lap) is the hardest corner in the set; most failures across experiments happened there.
+
+**For Phase 2**
+- Phase-entry decision (roadmap): how long runs survive ephemeral sessions (checkpoint-and-push vs. detached Modal jobs). Pixels are sample-hungry, so expect runs 10–100× longer than 300k ray steps. A Modal API token is requested via the credential form only if needed.
+- Owner-written CNN encoder (learner-owned): scaffold with TODOs, the owner dictates the layers. The Phase 1 ray policy is the expert for behavior cloning and the benchmark (Phase 2 gate: ≥ 90% of its held-out completion).
+- Keep γ ≥ 0.97 (E4) and a fresh track every episode (E3). Keep the progress reward (E2).

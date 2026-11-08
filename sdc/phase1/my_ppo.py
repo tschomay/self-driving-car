@@ -48,8 +48,26 @@ def compute_advantages(rewards, values, dones, last_values, gamma, lam):
       dones[t, i]    1.0 if car i's episode ended at step t (the next obs is a fresh episode)
       last_values[i] V(obs) after the final step, to value what comes after the rollout
     Returns advantages, shape (T, B).
+
+    Owner's choice (2026-11-08): option c, the blend (GAE), "for the reasons stated in the
+    weaknesses of each" of pure Monte Carlo (noisy) and one-step (only as good as the critic).
+    Episode ends: "the sum needs to restart in that case - this run isn't punished for past
+    failure. But the weights will be."
     """
-    raise NotImplementedError("OWNER TODO 1")
+    T = rewards.shape[0]
+    advantages = torch.zeros_like(rewards)
+    running = torch.zeros_like(last_values)  # blended advantage of the step after t, built backwards
+    for t in reversed(range(T)):
+        next_value = last_values if t == T - 1 else values[t + 1]
+        alive = 1.0 - dones[t]  # 0 where the episode ended at t: the next state belongs to a new episode
+        # option b, one step: this reward + critic's guess for the next state - critic's guess now.
+        # No guess about the next state across an episode end (the sum restarts).
+        surprise = rewards[t] + gamma * next_value * alive - values[t]
+        # option c: add the later steps' surprises, each faded by gamma*lam per step
+        # (lam = 0 -> pure b, lam = 1 -> pure a). Restart the sum at an episode end.
+        running = surprise + gamma * lam * alive * running
+        advantages[t] = running
+    return advantages
 
 
 # ---------------------------------------------------------------------------------------

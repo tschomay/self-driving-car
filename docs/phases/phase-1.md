@@ -91,7 +91,7 @@ Then the gate check.
 
 - **Code:** `sdc/phase1/my_ppo.py`. Plumbing (agent): networks, rollouts, bootstrapping at the time limit, minibatch loop, Adam, evaluation and metrics. Three OWNER TODOs: `compute_advantages`, `policy_loss`, `value_loss`. Known-answer tests in `tests/test_my_ppo.py` skip until each piece exists.
 - **Plumbing check (agent, 2026-11-07):** with throwaway reference stand-ins for the three TODOs, kept in the agent's scratchpad and never committed, the plumbing reached 100% held-out at 300k steps in 82 s (seed 0). So once the owner's pieces are in, any gap against SB3 comes from them.
-- **Progress:** _TODO 1 (advantages): pending · TODO 2 (policy loss): pending · TODO 3 (value loss): pending_
+- **Progress:** TODO 1 (advantages): done 2026-11-08. Owner chose the blend (GAE): Monte Carlo is too noisy and one-step is only as good as the critic. The sum restarts at an episode end ("this run isn't punished for past failure, but the weights will be"). 4/4 known-answer tests pass. _TODO 2 (policy loss): pending · TODO 3 (value loss): pending_
 - **Prediction / result / explanation:** _after the TODOs_
 
 ## Gate check

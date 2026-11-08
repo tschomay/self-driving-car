@@ -61,6 +61,21 @@ Then the gate check: the owner's CNN on the 20 held-out tracks, plus a saliency 
 - **Explanation (owner, after the run):** Smaller step allows it to learn details without overshooting. First it needs to learn how to recognize the track, and judge position and speed, then how to drive, then how to drive well. Too big of a step means the early stuff gets blown out rather than locked in. Slow to learn for the same reason: there's a lot more to learn.
 - **Takeaway:** A pixel network has to build its perception while the policy on top of it is changing. A step size that was fine for 12 ray numbers wrecks that half-built perception; a 10× smaller step keeps it and learns steadily, but slowly. The learning rate fixes the collapse, not the speed of learning.
 
+### E3 — Copy the expert, or learn from scratch?
+
+- **Prediction (owner, before the run):** My intuition is limited here, but I think A will struggle with what to do if it isn't on the ideal line, B will pick up bad driving, and C will work.
+- **Setup:** `sdc/phase2/bc.py`. Expert: Phase 1 SB3 PPO on rays (E1 seed 1: 100% held-out, 0.94× pure pursuit). 16 cars × 4,000 steps on random training tracks = 64k camera images (+ speed) labelled with the expert's action. **A:** `--noise 0` (the expert drives). **B:** `--noise 0.3` (Gaussian noise of std 0.3 added to the executed steering and throttle; labels stay clean). Network: SB3's PPO camera policy (NatureCNN + actor MLP), trained on mean-squared error to the expert action, Adam 3e-4, batch 256, 20 epochs; seeds 0–2. **C:** `python -m sdc.phase2.train --init runs/p2-e3-noisy-sS/model.zip --set learning_rate=3e-5 --steps 500000` (exploration noise starts at std 0.5; the critic starts untrained). Wall clock: A and B about 5 min each (15 s recording, the rest training); C about 28 min each.
+- **Result:** [report](https://claude.ai/artifact/CJfoJeg5U1qNGBAeTzJ47G).
+  - **A, clean copy: 20%, 10%, 25% held-out.** All failures were crashes, often late in the lap (up to 97%).
+  - **B, copy with wobbles: 95%, 90%, 90% at 0.95× pure pursuit** (expert: 100% at 0.94×). Same data size, network and training time as A.
+  - A's copy error ended *lower* than B's (MSE 0.007 vs. 0.009), yet A drives far worse.
+  - **C, B + PPO: 25%, 90%, 60%**, worse than B. Held-out completion fell from 95/90/90% to 45/65/70% within the first 50k steps, then recovered only partly. Early training episodes crashed 96–99% of the time (exploration noise std 0.5, untrained critic). Training return still rose (59 → 148, 68 → 290, 112 → 313).
+  - The pipeline check held back in E1 was a small version of B (noise 0.3, 25 epochs, a slightly different CNN head): 20/20 held-out.
+  - B already meets the gate's completion bar (≥ 18/20) on all seeds, using SB3's CNN. The gate counts only the owner's encoder (E5).
+- **Explanation (owner, after the run):** (1) Variety. It learns what to do in diverse situations. (2) Not sure. Feels like something about the PPO settings, like the learning rate is too fast or the amount it's allowed to change the weights is too much.
+- **Agent's note on (2):** the learning rate was already 10× below E1's (3e-5), and the clip was PPO's usual ±20%. The bigger suspects: the critic starts untrained, so the first advantages are noise; and training adds exploration noise (std 0.5) that makes the cloned car crash in 96–99% of early episodes. PPO then learns from crashes the copy never made on its own. Common fixes: train the critic first with the policy frozen, and start with smaller exploration noise.
+- **Takeaway:** Copying an expert from pixels works fast, but only if the data covers the expert's *recoveries*, not just its perfect laps. A clean copy drifts into states it has never seen, and its errors compound (distribution shift). Low training error doesn't measure that. Handing a good copy to RL can undo it at first, because RL's exploration and untrained critic start from scratch.
+
 ## Gate check
 
 ## Handoff to next phase

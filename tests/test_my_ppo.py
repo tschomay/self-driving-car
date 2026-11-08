@@ -46,10 +46,15 @@ def test_policy_loss_clipping():
     old = t([0.0, 0.0, 0.0])
     new = torch.stack([ln(t(1.5)), ln(t(0.5)), ln(t(0.5))])  # probability ratios 1.5, 0.5, 0.5
     adv = t([1.0, -1.0, 1.0])
-    # good action pushed up 1.5x: credit capped at 1.2; bad action pushed down to 0.5x: capped at 0.8;
-    # good action pushed DOWN to 0.5x: no cap, full blame -> objective mean(1.2, -0.8, 0.5); loss = minus that
+    # owner's rule: ratio held in [0.8, 1.2] in every case -> objective mean(1.2, -0.8, 0.8)
     loss = _call(my_ppo.policy_loss, new, old, adv, 0.2)
-    assert torch.isclose(loss, -t((1.2 - 0.8 + 0.5) / 3), atol=1e-5)
+    assert torch.isclose(loss, -t((1.2 - 0.8 + 0.8) / 3), atol=1e-5)
+    # textbook PPO: min(ratio*adv, clipped*adv) -> the third (a mistake) gets 0.5, unclipped
+    my_ppo.POLICY_LOSS_VARIANT = "textbook"
+    try:
+        assert torch.isclose(my_ppo.policy_loss(new, old, adv, 0.2), -t((1.2 - 0.8 + 0.5) / 3), atol=1e-5)
+    finally:
+        my_ppo.POLICY_LOSS_VARIANT = "owner"
 
 
 def test_value_loss_mean_squared():

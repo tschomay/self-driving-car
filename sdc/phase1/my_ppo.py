@@ -82,8 +82,23 @@ def policy_loss(new_logp, old_logp, advantages, clip):
     old_logp    log-probability of the same action under the policy that collected it
     advantages  from compute_advantages (normalized per minibatch by the plumbing)
     clip        e.g. 0.2
+
+    Owner's rule (2026-11-08), for an action whose probability ratio has left the ±clip band:
+      1. good action already pushed up past 1+clip: stop giving credit
+      2. bad action already pushed down past 1-clip: stop
+      3. good action accidentally pushed DOWN past 1-clip: still limit (no extra correction)
+    So the ratio is held inside the band in every case: once outside, this batch stops moving it.
+    (Textbook PPO differs on case 3: it takes min(ratio*adv, clipped*adv), which gives a mistake
+    like case 3 the full push back. Set policy_loss="textbook" to compare in E5.)
     """
-    raise NotImplementedError("OWNER TODO 2")
+    ratio = (new_logp - old_logp).exp()
+    objective = ratio.clamp(1 - clip, 1 + clip) * advantages
+    if POLICY_LOSS_VARIANT == "textbook":
+        objective = torch.min(ratio * advantages, objective)
+    return -objective.mean()  # minimise the negative = maximise the objective
+
+
+POLICY_LOSS_VARIANT = "owner"  # "owner" (clip every case) or "textbook" (min with unclipped)
 
 
 # ---------------------------------------------------------------------------------------
@@ -132,7 +147,7 @@ class ActorCritic(nn.Module):
 
 
 DEFAULTS = dict(n_envs=8, n_steps=256, batch_size=256, n_epochs=10, lr=3e-4, gamma=0.99, lam=0.95, clip=0.2,
-                vf_coef=0.5, max_grad_norm=0.5)
+                vf_coef=0.5, max_grad_norm=0.5, policy_loss="owner")
 
 
 def train(seed=0, total_timesteps=300_000, out="runs/p1-e5-mine", eval_every=25_000, label="my PPO",
@@ -140,6 +155,8 @@ def train(seed=0, total_timesteps=300_000, out="runs/p1-e5-mine", eval_every=25_
     from sdc.phase1.train import ENV_DEFAULTS, _gifs, _summary
 
     cfg = {**DEFAULTS, **overrides}
+    global POLICY_LOSS_VARIANT
+    POLICY_LOSS_VARIANT = cfg["policy_loss"]
     torch.set_num_threads(threads)
     torch.manual_seed(seed)
     out = Path(out)

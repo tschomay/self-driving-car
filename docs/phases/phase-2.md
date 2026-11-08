@@ -90,7 +90,12 @@ Then the gate check: the owner's CNN on the 20 held-out tracks, plus a saliency 
 ### E2 — Can the car tell its speed from pictures alone?
 
 - **Prediction (owner, before the run):** 1 picture struggles with braking, 4 pictures does fine.
-- **Setup:** run with behavior cloning (E3 B: noise 0.3, 64k samples, 20 epochs) because PPO from pixels doesn't learn yet. `python -m sdc.phase2.bc --noise 0.3 --no-speed --frames F` for F ∈ {1, 4}, seeds 0–2. The stack holds the last F images (0.1 s apart), restarted at each new episode. Baseline: E3 B (speed number + 1 image).
+- **Setup:** run with behavior cloning (E3 B: noise 0.3, 64k samples, 20 epochs) because PPO from pixels doesn't learn yet. `python -m sdc.phase2.bc --noise 0.3 --no-speed --frames F` for F ∈ {1, 4}, seeds 0–2. The stack holds the last F images (0.1 s apart), restarted at each new episode. Baseline: E3 B (speed number + 1 image). About 5 min (1 image) and 8 min (4 images) per run.
+- **Result:** [report](https://claude.ai/artifact/AmZQVX3gUAKxii7Xetpoc2).
+  - **Speed + 1 image (E3 B): 95%, 90%, 90%. No speed, 1 image: 0%, 5%, 0%. No speed, 4 images: 50%, 50%, 60%**, at 0.95–0.97× pure pursuit on finished laps.
+  - 1 image, no speed (seed 0): 3 attempts never got going (top speed 0–10 m/s, then stopped, timed out); others crashed at 21–25 m/s without braking. Mean speed on held-out attempts 1.6 m/s (14.1 with the speed number). Copy error 0.047–0.053.
+  - 4 images, no speed: normal pace (13.8 m/s mean), and it brakes. Every failure was a crash after slowing from 18–25 to 7–17 m/s: braked, but not enough or too late. Copy error 0.018 (0.009 with speed).
+  - Motion between frames: 2.5 m (4 pixels) at 25 m/s, about 1 pixel at 7 m/s.
 
 ## Gate check
 

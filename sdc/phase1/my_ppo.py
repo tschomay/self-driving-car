@@ -107,8 +107,11 @@ POLICY_LOSS_VARIANT = "owner"  # "owner" (clip every case) or "textbook" (min wi
 
 
 def value_loss(predicted, returns):
-    """Loss to minimise for the critic: predicted V(obs) vs. the returns target (1-D tensors)."""
-    raise NotImplementedError("OWNER TODO 3")
+    """Loss to minimise for the critic: predicted V(obs) vs. the returns target (1-D tensors).
+
+    Owner's choice (2026-11-08): (a) squared error, averaged: big misses count much more.
+    """
+    return ((predicted - returns) ** 2).mean()
 
 
 # ---------------------------------------------------------------------------------------

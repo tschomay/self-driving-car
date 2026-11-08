@@ -87,6 +87,11 @@ Then the gate check: the owner's CNN on the 20 held-out tracks, plus a saliency 
 - **Agent's note:** yes, and the size of the shift is only part of it. The car isn't drawn: it always sits at one fixed pixel, so *where the road is in the image* is the car's position on the road. Shifting the image 3 pixels shows a car 1.9 m to one side (a third of the road width) while the label is still the expert's action for the true position. Identical images then carry contradictory labels, so the copy error can't drop, and PPO gets equally mixed-up feedback. In DrQ's original tasks the important things move together inside the image, so a shift doesn't change the right answer. Here the image frame itself is the ruler.
 - **Takeaway:** Augmentation must preserve the answer. A shift is harmless when what matters is how things in the image relate to each other, and harmful when the absolute pixel position *is* the information. Before using a data-augmentation trick, ask: would the expert's action change if the input changed this way?
 
+### E2 — Can the car tell its speed from pictures alone?
+
+- **Prediction (owner, before the run):** 1 picture struggles with braking, 4 pictures does fine.
+- **Setup:** run with behavior cloning (E3 B: noise 0.3, 64k samples, 20 epochs) because PPO from pixels doesn't learn yet. `python -m sdc.phase2.bc --noise 0.3 --no-speed --frames F` for F ∈ {1, 4}, seeds 0–2. The stack holds the last F images (0.1 s apart), restarted at each new episode. Baseline: E3 B (speed number + 1 image).
+
 ## Gate check
 
 ## Handoff to next phase

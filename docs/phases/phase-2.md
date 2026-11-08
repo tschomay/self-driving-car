@@ -64,7 +64,14 @@ Then the gate check: the owner's CNN on the 20 held-out tracks, plus a saliency 
 ### E3 — Copy the expert, or learn from scratch?
 
 - **Prediction (owner, before the run):** My intuition is limited here, but I think A will struggle with what to do if it isn't on the ideal line, B will pick up bad driving, and C will work.
-- **Setup:** `sdc/phase2/bc.py`. Expert: Phase 1 SB3 PPO on rays (E1 seed 1: 100% held-out, 0.94× pure pursuit). 16 cars × 4,000 steps on random training tracks = 64k camera images (+ speed) labelled with the expert's action. **A:** `--noise 0` (the expert drives). **B:** `--noise 0.3` (Gaussian noise of std 0.3 added to the executed steering and throttle; labels stay clean). Network: SB3's PPO camera policy (NatureCNN + actor MLP), trained on mean-squared error to the expert action, Adam 3e-4, batch 256, 20 epochs; seeds 0–2. **C:** `python -m sdc.phase2.train --init runs/p2-e3-noisy-sS/model.zip --set learning_rate=3e-5 --steps 500000` (exploration noise starts at std 0.5; the critic starts untrained).
+- **Setup:** `sdc/phase2/bc.py`. Expert: Phase 1 SB3 PPO on rays (E1 seed 1: 100% held-out, 0.94× pure pursuit). 16 cars × 4,000 steps on random training tracks = 64k camera images (+ speed) labelled with the expert's action. **A:** `--noise 0` (the expert drives). **B:** `--noise 0.3` (Gaussian noise of std 0.3 added to the executed steering and throttle; labels stay clean). Network: SB3's PPO camera policy (NatureCNN + actor MLP), trained on mean-squared error to the expert action, Adam 3e-4, batch 256, 20 epochs; seeds 0–2. **C:** `python -m sdc.phase2.train --init runs/p2-e3-noisy-sS/model.zip --set learning_rate=3e-5 --steps 500000` (exploration noise starts at std 0.5; the critic starts untrained). Wall clock: A and B about 5 min each (15 s recording, the rest training); C about 28 min each.
+- **Result:** [report](https://claude.ai/artifact/CJfoJeg5U1qNGBAeTzJ47G).
+  - **A, clean copy: 20%, 10%, 25% held-out.** All failures were crashes, often late in the lap (up to 97%).
+  - **B, copy with wobbles: 95%, 90%, 90% at 0.95× pure pursuit** (expert: 100% at 0.94×). Same data size, network and training time as A.
+  - A's copy error ended *lower* than B's (MSE 0.007 vs. 0.009), yet A drives far worse.
+  - **C, B + PPO: 25%, 90%, 60%**, worse than B. Held-out completion fell from 95/90/90% to 45/65/70% within the first 50k steps, then recovered only partly. Early training episodes crashed 96–99% of the time (exploration noise std 0.5, untrained critic). Training return still rose (59 → 148, 68 → 290, 112 → 313).
+  - The pipeline check held back in E1 was a small version of B (noise 0.3, 25 epochs, a slightly different CNN head): 20/20 held-out.
+  - B already meets the gate's completion bar (≥ 18/20) on all seeds, using SB3's CNN. The gate counts only the owner's encoder (E5).
 
 ## Gate check
 

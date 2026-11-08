@@ -98,8 +98,9 @@ Then the gate check.
   - **Owner's PPO as specified: 100%, 90%, 90% held-out at 0.99×, 1.02×, 0.98× pure pursuit.** Gate numbers met on 1 of 3 seeds. First ≥ 95% at 51k–76k steps, no slower than the others. But it was unstable: held-out completion swung between 45% and 100% between evals, and 41–61% of training episodes ended off the road at the end.
   - **Textbook case 3: 100%, 100%, 100% at 0.95–0.96×**, first ≥ 95% at 51k on all seeds and steady after. That matches the library (95%, 100%, 100% at 0.94–0.96×).
   - Why (agent's measurement, 150k-step instrumented runs): under the owner's rule, 26% of training samples ended a pass outside the ±20% band, 12% outside in the wrong direction. Textbook: 5% and 2%. Updates on one minibatch move other states' actions too. The textbook rule pulls the wrong-way drift back; the owner's rule freezes it. Exploration noise ended similar (std 0.45–0.64).
-- **Explanation (owner, after the run):** _pending_
-- **Takeaway:** _pending_
+- **Explanation (owner, after the run):** I think it's because my version allows it to drift away after a good solution is found.
+- **Decision (owner):** "Let's take the textbook version." `policy_loss="textbook"` is now the default in `my_ppo.py`. The original rule stays available as `policy_loss="owner"`.
+- **Takeaway:** PPO's clip is one-sided on purpose. It limits how far one batch of data can push an action *in the direction the data supports*, and never limits undoing a mistake. Clip both ways and accidental drift can't be corrected: a good solution wanders off, and runs swing between 45% and 100%. With that fixed, the owner's PPO matches the library.
 
 ## Gate check
 

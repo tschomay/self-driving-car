@@ -76,6 +76,11 @@ Then the gate check: the owner's CNN on the 20 held-out tracks, plus a saliency 
 - **Agent's note on (2):** the learning rate was already 10× below E1's (3e-5), and the clip was PPO's usual ±20%. The bigger suspects: the critic starts untrained, so the first advantages are noise; and training adds exploration noise (std 0.5) that makes the cloned car crash in 96–99% of early episodes. PPO then learns from crashes the copy never made on its own. Common fixes: train the critic first with the policy frozen, and start with smaller exploration noise.
 - **Takeaway:** Copying an expert from pixels works fast, but only if the data covers the expert's *recoveries*, not just its perfect laps. A clean copy drifts into states it has never seen, and its errors compound (distribution shift). Low training error doesn't measure that. Handing a good copy to RL can undo it at first, because RL's exploration and untrained critic start from scratch.
 
+### E4 — Does shaking the picture help?
+
+- **Prediction (owner, before the run):** Yes to both (shifts help PPO from scratch, and they rescue the clean copy).
+- **Setup:** DrQ-style random shift (`camera.random_shift`): each training image slid by a random −3…+3 pixels in x and y (±1.9 m), edges filled by repeating edge pixels; lap evaluation never shifts. **A:** PPO from scratch, `--set learning_rate=0.00003 --env shift=3`, seeds 0–2, 1M steps; compared with E1b's learning rate 3e-5 runs (seed 2 added for this comparison). **B:** E3's clean copy with `--shift 3` (a fresh shift every time an image is used), seeds 0–2; compared with E3 A.
+
 ## Gate check
 
 ## Handoff to next phase

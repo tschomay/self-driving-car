@@ -61,6 +61,11 @@ Then the gate check: the owner's CNN on the 20 held-out tracks, plus a saliency 
 - **Explanation (owner, after the run):** Smaller step allows it to learn details without overshooting. First it needs to learn how to recognize the track, and judge position and speed, then how to drive, then how to drive well. Too big of a step means the early stuff gets blown out rather than locked in. Slow to learn for the same reason: there's a lot more to learn.
 - **Takeaway:** A pixel network has to build its perception while the policy on top of it is changing. A step size that was fine for 12 ray numbers wrecks that half-built perception; a 10× smaller step keeps it and learns steadily, but slowly. The learning rate fixes the collapse, not the speed of learning.
 
+### E3 — Copy the expert, or learn from scratch?
+
+- **Prediction (owner, before the run):** My intuition is limited here, but I think A will struggle with what to do if it isn't on the ideal line, B will pick up bad driving, and C will work.
+- **Setup:** `sdc/phase2/bc.py`. Expert: Phase 1 SB3 PPO on rays (E1 seed 1: 100% held-out, 0.94× pure pursuit). 16 cars × 4,000 steps on random training tracks = 64k camera images (+ speed) labelled with the expert's action. **A:** `--noise 0` (the expert drives). **B:** `--noise 0.3` (Gaussian noise of std 0.3 added to the executed steering and throttle; labels stay clean). Network: SB3's PPO camera policy (NatureCNN + actor MLP), trained on mean-squared error to the expert action, Adam 3e-4, batch 256, 20 epochs; seeds 0–2. **C:** `python -m sdc.phase2.train --init runs/p2-e3-noisy-sS/model.zip --set learning_rate=3e-5 --steps 500000` (exploration noise starts at std 0.5; the critic starts untrained).
+
 ## Gate check
 
 ## Handoff to next phase

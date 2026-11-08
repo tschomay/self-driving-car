@@ -4,6 +4,7 @@ Usage:
     python -m sdc.phase2.train --seed 0 --steps 2000000 --out runs/p2-e1-s0
     python -m sdc.phase2.train --env n_frames=4 --env speed=false ...    # frame stack, no speed number
     python -m sdc.phase2.train --out runs/p2-e1-s0 --resume                # continue from checkpoint
+    python -m sdc.phase2.train --init runs/p2-e3-noisy-s0/model.zip ...   # fine-tune a cloned policy
 
 Same tracks, physics, reward and lap evaluation as Phase 1; only the observation changes
 (sdc/racer/camera.py). Each run directory gets metrics.json (written at every checkpoint),
@@ -55,7 +56,7 @@ def gifs(model, env_cfg, out: Path, label: str, final: dict) -> list[dict]:
 def train(preset: str = "base", seed: int = 0, total_timesteps: int = 2_000_000, out: str | Path = "runs/p2",
           overrides: dict | None = None, env: dict | None = None, eval_every: int = 50_000,
           ckpt_every: int = 100_000, gif: bool = True, label: str | None = None, threads: int = 1,
-          resume: bool = False) -> dict:
+          resume: bool = False, init: str | None = None) -> dict:
     import torch
     from stable_baselines3 import PPO
     from stable_baselines3.common.callbacks import BaseCallback
@@ -82,6 +83,9 @@ def train(preset: str = "base", seed: int = 0, total_timesteps: int = 2_000_000,
         m["resumed_at"].append(int(model.num_timesteps))
     else:
         model = PPO("MultiInputPolicy", venv, seed=seed, device="cpu", verbose=0, **_resolve(cfg["ppo"]))
+        if init:   # start from another policy's weights (e.g. behavior cloning); the critic comes along untrained
+            model.policy.load_state_dict(PPO.load(init, device="cpu").policy.state_dict())
+            m["init"] = init
 
     def save(final: bool = False):
         m["trained_timesteps"] = int(model.num_timesteps)
@@ -149,6 +153,7 @@ def main():
     p.add_argument("--label", default=None)
     p.add_argument("--threads", type=int, default=1)
     p.add_argument("--resume", action="store_true")
+    p.add_argument("--init", default=None, help="model.zip whose policy weights to start from (e.g. a BC run)")
     a = p.parse_args()
 
     def parse(kvs):
@@ -156,7 +161,7 @@ def main():
 
     out = a.out or f"runs/p2-{a.preset}-s{a.seed}"
     m = train(a.preset, a.seed, a.steps, out, parse(a.set), parse(a.env), a.eval_every, a.ckpt_every,
-              label=a.label, threads=a.threads, resume=a.resume)
+              label=a.label, threads=a.threads, resume=a.resume, init=a.init)
     c, fe = m["compare"], m["final_eval"]
     ratio = f"{c['lap_time_ratio']:.3f}" if c["lap_time_ratio"] else "n/a"
     print(f"{m['label']}: held-out completion {fe['completion']:.0%}, mean lap {fe['mean_lap_time']} s, "

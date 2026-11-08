@@ -3,7 +3,7 @@
 - **Status:** in progress; started 2026-11-08
 - **Goal / gate:** replace rays with a low-res camera image (top-down crop first, then ego/chase view) through a small CNN encoder. **Gate:** the CNN policy reaches ≥ 90% of the Phase 1 policy's held-out lap completion (Phase 1 gate: 20/20, so ≥ 18/20 on tracks 10000–10019). A saliency/attention visualization shows the network keying on track edges, not artifacts.
 - **Learn:** convolutions, frame stacking, why pixels are sample-hungry, data augmentation (DrQ-style random shifts), imitation learning (behavior cloning from the Phase 1 expert) vs. RL from scratch, saliency maps.
-- **Code:** _to come_ (`sdc/racer/camera.py`, `sdc/phase2/`)
+- **Code:** `sdc/racer/camera.py` (camera, frame stack), `sdc/racer/camera_env.py` (SB3 adapter, camera policy for lap evaluation), `sdc/phase2/train.py` (SB3 PPO on pixels, checkpoint/resume), `tests/test_camera.py`
 - **How to reproduce the gate:** _to come_
 - **Previous gate:** Phase 1 passed (2026-11-08).
 
@@ -28,7 +28,18 @@ Optional, if time and interest allow: a chase/ego perspective camera (a view fro
 
 Then the gate check: the owner's CNN on the 20 held-out tracks, plus a saliency report.
 
+## The camera (what the car sees)
+
+- **Image:** 64×64 grayscale, straight down, centred on the car and turned with it ("up" = the car's heading). 0.625 m per pixel, so 40 m × 40 m: 35 m ahead, 5 m behind, 20 m to each side. Rays reached 40 m. Grass 40, road 110, white edge lines 230 (0.75 m wide). The road is about 10 pixels wide. Other parts of the track can show up in the image.
+- **Sample:** [held-out track 10000 vs. the camera view](phase2-camera-sample.png). The 41% panel is the 6.9 m corner that caused most Phase 1 failures.
+- **Speed (agent's benchmark, 1 thread):** SB3 PPO with NatureCNN trains at about 320 steps/s including evals, so 2M steps is about 1.7 h per run.
+
 ## Experiments
+
+### E1 — Pixels vs. rays
+
+- **Prediction (owner, before the run):** (1) At 300k steps: none of the 20. It'll just start learning how to control the car. (2) Yes, a longer run closes the gap, maybe around 1M steps. (Added after seeing the 64×64 sample, before any results:) Corners are less resolved, which looks like more noise in training, so it might learn more caution; if it completes the course it'll be slower.
+- **Setup:** `python -m sdc.phase2.train --seed S --steps 2000000 --out runs/p2-e1-sS --label "PPO pixels (NatureCNN)"` for S = 0, 1, 2, 1 torch thread each, in parallel. 1 frame plus speed. Phase 1 base PPO settings (8 cars, 256 steps per update, else SB3 defaults). Held-out eval every 50k steps. Compared with Phase 1 E1 (rays, same settings).
 
 ## Gate check
 

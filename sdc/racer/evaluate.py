@@ -29,6 +29,9 @@ def run_laps(policy, seeds=trk.HELD_OUT_SEEDS, record: bool = False) -> dict:
         traj[i].append(dict(pos=b.pos[i].copy(), heading=float(b.heading[i]), v=float(b.v[i]),
                             rays=b.rays[i].copy(), steer=float(a[i, 0]), throttle=float(a[i, 1]),
                             progress=float(b.progress[i] / b.length[i]), t=int(b.steps[i])))
+        imgs = getattr(policy, "last_images", None)   # camera policies: what the car saw this step
+        if imgs is not None:
+            traj[i][-1]["image"] = imgs[i].copy()
 
     while active.any():
         a = np.asarray(policy(b), dtype=float)
@@ -47,6 +50,8 @@ def run_laps(policy, seeds=trk.HELD_OUT_SEEDS, record: bool = False) -> dict:
                 traj[i].append(dict(pos=fs["pos"], heading=fs["heading"], v=fs["v"], rays=fs["rays"],
                                     steer=float(a[i, 0]), throttle=float(a[i, 1]),
                                     progress=rows[i]["laps"], t=info["episode"]["l"]))
+                if "image" in traj[i][-2]:
+                    traj[i][-1]["image"] = traj[i][-2]["image"]
             active[i] = False
     out = dict(tracks=rows, completion=float(np.mean([r["finished"] for r in rows])))
     times = [r["lap_time"] for r in rows if r["finished"]]

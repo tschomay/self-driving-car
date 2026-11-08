@@ -72,6 +72,9 @@ Then the gate check: the owner's CNN on the 20 held-out tracks, plus a saliency 
   - **C, B + PPO: 25%, 90%, 60%**, worse than B. Held-out completion fell from 95/90/90% to 45/65/70% within the first 50k steps, then recovered only partly. Early training episodes crashed 96–99% of the time (exploration noise std 0.5, untrained critic). Training return still rose (59 → 148, 68 → 290, 112 → 313).
   - The pipeline check held back in E1 was a small version of B (noise 0.3, 25 epochs, a slightly different CNN head): 20/20 held-out.
   - B already meets the gate's completion bar (≥ 18/20) on all seeds, using SB3's CNN. The gate counts only the owner's encoder (E5).
+- **Explanation (owner, after the run):** (1) Variety. It learns what to do in diverse situations. (2) Not sure. Feels like something about the PPO settings, like the learning rate is too fast or the amount it's allowed to change the weights is too much.
+- **Agent's note on (2):** the learning rate was already 10× below E1's (3e-5), and the clip was PPO's usual ±20%. The bigger suspects: the critic starts untrained, so the first advantages are noise; and training adds exploration noise (std 0.5) that makes the cloned car crash in 96–99% of early episodes. PPO then learns from crashes the copy never made on its own. Common fixes: train the critic first with the policy frozen, and start with smaller exploration noise.
+- **Takeaway:** Copying an expert from pixels works fast, but only if the data covers the expert's *recoveries*, not just its perfect laps. A clean copy drifts into states it has never seen, and its errors compound (distribution shift). Low training error doesn't measure that. Handing a good copy to RL can undo it at first, because RL's exploration and untrained critic start from scratch.
 
 ## Gate check
 

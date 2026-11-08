@@ -58,6 +58,8 @@ Then the gate check: the owner's CNN on the 20 held-out tracks, plus a saliency 
   - **Held-out at 1M:** 3e-4: 0%, 5%. 1e-4: 0%, 10%. 3e-5: 0%, 5%. Best eval of any run: 30% (1e-4, seed 1, 850k). None drives reliably.
   - **Driving style in training:** at 3e-5 the cars hold about 8 m/s and still crash in 95% of episodes, but get farther each time. At 3e-4 they slowed to 1–4 m/s.
   - Caveat: 2 seeds, 1M steps. The steady climb is clearest at 3e-5, the slowest learner.
+- **Explanation (owner, after the run):** Smaller step allows it to learn details without overshooting. First it needs to learn how to recognize the track, and judge position and speed, then how to drive, then how to drive well. Too big of a step means the early stuff gets blown out rather than locked in. Slow to learn for the same reason: there's a lot more to learn.
+- **Takeaway:** A pixel network has to build its perception while the policy on top of it is changing. A step size that was fine for 12 ray numbers wrecks that half-built perception; a 10× smaller step keeps it and learns steadily, but slowly. The learning rate fixes the collapse, not the speed of learning.
 
 ## Gate check
 

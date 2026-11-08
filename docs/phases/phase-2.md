@@ -47,6 +47,12 @@ Then the gate check: the owner's CNN on the 20 held-out tracks, plus a saliency 
   - **Not a bug (agent's checks).** A pipeline check passed: camera, frame handling and lap evaluation work end to end (details held back until E3, since they give away its answer). A diagnostic with separate actor and critic CNNs (SB3 shares one by default) did no better: 0–20% through 900k steps, seed 0. Gradient check on the final models: the critic's gradient is small, so it isn't swamping the policy at the end.
 - **Explanation (owner, after the run):** Rays give the actual answer for where you are relative to the road. Pixels don't: the system has to learn position, speed, etc. in addition to just the controls. But why does it get worse? That normally points to overfitting or too high a learning rate. Something is exploding instead of converging. Could also be that the reward needs tuning.
 - **Takeaway:** From pixels the network has to learn to see before it can learn to drive. With Phase 1's PPO settings that never happened in 2M steps (about 7× the ray budget, 60× the wall clock): learning peaked early and then fell apart. The owner's open hypotheses for the collapse: learning rate too high, overfitting, reward.
+- **Decision (owner, after E1):** test the learning-rate hypothesis (E1b), then go on to behavior cloning (E3) and image shifts (E4). Frame stacking (E2) waits until a pixel policy learns.
+
+### E1b — Does a smaller learning rate stop the collapse?
+
+- **Prediction (owner, before the run):** I think it will help, but I expect other changes are required to get really good results. So yes, it stops the collapse; no, not driving.
+- **Setup:** E1 setup with `--set learning_rate=LR`, LR ∈ {1e-4, 3e-5}, seeds 0–1, 1M steps, 4 in parallel on 1 thread each. The 3e-4 arm is E1's first 1M steps.
 
 ## Gate check
 

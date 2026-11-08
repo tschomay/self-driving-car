@@ -52,7 +52,12 @@ Then the gate check: the owner's CNN on the 20 held-out tracks, plus a saliency 
 ### E1b — Does a smaller learning rate stop the collapse?
 
 - **Prediction (owner, before the run):** I think it will help, but I expect other changes are required to get really good results. So yes, it stops the collapse; no, not driving.
-- **Setup:** E1 setup with `--set learning_rate=LR`, LR ∈ {1e-4, 3e-5}, seeds 0–1, 1M steps, 4 in parallel on 1 thread each. The 3e-4 arm is E1's first 1M steps.
+- **Setup:** E1 setup with `--set learning_rate=LR`, LR ∈ {1e-4, 3e-5}, seeds 0–1, 1M steps, 4 in parallel on 1 thread each. The 3e-4 arm is E1's first 1M steps. About 50 min.
+- **Result:** [report](https://claude.ai/artifact/CUHqJz1nDQCFo2R9QNcQ6k).
+  - **Training return** (mean per episode, 100k-step windows, 200k → 1M): 3e-4 (E1): 64 → 35 and 28 → 12, falling. 1e-4: 55 → 54 (dip to 28 at 800k) and 56 → 93 (peak 113). **3e-5: 25 → 77 and 24 → 73, rising in every window.**
+  - **Held-out at 1M:** 3e-4: 0%, 5%. 1e-4: 0%, 10%. 3e-5: 0%, 5%. Best eval of any run: 30% (1e-4, seed 1, 850k). None drives reliably.
+  - **Driving style in training:** at 3e-5 the cars hold about 8 m/s and still crash in 95% of episodes, but get farther each time. At 3e-4 they slowed to 1–4 m/s.
+  - Caveat: 2 seeds, 1M steps. The steady climb is clearest at 3e-5, the slowest learner.
 
 ## Gate check
 

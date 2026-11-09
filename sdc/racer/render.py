@@ -22,6 +22,7 @@ ROAD = (120, 126, 134)
 EDGE = (245, 245, 245)
 RAY = (31, 111, 235)
 CAR = (180, 70, 43)
+DIRT = (176, 138, 92)
 
 
 def _area(p):
@@ -30,7 +31,7 @@ def _area(p):
 
 
 class Painter:
-    def __init__(self, t: trk.Track, size: int = SIZE, margin: float = 8.0):
+    def __init__(self, t: trk.Track, size: int = SIZE, margin: float = 8.0, dirt: np.ndarray | None = None):
         self.t = t
         pts = np.vstack([t.left, t.right])
         lo, hi = pts.min(0) - margin, pts.max(0) + margin
@@ -44,6 +45,11 @@ class Painter:
         d.rectangle([0, PAD_TOP, size, size + PAD_TOP], fill=GRASS)
         d.polygon([tuple(p) for p in self.px(outer)], fill=ROAD)
         d.polygon([tuple(p) for p in self.px(inner)], fill=GRASS)
+        if dirt is not None:   # low-grip patches: brown road quads
+            N = len(t.center)
+            for k in np.flatnonzero(dirt):
+                q = np.stack([t.left[k], t.left[(k + 1) % N], t.right[(k + 1) % N], t.right[k]])
+                d.polygon([tuple(p) for p in self.px(q)], fill=DIRT)
         d.line([tuple(p) for p in self.px(np.vstack([outer, outer[:1]]))], fill=EDGE, width=2)
         d.line([tuple(p) for p in self.px(np.vstack([inner, inner[:1]]))], fill=EDGE, width=2)
         a, b = self.px(np.stack([t.left[0], t.right[0]]))
@@ -86,12 +92,16 @@ class Painter:
         return np.asarray(img)
 
 
-def lap_gif(track_seed: int, traj: list[dict], row: dict, label: str, path: str | Path, every: int = 1) -> None:
-    """One lap attempt on one track, at real speed (10 Hz), with readouts and an end card."""
+def lap_gif(track_seed: int, traj: list[dict], row: dict, label: str, path: str | Path, every: int = 1,
+            dirt: np.ndarray | None = None) -> None:
+    """One lap attempt on one track, at real speed (10 Hz), with readouts and an end card.
+
+    dirt: the track's dirt mask (Phase 3), drawn brown. States with 'slip' get a slip readout.
+    """
     from sdc.gifs import annotate, save_gif
 
     t = trk.generate(track_seed)
-    p = Painter(t)
+    p = Painter(t, dirt=dirt)
     frames, trail = [], []
     for k, s in enumerate(traj):
         trail.append((np.asarray(s["pos"]), s["v"]))
@@ -101,6 +111,12 @@ def lap_gif(track_seed: int, traj: list[dict], row: dict, label: str, path: str 
         lines = [f"time {s['t'] * sim.DT:5.1f} s   ·   lap {100 * s['progress']:3.0f}% done",
                  f"{'held-out' if track_seed >= trk.HELD_OUT_BASE else 'training'} track {track_seed}, start line, standstill, real speed",
                  f"speed {s['v'] * 3.6:3.0f} km/h   ·   steer {s['steer']:+.2f}   ·   throttle {s['throttle']:+.2f}"]
+        if "slip" in s:
+            ph = row.get("physics", {})
+            lines[1] = (f"held-out track {track_seed}" + (f" · grip {ph['grip']:.2f}× · delay {1000 * ph['delay']:.0f} ms"
+                        if ph else "") + (" · on dirt" if s.get("dirt") else ""))
+            lines.append(f"tail slide (rear slip) {abs(np.degrees(s['slip'][1])):4.1f}°   ·   front slip "
+                         f"{abs(np.degrees(s['slip'][0])):4.1f}°")
         end, good = None, True
         if last:
             if row["finished"]:

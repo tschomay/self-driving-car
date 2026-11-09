@@ -10,22 +10,32 @@ from sdc.racer import sim
 
 
 class RacerVecEnv(VecEnv):
-    def __init__(self, n_envs: int, **sim_kwargs):
-        self.batch = sim.RacerBatch(n_envs, **sim_kwargs)
-        obs_space = spaces.Box(0.0, 1.0, (sim.OBS_DIM,), np.float32)
+    def __init__(self, n_envs: int, batch_cls=sim.RacerBatch, obs_keep=None, **sim_kwargs):
+        """batch_cls: sim.RacerBatch or dynamics.DynamicRacerBatch; obs_keep: observation indices to keep."""
+        self.batch = batch_cls(n_envs, **sim_kwargs)
+        self.keep = None if obs_keep is None else np.asarray(obs_keep)
+        dim = self.batch.obs().shape[1] if self.keep is None else len(self.keep)
+        obs_space = spaces.Box(-np.inf, np.inf, (dim,), np.float32) if batch_cls is not sim.RacerBatch \
+            else spaces.Box(0.0, 1.0, (dim,), np.float32)
         act_space = spaces.Box(-1.0, 1.0, (2,), np.float32)
         super().__init__(n_envs, obs_space, act_space)
         self._actions = None
 
+    def _o(self, obs):
+        return obs if self.keep is None else obs[:, self.keep]
+
     def reset(self):
-        return self.batch.reset()
+        return self._o(self.batch.reset())
 
     def step_async(self, actions):
         self._actions = actions
 
     def step_wait(self):
         obs, r, term, trunc, infos = self.batch.step(self._actions)
-        return obs, r, term | trunc, infos
+        if self.keep is not None:
+            for i in np.flatnonzero(term | trunc):
+                infos[i]["terminal_observation"] = infos[i]["terminal_observation"][self.keep]
+        return self._o(obs), r, term | trunc, infos
 
     def close(self):
         pass

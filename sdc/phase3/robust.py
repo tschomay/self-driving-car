@@ -29,27 +29,28 @@ GATE_SPAN = {k: getattr(dy.GATE_DR, k) for k in SWEEPS}
 DRAWS = 5
 
 
-def laps(policy, physics="nominal", dirt=True, seeds=trk.HELD_OUT_SEEDS, record=False, seed=0, setup=None):
-    mk = functools.partial(dy.DynamicRacerBatch, physics=physics, dirt=dirt, seed=seed)
+def laps(policy, physics="nominal", dirt=True, seeds=trk.HELD_OUT_SEEDS, record=False, seed=0, setup=None,
+         realism=2):
+    mk = functools.partial(dy.DynamicRacerBatch, physics=physics, dirt=dirt, seed=seed, realism=realism)
     return evaluate.run_laps(policy, seeds, record=record, make_batch=mk, setup=setup)
 
 
-def sweep(policy, knobs=("grip", "delay", "mass", "noise"), dirt=True) -> dict:
+def sweep(policy, knobs=("grip", "delay", "mass", "noise"), dirt=True, realism=2) -> dict:
     out = {}
     for k in knobs:
         rows = []
         for v in SWEEPS[k]:
-            r = laps(policy, physics={k: v}, dirt=dirt)
+            r = laps(policy, physics={k: v}, dirt=dirt, realism=realism)
             rows.append(dict(value=v, completion=r["completion"], mean_lap_time=r["mean_lap_time"]))
         out[k] = rows
     return out
 
 
-def gate_laps(policy, physics=dy.GATE_DR, draws=DRAWS, dirt=True, seed=12345) -> dict:
+def gate_laps(policy, physics=dy.GATE_DR, draws=DRAWS, dirt=True, seed=12345, realism=2) -> dict:
     """DRAWS laps per held-out track, each lap with physics drawn from `physics`. Reproducible."""
     rows = []
     for d in range(draws):
-        r = laps(policy, physics=physics, dirt=dirt, seed=seed + d)
+        r = laps(policy, physics=physics, dirt=dirt, seed=seed + d, realism=realism)
         for t in r["tracks"]:
             rows.append(dict(t, draw=d))
     done = [r["finished"] for r in rows]

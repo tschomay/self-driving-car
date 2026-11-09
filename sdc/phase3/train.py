@@ -34,7 +34,9 @@ PRESETS: dict[str, dict] = {
     "base": dict(n_envs=8, ppo=dict(n_steps=256, batch_size=256)),
 }
 ENV_DEFAULTS = dict(tracks="random", reward="progress", crash_penalty=0.0, max_steps=1000, physics="nominal",
-                    dirt=True, obs_keep=None)
+                    dirt=True, obs_keep=None, realism=2, squash=False)
+# squash: the policy's raw output passes through tanh before reaching the car, so it eases toward ±1
+# instead of being clipped at it (realism=1 runs, E1-E3, predate both options).
 PHASE1_EXPERT = "runs/p1-e1-s1/model.zip"
 
 
@@ -42,13 +44,24 @@ def _summary(ev: dict) -> dict:
     return {k: ev[k] for k in ("completion", "mean_lap_time")}
 
 
-def sb3_policy(model, keep=None):
+def sb3_policy(model, keep=None, squash=False):
     keep = None if keep is None else np.asarray(keep)
 
     def act(b):
         o = b.obs()
-        return model.predict(o if keep is None else o[:, keep], deterministic=True)[0]
+        a = model.predict(o if keep is None else o[:, keep], deterministic=True)[0]
+        return np.tanh(a) if squash else a
     return act
+
+
+def _resolve(ppo: dict) -> dict:
+    """["linear", x] for a learning rate means: start at x, decay linearly to 0 by the end of training."""
+    out = dict(ppo)
+    lr = out.get("learning_rate")
+    if isinstance(lr, (list, tuple)) and lr[0] == "linear":
+        start = float(lr[1])
+        out["learning_rate"] = lambda remaining: remaining * start
+    return out
 
 
 def compare(final: dict, baseline: dict, gate: dict | None) -> dict:
@@ -60,13 +73,13 @@ def compare(final: dict, baseline: dict, gate: dict | None) -> dict:
                 gate=bool(gate and gate["completion"] >= GATE))
 
 
-def gifs(policy, out: Path, label: str, final: dict, physics="nominal", tracks=None) -> list[dict]:
+def gifs(policy, out: Path, label: str, final: dict, physics="nominal", tracks=None, realism=2) -> list[dict]:
     """Lap GIF on the standard held-out track, plus the first failed held-out track if any."""
     tracks = list(tracks or [GIF_TRACK])
     failed = [r["track"] for r in final["tracks"] if not r["finished"] and r["track"] not in tracks]
     if failed:
         tracks.append(failed[0])
-    rec = robust.laps(policy, physics=physics, seeds=tracks, record=True)
+    rec = robust.laps(policy, physics=physics, seeds=tracks, record=True, realism=realism)
     names = []
     for seed, traj, row in zip(tracks, rec["trajectories"], rec["tracks"]):
         name = f"lap-{seed}.gif"
@@ -79,21 +92,37 @@ def gifs(policy, out: Path, label: str, final: dict, physics="nominal", tracks=N
 def finish(policy, out: Path, m: dict, gif: bool = True, sweep: bool = True) -> dict:
     """Final evaluations shared by every Phase 3 run: nominal laps, gate-range laps, sweeps, GIFs."""
     t0 = time.perf_counter()
-    m["final_eval"] = robust.laps(policy)
-    m["gate_laps"] = robust.gate_laps(policy)
-    m["train_range_laps"] = robust.gate_laps(policy, physics=dy.TRAIN_DR, seed=777)
+    rl = m.get("env", {}).get("realism", 1 if "env" in m else 2)
+    m["final_eval"] = robust.laps(policy, realism=rl)
+    m["gate_laps"] = robust.gate_laps(policy, realism=rl)
+    m["train_range_laps"] = robust.gate_laps(policy, physics=dy.TRAIN_DR, seed=777, realism=rl)
     if sweep:
-        m["sweep"] = robust.sweep(policy)
+        m["sweep"] = robust.sweep(policy, realism=rl)
     m["compare"] = compare(m["final_eval"], m["baseline"], m["gate_laps"])
     who = m["label"] + (f", seed {m['seed']}" if m["preset"] == "base" else "")
-    m["gifs"] = gifs(policy, out, who, m["final_eval"]) if gif else []
+    m["gifs"] = gifs(policy, out, who, m["final_eval"], realism=rl) if gif else []
+    m["motion"] = motion(policy, rl)
     m["eval_wall_s"] = round(time.perf_counter() - t0, 1)
     (out / "metrics.json").write_text(json.dumps(m, indent=1, default=float))
     return m
 
 
-def baseline_laps() -> dict:
-    return robust.laps(dy.DynamicPursuit())
+def motion(policy, realism=2) -> dict:
+    """How smoothly it drives on the held-out laps (nominal physics): mean steering change per step,
+    share of steps at full lock, share of steps with an axle sliding more than 4°."""
+    r = robust.laps(policy, record=True, realism=realism)
+    ds, lock, slide = [], [], []
+    for tr in r["trajectories"]:
+        st = np.array([s["steer"] for s in tr])   # steering command, -1..1
+        ds += list(np.abs(np.diff(st)))
+        lock += list(np.abs(st) > 0.95)
+        slide += [np.degrees(np.abs(s["slip"])).max() > 4 for s in tr]
+    return dict(steer_change=round(float(np.mean(ds)), 3), full_lock=round(float(np.mean(lock)), 3),
+                sliding=round(float(np.mean(slide)), 3))
+
+
+def baseline_laps(realism=2) -> dict:
+    return robust.laps(dy.DynamicPursuit(), realism=realism)
 
 
 def pursuit_run(out="runs/p3-pursuit", gif=True) -> dict:
@@ -133,7 +162,9 @@ def train(preset="base", seed=0, total_timesteps=1_000_000, out="runs/p3", overr
     cfg["ppo"].update(overrides)
     env_cfg = {**ENV_DEFAULTS, **(env or {})}
     keep = env_cfg.pop("obs_keep")
-    baseline = baseline_laps()
+    squash = env_cfg.pop("squash")
+    rl = env_cfg["realism"]
+    baseline = baseline_laps(rl)
 
     class Metrics(BaseCallback):
         def __init__(self):
@@ -143,10 +174,10 @@ def train(preset="base", seed=0, total_timesteps=1_000_000, out="runs/p3", overr
             self._t0 = time.perf_counter()
 
         def _eval(self):
-            pol = sb3_policy(self.model, keep)
+            pol = sb3_policy(self.model, keep, squash)
             self.evals.append(dict(timesteps=int(self.num_timesteps), wall_s=round(time.perf_counter() - self._t0, 2),
-                                   **_summary(robust.laps(pol)),
-                                   gate_range=robust.gate_laps(pol, draws=1)["completion"]))
+                                   **_summary(robust.laps(pol, realism=rl)),
+                                   gate_range=robust.gate_laps(pol, draws=1, realism=rl)["completion"]))
 
         def _on_step(self):
             for info in self.locals["infos"]:
@@ -161,19 +192,20 @@ def train(preset="base", seed=0, total_timesteps=1_000_000, out="runs/p3", overr
             return True
 
     t0 = time.perf_counter()
-    venv = RacerVecEnv(n_envs, batch_cls=dy.DynamicRacerBatch, obs_keep=keep, seed=seed, **env_cfg)
-    model = PPO("MlpPolicy", venv, seed=seed, device="cpu", verbose=0, **cfg["ppo"])
+    venv = RacerVecEnv(n_envs, batch_cls=dy.DynamicRacerBatch, obs_keep=keep, squash=squash, seed=seed, **env_cfg)
+    model = PPO("MlpPolicy", venv, seed=seed, device="cpu", verbose=0, **_resolve(cfg["ppo"]))
     cb = Metrics()
     model.learn(total_timesteps=total_timesteps, callback=cb)
     cb._eval()
     train_s = time.perf_counter() - t0
     model.save(out / "model.zip")
     env_cfg["obs_keep"] = keep
+    env_cfg["squash"] = squash
     m = dict(label=label or out.name, preset=preset, seed=seed, threads=threads, n_envs=n_envs, ppo=cfg["ppo"],
              env={k: (dy.physics_range(v).to_dict() if k == "physics" else v) for k, v in env_cfg.items()},
              total_timesteps=total_timesteps, trained_timesteps=int(model.num_timesteps),
              train_wall_s=round(train_s, 2), episodes=cb.episodes, evals=cb.evals, baseline=baseline)
-    return finish(sb3_policy(model, keep), out, m, gif, sweep)
+    return finish(sb3_policy(model, keep, squash), out, m, gif, sweep)
 
 
 def regif(run_dir) -> None:
@@ -187,8 +219,9 @@ def regif(run_dir) -> None:
         model = PPO.load(PHASE1_EXPERT, device="cpu")
         pol = dy.phase1_policy(lambda o: model.predict(o, deterministic=True)[0])
     else:
-        pol = sb3_policy(PPO.load(out / "model.zip", device="cpu"), m["env"].get("obs_keep"))
-    m["gifs"] = gifs(pol, out, m["label"] + (f", seed {m['seed']}" if m["preset"] == "base" else ""), m["final_eval"])
+        pol = sb3_policy(PPO.load(out / "model.zip", device="cpu"), m["env"].get("obs_keep"), m["env"].get("squash", False))
+    m["gifs"] = gifs(pol, out, m["label"] + (f", seed {m['seed']}" if m["preset"] == "base" else ""), m["final_eval"],
+                     realism=m.get("env", {}).get("realism", 1 if "env" in m else 2))
     (out / "metrics.json").write_text(json.dumps(m, indent=1, default=float))
 
 

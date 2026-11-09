@@ -99,6 +99,15 @@ Then the gate check: the owner's CNN on the 20 held-out tracks, plus a saliency 
 - **Explanation (owner, after the run):** (1) No knowledge of speed means no in-between. Either you choose to accelerate or you don't, but once you've picked one nothing tells you to change. However, it would seem it could learn to brake as corners come into view, because that should happen to some extent in all training data. I guess it's too little too late. (2) It's an estimate of speed averaged over time, and some sections make speed harder to determine. It's also not a linear thing, since there are turns, so it can't just take simple pixels per second.
 - **Takeaway:** One image is a snapshot: it shows where you are, not how fast you're going. Without speed the right action is ambiguous (the same picture needs full throttle at 5 m/s and hard braking at 25 m/s), and a copy that can't tell them apart gets stuck or flies off. Stacking frames lets the network measure motion, which recovers most of it, but a measured speed is noisier than a reported one, especially when slow (1 pixel of motion per frame) and in turns. Keep the speed number when you have it; a real car has wheel encoders for exactly this.
 
+### E5 — Your own CNN encoder
+
+- **Code:** `sdc/phase2/my_cnn.py` (learner-owned). Plumbing (agent): sizes, speed input, SB3 wiring (`bc.py --encoder mine`), feature-map access; tests in `tests/test_my_cnn.py` skip until the TODOs exist. **Plumbing check (agent):** with a throwaway stand-in (NatureCNN's layers) in place of the TODOs, never committed, BC reproduced E3 B seed 0 exactly (95%, 0.946×).
+- **Owner's design (2026-11-09):**
+  - TODO 1, conv stack: first draft 32@5×5 s2, 64@3×3 s1, 64@3×3 s1 ("to see more fine detail"). That gave 26×26 maps, 43k numbers into the final layer, 11M weights, 8 m per feature and about 22× slower training. The owner wanted features to see further (about 40 m) without the cost. Worked out together: the final linear layer already sees the whole image; what matters is that each feature covers a corner (about 20 m); fine detail found in layer 1 survives later strides in the channels. **Final: 32@5×5 s2 → 64@3×3 s2 → 64@3×3 s2 → 64@3×3 s1**: maps 30 → 14 → 6 → 4, receptive field 33 px (21 m), 1,024 numbers, 0.36M weights.
+  - TODO 2, activation: ReLU. TODO 3, feature size: 128.
+- **Prediction (owner, before the run):** I hope mine will be a little more precise and therefore increase the success rate, but only a little. I don't think mine will be any faster. Saliency maps should show road edges, especially the view ahead going into corners.
+- **Setup:** `python -m sdc.phase2.bc --noise 0.3 --encoder mine --seed S` for S = 0–2 (E3 B recipe: speed + 1 image, 64k samples, 20 epochs). Compared with E3 B (NatureCNN).
+
 ## Gate check
 
 ## Handoff to next phase

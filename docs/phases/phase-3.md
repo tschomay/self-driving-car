@@ -192,6 +192,23 @@ Then the gate check, and the go/no-go on Phase 4.
 - **Explanation (owner, after the run):** "It must not be learning grip as a variable to adjust to, but rather as noise to drive conservatively enough that it's ok in the range of what it has seen."
 - **Takeaway:** domain randomization without a way to identify the condition buys robustness only inside the trained range, by being cautious enough for its worst case. To handle grip it never saw, the car has to estimate grip as it drives and adapt to it.
 
+### E7 — Can the car estimate grip from a short memory?
+
+- **Prediction (owner, before the run):** "Yes to both." (memory lifts the low-grip laps, and it needs the extra training)
+- **Setup:** E6 (h) recipe (full train-range randomization, accelerometer, realism 2, squashed actions, LR decay) vs. + `history=10`: the previous 9 steps' own-motion readings (speed, commands, gyro, accelerometer; 71 inputs). (i) 500k steps, (j) 1M steps; seeds 0–2; 6 runs on 4 CPUs, 9 and 14 min.
+- **Result:** [report](https://claude.ai/artifact/1bWtSinzs1rmjRgyddyM6n)
+
+  | | Gate range per seed | Gate laps at grip 0.5–0.7× | Train range | Held-out nominal | Mean lap |
+  |---|---|---|---|---|---|
+  | (h) no memory, 500k | 51 / 72 / 50% | 9% | 74–92% | 20 / 20 / 20 | 33.5 s |
+  | (i) memory, 500k | 43 / 57 / 39% | 2% | 69–80% | 20 / 20 / 18 | 33.3 s |
+  | (j) memory, 1M | 37 / 45 / 45% | 2% | 36–57% | 14 / 18 / 18 | 29.3 s |
+
+  - Memory made it worse, and more training made it faster (fastest randomized car) but riskier.
+  - Agent's read: the reward is metres gained; a crash costs only the reward it would have earned next (about 10 s at γ = 0.99), with no penalty. The gate counts finished laps. Longer training finds faster-but-riskier trades. Memory adds 54 mostly noisy inputs, and nothing in the reward asks for grip estimation.
+- **Explanation (owner, after the run):** _pending_
+- **Takeaway:** _pending_
+
 ## Gate check
 
 ## Handoff to next phase

@@ -96,6 +96,8 @@ Then the gate check: the owner's CNN on the 20 held-out tracks, plus a saliency 
   - 1 image, no speed (seed 0): 3 attempts never got going (top speed 0–10 m/s, then stopped, timed out); others crashed at 21–25 m/s without braking. Mean speed on held-out attempts 1.6 m/s (14.1 with the speed number). Copy error 0.047–0.053.
   - 4 images, no speed: normal pace (13.8 m/s mean), and it brakes. Every failure was a crash after slowing from 18–25 to 7–17 m/s: braked, but not enough or too late. Copy error 0.018 (0.009 with speed).
   - Motion between frames: 2.5 m (4 pixels) at 25 m/s, about 1 pixel at 7 m/s.
+- **Explanation (owner, after the run):** (1) No knowledge of speed means no in-between. Either you choose to accelerate or you don't, but once you've picked one nothing tells you to change. However, it would seem it could learn to brake as corners come into view, because that should happen to some extent in all training data. I guess it's too little too late. (2) It's an estimate of speed averaged over time, and some sections make speed harder to determine. It's also not a linear thing, since there are turns, so it can't just take simple pixels per second.
+- **Takeaway:** One image is a snapshot: it shows where you are, not how fast you're going. Without speed the right action is ambiguous (the same picture needs full throttle at 5 m/s and hard braking at 25 m/s), and a copy that can't tell them apart gets stuck or flies off. Stacking frames lets the network measure motion, which recovers most of it, but a measured speed is noisier than a reported one, especially when slow (1 pixel of motion per frame) and in turns. Keep the speed number when you have it; a real car has wheel encoders for exactly this.
 
 ## Gate check
 

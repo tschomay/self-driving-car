@@ -41,6 +41,7 @@ Collected as they come up (first batch: Phase 0, E1–E2). Apply them in every p
 - **Make every visual self-explanatory.** GIFs carry overlays: who is driving, which episode or seed, step out of the cap, return so far, the last action, the quantity that ends the episode, a progress bar, and an end card saying why it ended and that it loops (`sdc/gifs.py`). Report captions say what one GIF covers: one episode, which seed, real speed.
 - **Flag surprises before the owner finds them.** When a result looks odd (an untrained policy scoring 416), check it and explain it in the report instead of leaving the owner to wonder.
 - **Keep runs reproducible.** Pin the torch thread count (default 1) and record seeds. A different thread count changes results even with the same seed.
+- **Show controls visually, not as numbers.** Numbers are hard to read while a GIF plays. Lap GIFs draw steering and pedal as gauges under the map, and skid marks for tire slip (owner's request, Phase 3 E1).
 - **Phone-sized messages.** Short sections, tables for prediction vs. result, one question at a time where possible.
 
 ## Git workflow: merge when a body of work is done

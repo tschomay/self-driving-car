@@ -56,8 +56,9 @@ Each experiment is predict → run → explain. SB3 PPO, Phase 1 settings, 4 run
 | E2 | Trained at one grip, how does it do at others? | PPO trained at nominal physics vs. trained with grip randomized 0.7–1.1×; robustness curve over grip 0.4–1.3× | Domain randomization; overfitting to the physics |
 | E3 | What does control delay do, and does knowing your last command help? | Train with 0 delay vs. 0–60 ms delay, with and without the last-command inputs; test at 0–150 ms | Latency, partial observability, the Markov property |
 | E4 | Does the car drive smoothly once the physics stops rewarding twitchiness? (added after E3, from the owner's observation) | E3's recipe vs. learning fixes (squashed actions, decaying learning rate) vs. a more realistic car (servo, sliding wheels, tire relaxation) vs. both | Sim fidelity vs. learning fixes; smooth driving and the friction peak |
-| E5 | What does full randomization cost and buy? | Nominal vs. full train-range randomization (grip, mass, delay, noise); all four robustness curves, plus nominal lap time | The robustness vs. performance trade-off; sensor noise |
-| E6 | Can your own PPO drive the randomized car? | The owner's PPO (Phase 1) with the 15-number observation and E5's randomization: the gate candidate | Reusing the owner's PPO under harder dynamics |
+| E5 | Can it drive smoothly once it can feel the slide? (added after E4, from the owner's explanation) | E4 (d) vs. + sideways velocity vs. + accelerometer vs. both | What the car can sense limits what it can learn |
+| E6 | What does full randomization cost and buy? | Nominal vs. full train-range randomization (grip, mass, delay, noise); all four robustness curves, plus nominal lap time | The robustness vs. performance trade-off; sensor noise |
+| E7 | Can your own PPO drive the randomized car? | The owner's PPO (Phase 1) with E5/E6's observation and E6's randomization: the gate candidate | Reusing the owner's PPO under harder dynamics |
 
 Then the gate check, and the go/no-go on Phase 4.
 
@@ -147,6 +148,35 @@ Then the gate check, and the go/no-go on Phase 4.
   - Agent's read: the car can't sense sideways sliding (gyro only, no sideways accelerometer); training may also be too short.
 - **Explanation (owner, after the run):** "it doesn't know that it's going sideways. Instead of speed, it should see velocity and compare that vector with the direction it's facing"
 - **Takeaway:** sim fidelity mattered more than learning tricks: once twitching stopped paying, big slides and training wobble dropped and robustness rose. But the car still can't sense a slide, so it drives slowly and slides anyway. Next: give it a way to sense sideways motion.
+
+- **Correction (2026-11-09, found in E5):** the table's "slip > 8°" column is not "past the peak". At nominal grip the tires' sideways force peaks at about 9° (lower at lower grip) and falls off gently after it. E5 uses slip > 12° as "clearly past the peak".
+
+### E5 — Can it drive smoothly once it can feel the slide?
+
+- **Owner's question before the run:** with the wheels sawing back and forth, isn't forward acceleration lost to vectoring too, not just traction? Checked: yes, it's in the model. Turned front wheels push partly sideways, and slipping tires drag. Two seconds of full throttle from 10 m/s: 20.5 m/s straight, 18.5 m/s sawing ±1 (plus 4 m/s sideways). Missing from the model: rolling resistance and air drag (top speed is a hard 25 m/s cap), so coasting and scrubbing cost little.
+- **Prediction (owner, before the run):** "Both probably help but I think the accelerometer is sufficient"
+- **Setup:** E4 (d)'s recipe (realism 2, squashed actions, LR decay, delay 0–60 ms) plus new sensors (`sensors` option in `dynamics.py`): (e) sideways velocity in the car's frame (with forward speed: the velocity vector); (f) accelerometer, forward and sideways (cheap IMU); (g) both. 500k steps, seeds 0–2, 9 runs on 4 CPUs, about 15 min each. Compared with E4 (d).
+- **Result:** [report](https://claude.ai/artifact/Peia655v6S9mS9WbW3fZ9F)
+
+  | 3-seed mean | Slip > 12° | Slip > 20° | Mean speed | Mean lap | Held-out /20 per seed | Gate range per seed |
+  |---|---|---|---|---|---|---|
+  | hand-coded | 0% | 0% | 11.0 m/s | 25.3 s | 19 | 94% |
+  | (d) no new sensor | 29% | 7% | 8.5 | 32.0 s | 19 / 20 / 17 | 54 / 61 / 51% |
+  | (e) + velocity | 35% | 9% | 8.6 | 32.0 s | 20 / 18 / 20 | 56 / 48 / 59% |
+  | (f) + accelerometer | 27% | 6% | 8.6 | 31.6 s | 19 / 20 / 19 | 47 / 52 / 49% |
+  | (g) + both | 32% | 8% | 8.8 | 31.0 s | 20 / 20 / 20 | 56 / 49 / 57% |
+
+  - No change in sliding or speed. Slightly more reliable at nominal (both sensors: 20/20 in every seed); the steadiest training curves yet. Both sensors: better with sensor noise (87% at 6% noise vs. 70–77%).
+  - Agent's read: the car can now feel the slide, but nothing pushes it to use that. Sliding past the peak costs little here (gentle fall-off, no drag), and the reward is only progress. Its real weakness is caution: full throttle on 2–3% of steps vs. 21%.
+  - Gate-range weak spots: grip 0.4–0.6× (0–20%) and mass 0.65× (about 65%), neither ever trained on.
+- **Explanation (owner, after the run):** "Is it some of the variance we've added? It learns to be cautious because it never knows if it'll hit mud (I don't remember if we're still using sensor noise etc as well)"
+- **Check (agent):** E5 trained at nominal grip and mass, no sensor noise, delay 0–60 ms, and invisible dirt on every track. The hand-coded driver tests the dirt idea:
+  - knowing where the dirt is: 19/20, 25.3 s
+  - blind to dirt (assumes full grip everywhere): 2/20 (crashes on dirt corners)
+  - assuming every corner might be dirt (on a dirt-free track): 20/20, 29.1 s
+  
+  The RL car's 31–32 s sits near the "assume dirt everywhere" driver, so unseen dirt plausibly explains most of its caution.
+- **Takeaway:** a sense only changes behavior if the training makes it pay. Here the dominant risk (invisible dirt) is one no sensor reveals in time, so the car drives every corner as if it might be dirt.
 
 ## Gate check
 

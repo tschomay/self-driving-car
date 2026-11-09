@@ -34,7 +34,7 @@ PRESETS: dict[str, dict] = {
     "base": dict(n_envs=8, ppo=dict(n_steps=256, batch_size=256)),
 }
 ENV_DEFAULTS = dict(tracks="random", reward="progress", crash_penalty=0.0, max_steps=1000, physics="nominal",
-                    dirt=True, obs_keep=None, realism=2, squash=False)
+                    dirt=True, obs_keep=None, realism=2, squash=False, sensors=[])
 # squash: the policy's raw output passes through tanh before reaching the car, so it eases toward ±1
 # instead of being clipped at it (realism=1 runs, E1-E3, predate both options).
 PHASE1_EXPERT = "runs/p1-e1-s1/model.zip"
@@ -73,13 +73,20 @@ def compare(final: dict, baseline: dict, gate: dict | None) -> dict:
                 gate=bool(gate and gate["completion"] >= GATE))
 
 
-def gifs(policy, out: Path, label: str, final: dict, physics="nominal", tracks=None, realism=2) -> list[dict]:
+def car_of(env: dict | None) -> dict:
+    """The car options (realism, sensors) a run used. Runs without them (E1-E3) used realism 1."""
+    if env is None:
+        return dict(realism=2)
+    return dict(realism=env.get("realism", 1), sensors=tuple(env.get("sensors", ())))
+
+
+def gifs(policy, out: Path, label: str, final: dict, physics="nominal", tracks=None, **car) -> list[dict]:
     """Lap GIF on the standard held-out track, plus the first failed held-out track if any."""
     tracks = list(tracks or [GIF_TRACK])
     failed = [r["track"] for r in final["tracks"] if not r["finished"] and r["track"] not in tracks]
     if failed:
         tracks.append(failed[0])
-    rec = robust.laps(policy, physics=physics, seeds=tracks, record=True, realism=realism)
+    rec = robust.laps(policy, physics=physics, seeds=tracks, record=True, **car)
     names = []
     for seed, traj, row in zip(tracks, rec["trajectories"], rec["tracks"]):
         name = f"lap-{seed}.gif"
@@ -92,25 +99,25 @@ def gifs(policy, out: Path, label: str, final: dict, physics="nominal", tracks=N
 def finish(policy, out: Path, m: dict, gif: bool = True, sweep: bool = True) -> dict:
     """Final evaluations shared by every Phase 3 run: nominal laps, gate-range laps, sweeps, GIFs."""
     t0 = time.perf_counter()
-    rl = m.get("env", {}).get("realism", 1 if "env" in m else 2)
-    m["final_eval"] = robust.laps(policy, realism=rl)
-    m["gate_laps"] = robust.gate_laps(policy, realism=rl)
-    m["train_range_laps"] = robust.gate_laps(policy, physics=dy.TRAIN_DR, seed=777, realism=rl)
+    car = car_of(m.get("env"))
+    m["final_eval"] = robust.laps(policy, **car)
+    m["gate_laps"] = robust.gate_laps(policy, **car)
+    m["train_range_laps"] = robust.gate_laps(policy, physics=dy.TRAIN_DR, seed=777, **car)
     if sweep:
-        m["sweep"] = robust.sweep(policy, realism=rl)
+        m["sweep"] = robust.sweep(policy, **car)
     m["compare"] = compare(m["final_eval"], m["baseline"], m["gate_laps"])
     who = m["label"] + (f", seed {m['seed']}" if m["preset"] == "base" else "")
-    m["gifs"] = gifs(policy, out, who, m["final_eval"], realism=rl) if gif else []
-    m["motion"] = motion(policy, rl)
+    m["gifs"] = gifs(policy, out, who, m["final_eval"], **car) if gif else []
+    m["motion"] = motion(policy, **car)
     m["eval_wall_s"] = round(time.perf_counter() - t0, 1)
     (out / "metrics.json").write_text(json.dumps(m, indent=1, default=float))
     return m
 
 
-def motion(policy, realism=2) -> dict:
+def motion(policy, **car) -> dict:
     """How smoothly it drives on the held-out laps (nominal physics): mean steering change per step,
     share of steps at full lock, share of steps with an axle sliding more than 4°."""
-    r = robust.laps(policy, record=True, realism=realism)
+    r = robust.laps(policy, record=True, **car)
     ds, lock, slide = [], [], []
     for tr in r["trajectories"]:
         st = np.array([s["steer"] for s in tr])   # steering command, -1..1
@@ -121,8 +128,8 @@ def motion(policy, realism=2) -> dict:
                 sliding=round(float(np.mean(slide)), 3))
 
 
-def baseline_laps(realism=2) -> dict:
-    return robust.laps(dy.DynamicPursuit(), realism=realism)
+def baseline_laps(**car) -> dict:
+    return robust.laps(dy.DynamicPursuit(), **car)
 
 
 def pursuit_run(out="runs/p3-pursuit", gif=True) -> dict:
@@ -163,8 +170,8 @@ def train(preset="base", seed=0, total_timesteps=1_000_000, out="runs/p3", overr
     env_cfg = {**ENV_DEFAULTS, **(env or {})}
     keep = env_cfg.pop("obs_keep")
     squash = env_cfg.pop("squash")
-    rl = env_cfg["realism"]
-    baseline = baseline_laps(rl)
+    car = dict(realism=env_cfg["realism"], sensors=tuple(env_cfg["sensors"]))
+    baseline = baseline_laps(**car)
 
     class Metrics(BaseCallback):
         def __init__(self):
@@ -176,8 +183,8 @@ def train(preset="base", seed=0, total_timesteps=1_000_000, out="runs/p3", overr
         def _eval(self):
             pol = sb3_policy(self.model, keep, squash)
             self.evals.append(dict(timesteps=int(self.num_timesteps), wall_s=round(time.perf_counter() - self._t0, 2),
-                                   **_summary(robust.laps(pol, realism=rl)),
-                                   gate_range=robust.gate_laps(pol, draws=1, realism=rl)["completion"]))
+                                   **_summary(robust.laps(pol, **car)),
+                                   gate_range=robust.gate_laps(pol, draws=1, **car)["completion"]))
 
         def _on_step(self):
             for info in self.locals["infos"]:
@@ -221,7 +228,7 @@ def regif(run_dir) -> None:
     else:
         pol = sb3_policy(PPO.load(out / "model.zip", device="cpu"), m["env"].get("obs_keep"), m["env"].get("squash", False))
     m["gifs"] = gifs(pol, out, m["label"] + (f", seed {m['seed']}" if m["preset"] == "base" else ""), m["final_eval"],
-                     realism=m.get("env", {}).get("realism", 1 if "env" in m else 2))
+                     **car_of(m.get("env")))
     (out / "metrics.json").write_text(json.dumps(m, indent=1, default=float))
 
 

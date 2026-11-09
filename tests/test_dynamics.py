@@ -75,3 +75,15 @@ def test_hand_coded_driver_laps_and_phase1_adapter():
     b = _car()
     a = dy.phase1_policy(lambda o: np.ones((len(o), 2)))(b)
     assert a.shape == (1, 2) and np.isclose(a[0, 0], 1.0)   # at standstill the full lock is allowed
+
+
+def test_extra_sensors_read_sideways_motion():
+    b = dy.DynamicRacerBatch(1, tracks=[10001], start="line", dirt=False, sensors=("velocity", "accel"))
+    o = b.reset()
+    assert o.shape == (1, dy.OBS_DIM + 3)
+    b.vx[:] = 15.0
+    for _ in range(5):
+        o, *_ = b.step(np.array([[0.5, 0.0]]))   # steady left turn: slides outward (−y), pulled inward (+y)
+    vy, ax, ay = o[0, dy.OBS_DIM:]
+    assert vy < 0 and ay > 0.2
+    assert np.isclose(ay * dy.G, b.vx[0] * b.yaw_rate[0], rtol=0.3)   # sideways g ≈ v·(turn rate)

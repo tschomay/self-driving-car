@@ -1,10 +1,10 @@
 # Phase 2 — Pixels → CNN
 
-- **Status:** in progress; started 2026-11-08
+- **Status:** gate passed (2026-11-09); started 2026-11-08
 - **Goal / gate:** replace rays with a low-res camera image (top-down crop first, then ego/chase view) through a small CNN encoder. **Gate:** the CNN policy reaches ≥ 90% of the Phase 1 policy's held-out lap completion (Phase 1 gate: 20/20, so ≥ 18/20 on tracks 10000–10019). A saliency/attention visualization shows the network keying on track edges, not artifacts.
 - **Learn:** convolutions, frame stacking, why pixels are sample-hungry, data augmentation (DrQ-style random shifts), imitation learning (behavior cloning from the Phase 1 expert) vs. RL from scratch, saliency maps.
-- **Code:** `sdc/racer/camera.py` (camera, frame stack), `sdc/racer/camera_env.py` (SB3 adapter, camera policy for lap evaluation), `sdc/phase2/train.py` (SB3 PPO on pixels, checkpoint/resume), `tests/test_camera.py`
-- **How to reproduce the gate:** _to come_
+- **Code:** `sdc/racer/camera.py` (camera, frame stack), `sdc/racer/camera_env.py` (SB3 adapter, camera policy for lap evaluation), `sdc/phase2/train.py` (SB3 PPO on pixels, checkpoint/resume), `sdc/phase2/bc.py` (behavior cloning), `sdc/phase2/my_cnn.py` (owner's encoder), `sdc/phase2/saliency.py`, `sdc/phase2/report.py`, `sdc/phase2/gate.py`, `tests/test_camera.py`, `tests/test_my_cnn.py`
+- **How to reproduce the gate:** `python -m sdc.phase2.gate` (about 14 min on 1 thread; trains the Phase 1 expert first if `runs/p1-e1-s1` is missing)
 - **Previous gate:** Phase 1 passed (2026-11-08).
 
 ## Phase-entry decisions (owner, 2026-11-08)
@@ -117,4 +117,39 @@ Then the gate check: the owner's CNN on the 20 held-out tracks, plus a saliency 
 
 ## Gate check
 
+- **Run:** 2026-11-09, `python -m sdc.phase2.gate`, commit 9b30021. The owner's CNN encoder (`sdc/phase2/my_cnn.py`) trained by behavior cloning (E5 recipe: noise 0.3, speed + 1 image, 64k samples, 20 epochs), seed 0, 1 torch thread, cloud container (4 CPU, no GPU). [Gate report](https://claude.ai/artifact/32wAV6HVcJ69SNhLwSyAXS).
+- **Result vs. threshold:**
+  - Held-out lap completion **19/20 = 95%** (tracks 10000–10019) vs. ≥ 90% of Phase 1's 100% (≥ 18/20): pass. Lap time 0.945× pure pursuit on finished tracks. The one failure: track 10000, off the road at 40% (the 6.9 m corner).
+  - Saliency: steering edge enrichment **1.82** (throttle 1.69) vs. > 1: pass. The figure shows steering keyed on the road edges ahead, strongest where the road bends; nothing in the image besides the road and its edges draws attention (there are no other artifacts in this camera to key on). The > 1 criterion was set after E5's numbers were seen.
+  - Whole command 13.4 min. It reproduced E5 seed 0 exactly (same completion, same lap times, same enrichment), so pinned seeds and threads hold.
+- **Verdict:** **PASS.**
+
 ## Handoff to next phase
+
+**Built and reusable in Phase 3**
+- `sdc/racer/camera.py`: ego-centred top-down 64×64 camera (0.625 m/px, 35 m ahead), frame stacks, DrQ shift. `sdc/racer/camera_env.py`: SB3 VecEnv with image (+ speed) observations and `CameraPolicy` for lap evaluation.
+- `sdc/phase2/bc.py`: behavior cloning of the Phase 1 ray expert (noise, frames, speed, encoder options). 64k samples + 20 epochs: 5 min (NatureCNN) or 14 min (owner's CNN).
+- `sdc/phase2/train.py`: SB3 PPO on pixels with checkpoint/resume and `--init` from a cloned policy.
+- `sdc/phase2/my_cnn.py`: the owner's encoder (32@5×5 s2 → 64@3×3 s2 → 64@3×3 s2 → 64@3×3 s1, ReLU, 128 features).
+- `sdc/phase2/saliency.py`: SmoothGrad maps and the edge-enrichment number. Reports can embed saliency figures.
+
+**What the owner learned (in their words, condensed)**
+- Pixels make the network learn position and speed before it can learn controls (E1).
+- Too big a step blows out the early perception instead of locking it in; there's a lot more to learn (E1b).
+- Copying needs variety: wobbly data teaches recovery (E3).
+- Random shifts too big relative to the road make the right answer change, so nothing is learned (E4).
+- One image has no speed; stacked frames estimate it, but imperfectly in turns (E2).
+- A fine first layer looks at details, so the encoder watches edges more (E5).
+
+**Surprises worth remembering**
+- PPO from pixels with Phase 1's settings never learned to drive in 2M steps (1.6 h per run), and got worse after an early peak. Behavior cloning with noisy data drove 90–95% in 5 minutes.
+- Lower training loss doesn't mean better driving (clean copy: lowest loss, 10–25%).
+- PPO fine-tuning from a good copy first made it worse (untrained critic plus exploration noise).
+- A standard trick (DrQ shifts) hurt here, because the image frame is the ruler: the car sits at a fixed pixel.
+- Held-out track 10000's 6.9 m corner is still the hardest spot.
+
+**For Phase 3 (realistic dynamics and robustness)**
+- No phase-entry decision is deferred to Phase 3 in the roadmap. The Phase 3 exit decides whether to do Phase 4.
+- Open question: Phase 3 changes the physics (tire slip, latency, noise, randomized friction), so the Phase 1 ray expert won't be an expert any more. Either retrain a ray expert under the new physics first (cheap: rays + PPO took minutes) and clone it into pixels, or do Phase 3 on rays and return to pixels later. The owner decides at Phase 3 entry.
+- PPO from pixels needs a smaller learning rate (3e-5) to stay stable, and is about 10× slower per step than rays. Modal hasn't been needed so far.
+- Keep the speed number (E2). Actuation latency in Phase 3 makes the last action part of the state, so add it to the observation (the owner's Phase 1 question).

@@ -37,9 +37,31 @@ def conv_layers(in_channels: int) -> nn.Sequential | None:
     """OWNER TODO 1: the convolution stack.
 
     Input: (batch, in_channels, 64, 64), pixel values scaled to 0..1 (in_channels = stacked frames).
-    Return an nn.Sequential of Conv2d layers, each followed by an activation (OWNER TODO 2).
+    Return an nn.Sequential of Conv2d layers, each followed by the activation (OWNER TODO 2).
     Example of the syntax only: nn.Conv2d(in_channels, 16, kernel_size=5, stride=2), nn.ReLU()
+
+    Owner's design (2026-11-09), worked out with the agent: fine detail first, then shrink.
+      layer  filters  kernel  stride   map     each output sees
+      1      32       5×5     2        30×30   5 px  (3 m)
+      2      64       3×3     2        14×14   9 px  (6 m)
+      3      64       3×3     2        6×6     17 px (11 m)
+      4      64       3×3     1        4×4     33 px (21 m)  → 1,024 numbers into the squeeze
+    (A first version with stride 1 in layers 2-4 gave 26×26 maps, 43k numbers, 11M weights and
+    8 m per output; the owner wanted features that see further at an affordable cost.)
     """
+    act = activation
+    if act() is None:
+        return None
+    return nn.Sequential(
+        nn.Conv2d(in_channels, 32, kernel_size=5, stride=2), act(),
+        nn.Conv2d(32, 64, kernel_size=3, stride=2), act(),
+        nn.Conv2d(64, 64, kernel_size=3, stride=2), act(),
+        nn.Conv2d(64, 64, kernel_size=3, stride=1), act(),
+    )
+
+
+def activation() -> nn.Module | None:
+    """OWNER TODO 2: the nonlinearity after each layer (e.g. nn.ReLU(), nn.Tanh(), nn.ELU())."""
     return None
 
 
@@ -59,7 +81,7 @@ class MyEncoder(BaseFeaturesExtractor):
         with torch.no_grad():
             n_flat = convs(torch.zeros(1, *img_space.shape)).flatten(1).shape[1]
         self.convs = convs
-        self.linear = nn.Sequential(nn.Linear(n_flat, FEATURES_DIM), nn.ReLU())
+        self.linear = nn.Sequential(nn.Linear(n_flat, FEATURES_DIM), activation())
         self.n_flat = n_flat
 
     def forward(self, obs: dict) -> torch.Tensor:

@@ -87,3 +87,16 @@ def test_extra_sensors_read_sideways_motion():
     vy, ax, ay = o[0, dy.OBS_DIM:]
     assert vy < 0 and ay > 0.2
     assert np.isclose(ay * dy.G, b.vx[0] * b.yaw_rate[0], rtol=0.3)   # sideways g ≈ v·(turn rate)
+
+
+def test_history_remembers_recent_own_motion():
+    b = dy.DynamicRacerBatch(2, tracks=[10001, 10002], start="line", dirt=False, sensors=("accel",), history=3)
+    o = b.reset()
+    p = len(b.proprio)   # speed, 2 commands, gyro, 2 accel
+    assert p == 6 and o.shape == (2, dy.OBS_DIM + 2 + 2 * p)
+    assert np.all(o[:, -2 * p:] == 0)                       # nothing remembered yet
+    o1, *_ = b.step(np.array([[0.2, 1.0], [0.0, 1.0]]))
+    o2, *_ = b.step(np.array([[0.4, 0.5], [0.0, 1.0]]))
+    base = dy.OBS_DIM + 2
+    assert np.allclose(o2[:, base:base + p], o1[:, b.proprio])            # 1 step ago
+    assert np.allclose(o2[0, base + 1:base + 3], [0.2, 1.0])              # ...including the command then

@@ -34,7 +34,7 @@ PRESETS: dict[str, dict] = {
     "base": dict(n_envs=8, ppo=dict(n_steps=256, batch_size=256)),
 }
 ENV_DEFAULTS = dict(tracks="random", reward="progress", crash_penalty=0.0, max_steps=1000, physics="nominal",
-                    dirt=True, obs_keep=None, realism=2, squash=False, sensors=[])
+                    dirt=True, obs_keep=None, realism=2, squash=False, sensors=[], history=1)
 # squash: the policy's raw output passes through tanh before reaching the car, so it eases toward ±1
 # instead of being clipped at it (realism=1 runs, E1-E3, predate both options).
 PHASE1_EXPERT = "runs/p1-e1-s1/model.zip"
@@ -77,7 +77,7 @@ def car_of(env: dict | None) -> dict:
     """The car options (realism, sensors) a run used. Runs without them (E1-E3) used realism 1."""
     if env is None:
         return dict(realism=2)
-    return dict(realism=env.get("realism", 1), sensors=tuple(env.get("sensors", ())))
+    return dict(realism=env.get("realism", 1), sensors=tuple(env.get("sensors", ())), history=env.get("history", 1))
 
 
 def gifs(policy, out: Path, label: str, final: dict, physics="nominal", tracks=None, **car) -> list[dict]:
@@ -170,7 +170,7 @@ def train(preset="base", seed=0, total_timesteps=1_000_000, out="runs/p3", overr
     env_cfg = {**ENV_DEFAULTS, **(env or {})}
     keep = env_cfg.pop("obs_keep")
     squash = env_cfg.pop("squash")
-    car = dict(realism=env_cfg["realism"], sensors=tuple(env_cfg["sensors"]))
+    car = dict(realism=env_cfg["realism"], sensors=tuple(env_cfg["sensors"]), history=env_cfg["history"])
     baseline = baseline_laps(**car)
 
     class Metrics(BaseCallback):

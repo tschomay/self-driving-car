@@ -188,8 +188,8 @@ Then the gate check, and the go/no-go on Phase 4.
   - Cost: about 6% slower at nominal (33.5 s vs. 31.6 s).
   - Gate-lap failures by grip (300 laps): 0.5–0.7×: 9% finished; 0.7–0.9×: 46%; 0.9–1.1×: 92%; 1.1–1.3×: 93%. Light cars (0.65–0.8×): 33%.
   - Implication: a car perfect at grip ≥ 0.7× and hopeless below would score about 75%. The gate needs most laps at 0.5–0.7× grip to finish. The hand-coded driver does that (95%, about 35 s laps) because it knows the grip.
-- **Explanation (owner, after the run):** _pending_
-- **Takeaway:** _pending_
+- **Explanation (owner, after the run):** "It must not be learning grip as a variable to adjust to, but rather as noise to drive conservatively enough that it's ok in the range of what it has seen."
+- **Takeaway:** domain randomization without a way to identify the condition buys robustness only inside the trained range, by being cautious enough for its worst case. To handle grip it never saw, the car has to estimate grip as it drives and adapt to it.
 
 ## Gate check
 

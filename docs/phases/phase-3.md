@@ -80,6 +80,24 @@ Then the gate check, and the go/no-go on Phase 4.
 - **Takeaway:** a policy trained where grip is free learns habits (full lock plus full brake) that break the moment grip becomes a shared budget. Retraining in the new car fixes nominal driving (75–85%), but not other grips.
 - **Owner's request (2026-11-09):** GIFs now show steering and pedal as gauges under the map instead of numbers, and leave skid marks that get darker and thicker the more an axle slides (from 4°, full at 20°). The E1 report was republished with the new GIFs.
 
+### E2 — Trained at one grip, how does it do at others?
+
+- **Prediction (owner, before the run):** "It might struggle with learning to drive. The rules based on what it measures aren't fixed anymore. It has to learn to react to the situation and determine what impact its reaction has. I think it can learn with enough training but it will cost some speed"
+- **Setup:** E1's retrained runs (grip fixed at 1.0×) vs. new runs with grip drawn uniformly from 0.7–1.1× each episode (mass, delay, noise nominal). Same settings as E1: SB3 PPO, 500k steps, seeds 0–2, about 5.5 min each. Robustness curve: held-out tracks with dirt at grip 0.4–1.3×, the other knobs nominal.
+- **Result:** [report](https://claude.ai/artifact/6GkRXA1c65jnERAaZyH7P7)
+
+  | Grip | 0.6× | 0.7× | 0.8× | 0.9× | 1.0× | 1.1× | 1.3× |
+  |---|---|---|---|---|---|---|---|
+  | fixed 1.0× (3-seed mean) | 2% | 22% | 45% | 70% | 80% | 87% | 85% |
+  | randomized 0.7–1.1× | 7% | 32% | 63% | 72% | 78% | 82% | 82% |
+
+  - Both 0% at 0.4–0.5×. Train-range laps (100): fixed 51–62%, randomized 60–61%. Gate range: 35–45% vs. 42–45%.
+  - Cost: about 4% slower at nominal (29.7 s vs. 28.0 s mean lap; 1.18× vs. 1.14× the hand-coded driver). Same nominal completion.
+  - Learning speed no slower (at 150k steps: 45–90% vs. 30–75%).
+  - Side effect: more robust to heavy mass (1.35×: 95% vs. 82%), though mass wasn't randomized.
+- **Explanation (owner, after the run):** "It doesn't know the situation until it's too late to react appropriately"
+- **Takeaway:** randomization only teaches caution as far as the car can sense the condition. Grip is felt only once the tires slide, so at low grip that's already too late in a corner. It buys a little robustness for about 4% speed.
+
 ## Gate check
 
 ## Handoff to next phase

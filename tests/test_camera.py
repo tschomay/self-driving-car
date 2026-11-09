@@ -60,3 +60,16 @@ def test_random_shift():
         a, b = imgs.reshape(6, 8, 8)[k], out.reshape(6, 8, 8)[k]
         assert any(np.array_equal(a[2:6, 2:6], b[2 + dy:6 + dy, 2 + dx:6 + dx])
                    for dy in range(-2, 3) for dx in range(-2, 3))
+
+
+def test_saliency_edge_enrichment():
+    from sdc.phase2 import saliency
+
+    img = np.full((8, 8), camera.GRASS, np.uint8)
+    img[:, 3] = camera.EDGE
+    m = saliency.edge_mask(img, grow=1)
+    assert m[:, 2:5].all() and not m[:, 0].any()
+    sal = np.zeros((8, 8))
+    sal[:, 3] = 1.0                                   # all saliency on the edge line
+    assert saliency.enrichment(sal, img) > 2.5        # edge band covers 3/8 of the image → 8/3
+    assert abs(saliency.enrichment(np.ones((8, 8)), img) - 1.0) < 1e-9

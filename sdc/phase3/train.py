@@ -106,7 +106,7 @@ def finish(policy, out: Path, m: dict, gif: bool = True, sweep: bool = True) -> 
     if sweep:
         m["sweep"] = robust.sweep(policy, **car)
     m["compare"] = compare(m["final_eval"], m["baseline"], m["gate_laps"])
-    who = m["label"] + (f", seed {m['seed']}" if m["preset"] == "base" else "")
+    who = m["label"] + (f", seed {m['seed']}" if m["preset"] in ("base", "mine") else "")
     m["gifs"] = gifs(policy, out, who, m["final_eval"], **car) if gif else []
     m["motion"] = motion(policy, **car)
     m["eval_wall_s"] = round(time.perf_counter() - t0, 1)
@@ -225,9 +225,12 @@ def regif(run_dir) -> None:
     elif m["preset"] == "phase1":
         model = PPO.load(PHASE1_EXPERT, device="cpu")
         pol = dy.phase1_policy(lambda o: model.predict(o, deterministic=True)[0])
+    elif m["preset"] == "mine":
+        from sdc.phase3.my_ppo import load_policy
+        pol = load_policy(out)[0]
     else:
         pol = sb3_policy(PPO.load(out / "model.zip", device="cpu"), m["env"].get("obs_keep"), m["env"].get("squash", False))
-    m["gifs"] = gifs(pol, out, m["label"] + (f", seed {m['seed']}" if m["preset"] == "base" else ""), m["final_eval"],
+    m["gifs"] = gifs(pol, out, m["label"] + (f", seed {m['seed']}" if m["preset"] in ("base", "mine") else ""), m["final_eval"],
                      **car_of(m.get("env")))
     (out / "metrics.json").write_text(json.dumps(m, indent=1, default=float))
 

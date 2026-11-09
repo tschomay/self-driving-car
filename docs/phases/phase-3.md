@@ -178,6 +178,19 @@ Then the gate check, and the go/no-go on Phase 4.
   The RL car's 31–32 s sits near the "assume dirt everywhere" driver, so unseen dirt plausibly explains most of its caution.
 - **Takeaway:** a sense only changes behavior if the training makes it pay. Here the dominant risk (invisible dirt) is one no sensor reveals in time, so the car drives every corner as if it might be dirt.
 
+### E6 — What does full randomization cost and buy?
+
+- **Prediction (owner, before the run):** "I think it will get us close to gate range. grip and mass are really related, but one of those curves will move the most. Only costs a little time at normal physics, and maybe not even that" (owner chose the accelerometer only, no velocity sensor, from here on)
+- **Setup:** E5 (f) (accelerometer, delay 0–60 ms only) vs. (h) full train-range randomization: grip 0.7–1.1×, mass 0.8–1.2×, delay 0–60 ms, noise 0–2%. Realism 2, squashed actions, LR decay, 500k steps, seeds 0–2, about 6.5 min each.
+- **Result:** [report](https://claude.ai/artifact/XFCGQQ14trJC94pC31bh6H)
+  - Gate range: 47–52% → **50–72%** (51 / 72 / 50%). Train range 66–73% → 74–92%. Held-out at nominal: 20/20 in all 3 seeds.
+  - Curves (delay-only vs. full): noise 6%: 70% → 93%; grip 0.7×: 33% → 63%; grip 0.6×: 20% → 35%; mass 0.65×: 65% → 75%; delay 150 ms: 72% → 62%.
+  - Cost: about 6% slower at nominal (33.5 s vs. 31.6 s).
+  - Gate-lap failures by grip (300 laps): 0.5–0.7×: 9% finished; 0.7–0.9×: 46%; 0.9–1.1×: 92%; 1.1–1.3×: 93%. Light cars (0.65–0.8×): 33%.
+  - Implication: a car perfect at grip ≥ 0.7× and hopeless below would score about 75%. The gate needs most laps at 0.5–0.7× grip to finish. The hand-coded driver does that (95%, about 35 s laps) because it knows the grip.
+- **Explanation (owner, after the run):** "It must not be learning grip as a variable to adjust to, but rather as noise to drive conservatively enough that it's ok in the range of what it has seen."
+- **Takeaway:** domain randomization without a way to identify the condition buys robustness only inside the trained range, by being cautious enough for its worst case. To handle grip it never saw, the car has to estimate grip as it drives and adapt to it.
+
 ## Gate check
 
 ## Handoff to next phase

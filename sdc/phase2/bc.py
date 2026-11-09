@@ -62,7 +62,7 @@ def collect(expert, cars: int, steps: int, noise: float, seed: int, n_frames: in
 def train(seed: int = 0, out: str | Path = "runs/p2-bc", noise: float = 0.0, cars: int = 16, steps: int = 4000,
           epochs: int = 20, lr: float = 3e-4, batch: int = 256, init_std: float = 0.5, label: str | None = None,
           expert_path: str = EXPERT, threads: int = 1, gif: bool = True, shift: int = 0, n_frames: int = 1,
-          speed: bool = True) -> dict:
+          speed: bool = True, encoder: str = "nature") -> dict:
     import torch
     from stable_baselines3 import PPO
 
@@ -78,8 +78,13 @@ def train(seed: int = 0, out: str | Path = "runs/p2-bc", noise: float = 0.0, car
     collect_s = time.perf_counter() - t0
 
     env_cfg = {**ENV_DEFAULTS, "n_frames": n_frames, "speed": speed}
-    model = PPO("MultiInputPolicy", CameraVecEnv(2, seed=seed, n_frames=n_frames, speed=speed), seed=seed, device="cpu", verbose=0,
-                n_steps=256, batch_size=256)
+    policy_kwargs = {}
+    if encoder == "mine":   # the owner's CNN (sdc/phase2/my_cnn.py) instead of SB3's NatureCNN
+        from sdc.phase2.my_cnn import MyEncoder
+
+        policy_kwargs = dict(features_extractor_class=MyEncoder)
+    model = PPO("MultiInputPolicy", CameraVecEnv(2, seed=seed, n_frames=n_frames, speed=speed), seed=seed, device="cpu",
+                verbose=0, n_steps=256, batch_size=256, policy_kwargs=policy_kwargs)
     pol = model.policy
     with torch.no_grad():
         pol.log_std.fill_(float(np.log(init_std)))
@@ -122,7 +127,7 @@ def train(seed: int = 0, out: str | Path = "runs/p2-bc", noise: float = 0.0, car
     final = evaluate.run_laps(policy_of(model, env_cfg))
     m = dict(label=label or out.name, preset="bc", seed=seed, threads=threads, n_envs=cars,
              ppo=dict(method="behavior cloning", epochs=epochs, lr=lr, batch=batch, init_std=init_std),
-             env=dict(noise=noise, shift=shift, n_frames=n_frames, speed=speed, expert=expert_path, samples=int(n), cars=cars, steps_per_car=steps),
+             env=dict(noise=noise, shift=shift, n_frames=n_frames, speed=speed, encoder=encoder, expert=expert_path, samples=int(n), cars=cars, steps_per_car=steps),
              total_timesteps=int(n), trained_timesteps=int(n), train_wall_s=round(collect_s + train_s, 1),
              collect_wall_s=round(collect_s, 1), data_crashes=crashes, bc_epochs=hist, episodes=[], evals=[],
              final_eval=final, baseline=baseline, compare=evaluate.compare(final, baseline))
@@ -146,9 +151,10 @@ def main():
     p.add_argument("--shift", type=int, default=0, help="DrQ random shift of training images, ±pixels")
     p.add_argument("--frames", type=int, default=1, help="camera images stacked per observation")
     p.add_argument("--no-speed", action="store_true", help="don't give the policy its speed as a number")
+    p.add_argument("--encoder", default="nature", choices=["nature", "mine"], help="SB3 NatureCNN or sdc/phase2/my_cnn.py")
     a = p.parse_args()
     m = train(a.seed, a.out, a.noise, a.cars, a.steps, a.epochs, a.lr, init_std=a.init_std, label=a.label,
-              expert_path=a.expert, shift=a.shift, n_frames=a.frames, speed=not a.no_speed)
+              expert_path=a.expert, shift=a.shift, n_frames=a.frames, speed=not a.no_speed, encoder=a.encoder)
     fe = m["final_eval"]
     print(f"{m['label']}: held-out completion {fe['completion']:.0%}, mean lap {fe['mean_lap_time']} s, "
           f"ratio {m['compare']['lap_time_ratio']}; {m['trained_timesteps']} expert samples, "

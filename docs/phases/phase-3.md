@@ -145,8 +145,8 @@ Then the gate check, and the go/no-go on Phase 4.
   - (d) is the most robust: delay 87–93% up to 120 ms, 72% at 150 ms (others 45–50%); best gate range.
   - The new car fixed most of the training wobble: (c) and (d) stay at 85–100% held-out from 150k steps on.
   - Agent's read: the car can't sense sideways sliding (gyro only, no sideways accelerometer); training may also be too short.
-- **Explanation (owner, after the run):** _pending_
-- **Takeaway:** _pending_
+- **Explanation (owner, after the run):** "it doesn't know that it's going sideways. Instead of speed, it should see velocity and compare that vector with the direction it's facing"
+- **Takeaway:** sim fidelity mattered more than learning tricks: once twitching stopped paying, big slides and training wobble dropped and robustness rose. But the car still can't sense a slide, so it drives slowly and slides anyway. Next: give it a way to sense sideways motion.
 
 ## Gate check
 

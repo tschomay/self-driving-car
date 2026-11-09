@@ -61,11 +61,14 @@ def conv_layers(in_channels: int) -> nn.Sequential | None:
 
 
 def activation() -> nn.Module | None:
-    """OWNER TODO 2: the nonlinearity after each layer (e.g. nn.ReLU(), nn.Tanh(), nn.ELU())."""
-    return None
+    """OWNER TODO 2: the nonlinearity after each layer (e.g. nn.ReLU(), nn.Tanh(), nn.ELU()).
+
+    Owner's choice (2026-11-09): ReLU (negative → 0, positive passes through).
+    """
+    return nn.ReLU()
 
 
-FEATURES_DIM = None   # OWNER TODO 3: size of the vector the image is squeezed into (e.g. 64, 128, 256)
+FEATURES_DIM = 128    # OWNER TODO 3 (owner's choice, 2026-11-09): size of the vector the image is squeezed into
 
 
 class MyEncoder(BaseFeaturesExtractor):

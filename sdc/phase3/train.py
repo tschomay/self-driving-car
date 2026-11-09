@@ -85,7 +85,8 @@ def finish(policy, out: Path, m: dict, gif: bool = True, sweep: bool = True) -> 
     if sweep:
         m["sweep"] = robust.sweep(policy)
     m["compare"] = compare(m["final_eval"], m["baseline"], m["gate_laps"])
-    m["gifs"] = gifs(policy, out, m["label"], m["final_eval"]) if gif else []
+    who = m["label"] + (f", seed {m['seed']}" if m["preset"] == "base" else "")
+    m["gifs"] = gifs(policy, out, who, m["final_eval"]) if gif else []
     m["eval_wall_s"] = round(time.perf_counter() - t0, 1)
     (out / "metrics.json").write_text(json.dumps(m, indent=1, default=float))
     return m
@@ -175,6 +176,22 @@ def train(preset="base", seed=0, total_timesteps=1_000_000, out="runs/p3", overr
     return finish(sb3_policy(model, keep), out, m, gif, sweep)
 
 
+def regif(run_dir) -> None:
+    """Redraw a finished run's GIFs (e.g. after a rendering change) from its saved model."""
+    from stable_baselines3 import PPO
+    out = Path(run_dir)
+    m = json.loads((out / "metrics.json").read_text())
+    if m["preset"] == "pursuit":
+        pol = dy.DynamicPursuit()
+    elif m["preset"] == "phase1":
+        model = PPO.load(PHASE1_EXPERT, device="cpu")
+        pol = dy.phase1_policy(lambda o: model.predict(o, deterministic=True)[0])
+    else:
+        pol = sb3_policy(PPO.load(out / "model.zip", device="cpu"), m["env"].get("obs_keep"))
+    m["gifs"] = gifs(pol, out, m["label"] + (f", seed {m['seed']}" if m["preset"] == "base" else ""), m["final_eval"])
+    (out / "metrics.json").write_text(json.dumps(m, indent=1, default=float))
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--preset", default="base", choices=[*PRESETS, "pursuit", "phase1"])
@@ -188,7 +205,12 @@ def main():
     p.add_argument("--label", default=None)
     p.add_argument("--threads", type=int, default=1)
     p.add_argument("--no-sweep", action="store_true")
+    p.add_argument("--regif", nargs="+", metavar="RUN_DIR", help="only redraw these runs' GIFs")
     a = p.parse_args()
+    if a.regif:
+        for d in a.regif:
+            regif(d)
+        return
 
     def parse(kvs):
         return {k: json.loads(v) for k, v in (kv.split("=", 1) for kv in kvs)}

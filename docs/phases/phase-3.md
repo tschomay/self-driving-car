@@ -76,8 +76,9 @@ Then the gate check, and the go/no-go on Phase 4.
 
   - Phase 1 policy: 0/20 at every point of every sweep, even at 1.3× grip. 18 attempts leave the road 12–50% into the lap; 2 spin, stop and time out. Mechanism (checked step by step): full steering lock plus full brake into corners. Full brake exceeds what the tires hold, so the wheels lock and can't steer; the fronts slide 20–60° past their 6–9° peak and the car ploughs straight off.
   - Retrained: the held-out curve swings 50–100% between checks every 50k steps (best checkpoints 95–100%). Tracks 10003 and 10005 fail in all 3 seeds. Below 0.8× grip it collapses.
-- **Explanation (owner, after the run):** _pending_
-- **Takeaway:** _pending_
+- **Explanation (owner, after the run):** "Even with extra grip, the grip budget is shared, full brake can lock the wheels, and sliding wheels have less friction."
+- **Takeaway:** a policy trained where grip is free learns habits (full lock plus full brake) that break the moment grip becomes a shared budget. Retraining in the new car fixes nominal driving (75–85%), but not other grips.
+- **Owner's request (2026-11-09):** GIFs now show steering and pedal as gauges under the map instead of numbers, and leave skid marks that get darker and thicker the more an axle slides (from 4°, full at 20°). The E1 report was republished with the new GIFs.
 
 ## Gate check
 

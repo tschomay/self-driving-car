@@ -17,12 +17,17 @@ from sdc.racer import track as trk
 
 SIZE = 480
 PAD_TOP = 64      # white band for the readout lines
+BAND = 44         # white strip under the map for the control gauges
 GRASS = (214, 226, 206)
 ROAD = (120, 126, 134)
 EDGE = (245, 245, 245)
 RAY = (31, 111, 235)
 CAR = (180, 70, 43)
 DIRT = (176, 138, 92)
+ACCENT = (31, 111, 235)
+GAS = (15, 138, 106)
+BRAKE_COL = (190, 50, 40)
+SKID_START, SKID_FULL = 4.0, 20.0   # degrees of slip: marks appear, then reach full darkness/width
 
 
 def _area(p):
@@ -40,7 +45,7 @@ class Painter:
         self.size = size
         self.off = (size - (hi - lo) * self.scale) / 2
         outer, inner = (t.left, t.right) if _area(t.left) > _area(t.right) else (t.right, t.left)
-        base = Image.new("RGB", (size, size + PAD_TOP), (255, 255, 255))
+        base = Image.new("RGB", (size, size + PAD_TOP + BAND), (255, 255, 255))
         d = ImageDraw.Draw(base)
         d.rectangle([0, PAD_TOP, size, size + PAD_TOP], fill=GRASS)
         d.polygon([tuple(p) for p in self.px(outer)], fill=ROAD)
@@ -59,12 +64,36 @@ class Painter:
             d.line([tuple(a + (b - a) * f), tuple(a + (b - a) * g)], fill=(0, 0, 0) if k % 2 else (255, 255, 255),
                    width=4)
         self.base = base
+        self.skid = Image.new("RGBA", base.size, (0, 0, 0, 0))   # skid marks build up over the lap
 
     def px(self, p):
         p = np.atleast_2d(p)
         x = (p[:, 0] - self.lo[0]) * self.scale + self.off[0]
         y = self.size - ((p[:, 1] - self.lo[1]) * self.scale + self.off[1]) + PAD_TOP
         return np.stack([x, y], axis=1)
+
+    def wheels(self, s: dict) -> tuple[np.ndarray, np.ndarray]:
+        """(front pair, rear pair) of wheel positions in metres. Dynamic-car states put pos at the centre of mass."""
+        pos, h = np.asarray(s["pos"]), s["heading"]
+        fwd = np.array([np.cos(h), np.sin(h)])
+        left = np.array([-fwd[1], fwd[0]])
+        half = sim.WHEELBASE / 2
+        c = pos if "slip" in s else pos + fwd * half
+        side = left * sim.CAR_WID * 0.45
+        return (np.stack([c + fwd * half + side, c + fwd * half - side]),
+                np.stack([c - fwd * half + side, c - fwd * half - side]))
+
+    def add_skids(self, prev: dict, cur: dict) -> None:
+        """Skid marks between two states: darker and thicker the more each axle slides (from SKID_START°)."""
+        d = ImageDraw.Draw(self.skid)
+        for axle, (a, b) in enumerate(zip(self.wheels(prev), self.wheels(cur))):
+            deg = abs(np.degrees(cur["slip"][axle]))
+            if deg < SKID_START:
+                continue
+            t = min((deg - SKID_START) / (SKID_FULL - SKID_START), 1.0)
+            col = (25, 22, 20, round(70 + 170 * t))
+            for p0, p1 in zip(self.px(a), self.px(b)):
+                d.line([tuple(p0), tuple(p1)], fill=col, width=round(2 + 3 * t))
 
     def frame(self, s: dict, trail: list[tuple[np.ndarray, float]]) -> np.ndarray:
         img = self.base.copy()
@@ -74,7 +103,10 @@ class Painter:
             for k in range(1, len(pts)):
                 f = trail[k][1] / sim.V_MAX
                 col = (round(31 + f * (194 - 31)), round(111 + f * (65 - 111)), round(235 + f * (12 - 235)))
-                d.line([tuple(pts[k - 1]), tuple(pts[k])], fill=col, width=3)
+                d.line([tuple(pts[k - 1]), tuple(pts[k])], fill=col, width=2 if "slip" in s else 3)
+        if "slip" in s:
+            img.paste(self.skid, (0, 0), self.skid)
+            d = ImageDraw.Draw(img)
         pos, h = np.asarray(s["pos"]), s["heading"]
         for ang, dist in zip(sim.RAY_ANGLES, s["rays"]):
             end = pos + dist * np.array([np.cos(h + ang), np.sin(h + ang)])
@@ -85,12 +117,40 @@ class Painter:
         left = np.array([-fwd[1], fwd[0]])
         # draw the car a little larger than life so it reads on a phone
         L, W = sim.CAR_LEN * 1.4, sim.CAR_WID * 1.6
-        c = pos + fwd * sim.WHEELBASE / 2
+        c = pos if "slip" in s else pos + fwd * sim.WHEELBASE / 2
         corners = [c + fwd * L / 2 + left * W / 2, c + fwd * L / 2 - left * W / 2,
                    c - fwd * L / 2 - left * W / 2, c - fwd * L / 2 + left * W / 2]
         d.polygon([tuple(p) for p in self.px(np.array(corners))], fill=CAR, outline=(255, 255, 255))
+        if "steer" in s:
+            controls(d, s["steer"], s["throttle"], y=PAD_TOP + self.size + 8, width=self.size)
         return np.asarray(img)
 
+
+def controls(d: ImageDraw.ImageDraw, steer: float, throttle: float, y: int, width: int) -> None:
+    """Two gauges in the strip under the map, each filling out from a centre line.
+
+    Steering (blue): left half = turning left, right half = right. Pedal: red to the left = brake, green to
+    the right = gas.
+    """
+    from sdc.gifs import _font
+
+    f = _font(12)
+    half = (width - 48) / 2
+
+    def gauge(x0, label_l, label_r, value, col_l, col_r, title):
+        w = half - 30
+        cx = x0 + w / 2
+        d.rectangle([x0, y + 16, x0 + w, y + 28], fill=(232, 236, 241))
+        end = cx + value * w / 2
+        d.rectangle([min(cx, end), y + 16, max(cx, end), y + 28], fill=col_r if value >= 0 else col_l)
+        d.line([cx, y + 12, cx, y + 32], fill=(23, 32, 43), width=1)
+        d.text((cx, y), title, fill=(23, 32, 43), font=f, anchor="mt")
+        d.text((x0, y + 2), label_l, fill=col_l, font=f)
+        d.text((x0 + w, y + 2), label_r, fill=col_r, font=f, anchor="ra")
+
+    # steer > 0 is left, so draw it negated (left of centre)
+    gauge(24, "left", "right", -steer, ACCENT, ACCENT, "steer")
+    gauge(24 + half + 30, "brake", "gas", throttle, BRAKE_COL, GAS, "pedal")
 
 def lap_gif(track_seed: int, traj: list[dict], row: dict, label: str, path: str | Path, every: int = 1,
             dirt: np.ndarray | None = None) -> None:
@@ -105,18 +165,20 @@ def lap_gif(track_seed: int, traj: list[dict], row: dict, label: str, path: str 
     frames, trail = [], []
     for k, s in enumerate(traj):
         trail.append((np.asarray(s["pos"]), s["v"]))
+        if k and "slip" in s:
+            p.add_skids(traj[k - 1], s)
         last = k == len(traj) - 1
         if k % every and not last:
             continue
         lines = [f"time {s['t'] * sim.DT:5.1f} s   ·   lap {100 * s['progress']:3.0f}% done",
                  f"{'held-out' if track_seed >= trk.HELD_OUT_BASE else 'training'} track {track_seed}, start line, standstill, real speed",
-                 f"speed {s['v'] * 3.6:3.0f} km/h   ·   steer {s['steer']:+.2f}   ·   throttle {s['throttle']:+.2f}"]
+                 f"speed {s['v'] * 3.6:3.0f} km/h"]
         if "slip" in s:
             ph = row.get("physics", {})
             lines[1] = (f"held-out track {track_seed}" + (f" · grip {ph['grip']:.2f}× · delay {1000 * ph['delay']:.0f} ms"
                         if ph else "") + (" · on dirt" if s.get("dirt") else ""))
-            lines.append(f"tail slide (rear slip) {abs(np.degrees(s['slip'][1])):4.1f}°   ·   front slip "
-                         f"{abs(np.degrees(s['slip'][0])):4.1f}°")
+            lines[2] += (f"   ·   slip: front {abs(np.degrees(s['slip'][0])):3.0f}°, rear "
+                         f"{abs(np.degrees(s['slip'][1])):3.0f}°")
         end, good = None, True
         if last:
             if row["finished"]:
@@ -140,7 +202,7 @@ def camera_inset(frame: np.ndarray, cam_img: np.ndarray, scale: int = 2) -> np.n
     img = Image.fromarray(frame)
     c = Image.fromarray(cam_img).resize((cam_img.shape[1] * scale, cam_img.shape[0] * scale), Image.NEAREST)
     w, h = c.size
-    x, y = img.width - w - 8, img.height - h - 8
+    x, y = img.width - w - 8, img.height - BAND - h - 8
     d = ImageDraw.Draw(img)
     d.rectangle([x - 3, y - 21, x + w + 2, y + h + 2], fill=(255, 255, 255))
     d.text((x, y - 19), "what the car sees", fill=(23, 32, 43), font=_font(13))

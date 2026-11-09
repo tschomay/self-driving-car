@@ -24,9 +24,10 @@ from sdc.report import N_SERIES, _nice_ticks
 
 GIF_CAPTION = ("Each GIF is one lap attempt on one held-out track at nominal physics, from a standing start, at "
                "real speed (10 steps per second). Brown stretches are dirt (65% grip); the car can't see them. Blue "
-               "lines are the 11 sensor rays. The trail shows speed (blue slow, orange fast). The bottom readout is "
-               "tire slip: how far each axle is sliding sideways (tires grip best around 6–9°; far beyond that the "
-               "car is sliding). An end card says how it ended, then the GIF loops. GIFs show the first seed of a "
+               "lines are the 11 sensor rays. The thin trail shows speed (blue slow, orange fast). Dark skid marks "
+               "appear where an axle slides more than 4° sideways, darker and thicker up to 20° (tires grip best "
+               "around 6–9°; far beyond that the car is sliding). Gauges under the map: steering (blue, left or "
+               "right of centre) and pedal (red brake to the left, green gas to the right). An end card says how it ended, then the GIF loops. GIFs show the first seed of a "
                "row; a second GIF, if present, is the first held-out track it failed.")
 
 RESULTS_CAPTION = ("Big number: share of the 20 held-out tracks (never trained on) finished in one lap from a "

@@ -62,6 +62,23 @@ Then the gate check, and the go/no-go on Phase 4.
 
 ## Experiments
 
+### E1 — Does a perfect-grip driver survive real tires?
+
+- **Prediction (owner, before the run):** "It will fail all tracks. Too aggressive so it will slide off the track or spin"
+- **Setup:** (a) the Phase 1 SB3 ray policy (Phase 1 E1 seed 1, retrained here: 100% held-out on the Phase 1 car, 0.94× pure pursuit), unchanged, through `dynamics.phase1_policy` (rays + speed in, steering converted to a wheel angle the Phase 1 way). (b) SB3 PPO retrained in the dynamic car: Phase 1 settings (8 cars, 256 steps per update), nominal physics, dirt on, 15-number observation, 500k steps, seeds 0–2, about 6 min each on 1 thread. Yardstick: the hand-coded driver (knows track, grip, dirt). Evaluation: held-out tracks 10000–10019 at nominal physics with dirt, plus 100 gate-range laps and robustness sweeps. Pilot runs (1M steps, held back from the owner) sized the budget: the held-out curve peaked around 200–400k.
+- **Result:** [report](https://claude.ai/artifact/4H6sjxrJgKhT2MEz9GgdgN)
+
+  | | Held-out, nominal | Gate range (100 laps) | Lap time vs. hand-coded |
+  |---|---|---|---|
+  | hand-coded (knows grip) | 19/20 | 94% | 1.00× (25.3 s) |
+  | Phase 1 policy, unchanged | **0/20** | 0% | – |
+  | PPO retrained, seeds 0/1/2 | 85% / 80% / 75% | 35% / 45% / 44% | 1.13× / 1.13× / 1.17× |
+
+  - Phase 1 policy: 0/20 at every point of every sweep, even at 1.3× grip. 18 attempts leave the road 12–50% into the lap; 2 spin, stop and time out. Mechanism (checked step by step): full steering lock plus full brake into corners. Full brake exceeds what the tires hold, so the wheels lock and can't steer; the fronts slide 20–60° past their 6–9° peak and the car ploughs straight off.
+  - Retrained: the held-out curve swings 50–100% between checks every 50k steps (best checkpoints 95–100%). Tracks 10003 and 10005 fail in all 3 seeds. Below 0.8× grip it collapses.
+- **Explanation (owner, after the run):** _pending_
+- **Takeaway:** _pending_
+
 ## Gate check
 
 ## Handoff to next phase

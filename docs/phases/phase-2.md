@@ -112,6 +112,8 @@ Then the gate check: the owner's CNN on the 20 held-out tracks, plus a saliency 
   - Failures: seeds 0 and 1 on track 10000 at 40% (the 6.9 m corner, Phase 1's hardest); seed 2 on track 10005 at 9%.
   - **Edge enrichment** (median over every 5th step of all held-out attempts): steering 1.82, 1.83, 1.90 (NatureCNN 1.64–1.70); throttle 1.67–1.69 (NatureCNN 1.47–1.51).
   - Saliency maps: steering lights up the road edges a few car-lengths ahead, especially where the road bends; throttle spreads further up the road.
+- **Explanation (owner, after the run):** Mine was meant to be more careful. The fine-grained first layer is designed to look at details rather than the overall picture.
+- **Takeaway:** Architecture shapes *what* a network attends to, even when the score barely moves. A fine first layer (5×5, stride 2: 1.25 m steps) builds features from thin details like the 1-pixel edge lines, and the saliency shows it leaning on them more. Both CNNs copy the same expert, so lap times match. The design bought a small reliability gain (95/95/95 vs. 95/90/90) for about 3× the training time.
 
 ## Gate check
 

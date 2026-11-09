@@ -33,7 +33,9 @@ def _sw(i):
 
 def build(run_dirs, title: str, question: str, out, eyebrow: str = "Phase 1", notes: list[str] | None = None,
           max_gifs: int = 6, curve: str = "laps", gifs_per_group: int = 2, gif_caption: str | None = None,
-          footer: str = "sdc/phase1/report.py", extra_sections: list[str] | None = None) -> Path:
+          footer: str = "sdc/phase1/report.py", extra_sections: list[str] | None = None,
+          results_caption: str | None = None, base_name: str = "pure pursuit", extra_sub=None,
+          eval_threshold: float = 95, eval_caption: str | None = None, extra_eval=None) -> Path:
     runs = []
     for d in run_dirs:
         m = json.loads((Path(d) / "metrics.json").read_text())
@@ -55,7 +57,7 @@ def build(run_dirs, title: str, question: str, out, eyebrow: str = "Phase 1", no
         times = [m["final_eval"]["mean_lap_time"] for m in ms if m["final_eval"]["mean_lap_time"]]
         if times:
             r_ok = [r for r in ratios if r]
-            sub.append(f"mean lap {np.mean(times):.1f} s on finished tracks · {np.mean(r_ok):.2f}× pure pursuit")
+            sub.append(f"mean lap {np.mean(times):.1f} s on finished tracks · {np.mean(r_ok):.2f}× {base_name}")
         else:
             sub.append("no held-out lap finished")
         if len(ms) > 1:
@@ -66,6 +68,8 @@ def build(run_dirs, title: str, question: str, out, eyebrow: str = "Phase 1", no
         if "train_wall_s" in ms[0]:
             sub.append(f"train: {np.mean([m['trained_timesteps'] for m in ms]):,.0f} steps, "
                        f"{np.mean([m['train_wall_s'] for m in ms]):.0f} s")
+        if extra_sub is not None:
+            sub.extend(extra_sub(ms))
         if ms[0]["preset"] == "pursuit":
             pill = '<span class="pill">baseline</span>'
         else:
@@ -75,10 +79,11 @@ def build(run_dirs, title: str, question: str, out, eyebrow: str = "Phase 1", no
                     f'<span class="big">{100 * np.mean(comp):.0f}%</span>'
                     f'<span class="sub">{"<br>".join(html.escape(s) for s in sub)}</span></div>')
 
-    sections = [f'<section><h2>Results</h2><p class="caption">Big number: share of the 20 held-out tracks '
+    cap = results_caption or (f'Big number: share of the 20 held-out tracks '
                 f'(never trained on) where the car finished one lap from a standing start without leaving the '
                 f'road. Gate: ≥ 95% and mean lap time ≤ 1.1× the hand-coded pure-pursuit driver '
-                f'({base_time:.1f} s).</p><div class="runs">{"".join(rows)}</div></section>']
+                f'({base_time:.1f} s).')
+    sections = [f'<section><h2>Results</h2><p class="caption">{html.escape(cap)}</p><div class="runs">{"".join(rows)}</div></section>']
 
     key = {"laps": ("laps per training episode", "laps"), "return": ("episode return", "ret"),
            "speed": ("mean speed (m/s)", "speed")}[curve]
@@ -98,6 +103,8 @@ def build(run_dirs, title: str, question: str, out, eyebrow: str = "Phase 1", no
                 eval_series.append(dict(x=[e["timesteps"] for e in m["evals"]],
                                         y=[100 * e["completion"] for e in m["evals"]], color=color[label],
                                         width=2 if len(ms) == 1 else 1.5, opacity=1 if len(ms) == 1 else .75, dot=True))
+                if extra_eval is not None:
+                    eval_series.extend(extra_eval(m, color[label]))
     if train_series:
         y_max = max(1.0, float(np.ceil(y_hi * 1.15 * 2) / 2)) if curve == "laps" else y_hi * 1.15
         sections.append('<section><h2>Learning curve</h2>'
@@ -108,9 +115,10 @@ def build(run_dirs, title: str, question: str, out, eyebrow: str = "Phase 1", no
     if eval_series:
         gaps = [m["evals"][2]["timesteps"] - m["evals"][1]["timesteps"] for m in runs if len(m.get("evals", [])) > 2]
         sections.append('<section><h2>Held-out lap completion during training</h2>'
-                        f'<div class="chart">{line_chart(eval_series, "environment steps", "held-out completion (%)", y_max=105, threshold=95, threshold_label="gate ≥ {:g}%")}</div>'
+                        f'<div class="chart">{line_chart(eval_series, "environment steps", "held-out completion (%)", y_max=105, threshold=eval_threshold, threshold_label="gate ≥ {:g}%")}</div>'
                         f'<p class="caption">Every {_fmt_steps(float(np.median(gaps)) if gaps else 0)} steps: one lap '
-                        'attempt on each of the 20 held-out tracks with the greedy (no-noise) policy.</p></section>')
+                        'attempt on each of the 20 held-out tracks with the greedy (no-noise) policy.'
+                        f'{(" " + html.escape(eval_caption)) if eval_caption else ""}</p></section>')
 
     figs = []
     for label, ms in groups.items():

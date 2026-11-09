@@ -33,7 +33,7 @@ def _sw(i):
 
 def build(run_dirs, title: str, question: str, out, eyebrow: str = "Phase 1", notes: list[str] | None = None,
           max_gifs: int = 6, curve: str = "laps", gifs_per_group: int = 2, gif_caption: str | None = None,
-          footer: str = "sdc/phase1/report.py") -> Path:
+          footer: str = "sdc/phase1/report.py", extra_sections: list[str] | None = None) -> Path:
     runs = []
     for d in run_dirs:
         m = json.loads((Path(d) / "metrics.json").read_text())
@@ -155,6 +155,7 @@ def build(run_dirs, title: str, question: str, out, eyebrow: str = "Phase 1", no
                     'leaving the road. With several seeds: seeds that finished, and their mean lap time.</p>'
                     f'<div class="tablewrap"><table><tr><th>track</th>{head}</tr>{"".join(trs)}</table></div></section>')
 
+    sections.extend(extra_sections or [])
     if notes:
         sections.append('<section class="notes"><h2>Notes</h2>' + "".join(f"<p>{html.escape(n)}</p>" for n in notes)
                         + "</section>")

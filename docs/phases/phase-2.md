@@ -106,7 +106,12 @@ Then the gate check: the owner's CNN on the 20 held-out tracks, plus a saliency 
   - TODO 1, conv stack: first draft 32@5×5 s2, 64@3×3 s1, 64@3×3 s1 ("to see more fine detail"). That gave 26×26 maps, 43k numbers into the final layer, 11M weights, 8 m per feature and about 22× slower training. The owner wanted features to see further (about 40 m) without the cost. Worked out together: the final linear layer already sees the whole image; what matters is that each feature covers a corner (about 20 m); fine detail found in layer 1 survives later strides in the channels. **Final: 32@5×5 s2 → 64@3×3 s2 → 64@3×3 s2 → 64@3×3 s1**: maps 30 → 14 → 6 → 4, receptive field 33 px (21 m), 1,024 numbers, 0.36M weights.
   - TODO 2, activation: ReLU. TODO 3, feature size: 128.
 - **Prediction (owner, before the run):** I hope mine will be a little more precise and therefore increase the success rate, but only a little. I don't think mine will be any faster. Saliency maps should show road edges, especially the view ahead going into corners.
-- **Setup:** `python -m sdc.phase2.bc --noise 0.3 --encoder mine --seed S` for S = 0–2 (E3 B recipe: speed + 1 image, 64k samples, 20 epochs). Compared with E3 B (NatureCNN).
+- **Setup:** `python -m sdc.phase2.bc --noise 0.3 --encoder mine --seed S` for S = 0–2 (E3 B recipe: speed + 1 image, 64k samples, 20 epochs). Compared with E3 B (NatureCNN). About 14 min per seed (NatureCNN: 5). Saliency: `python -m sdc.phase2.saliency <run>` (SmoothGrad; edge enrichment = share of saliency on edge lines ±1 px ÷ their share of the image, which is 12%).
+- **Result:** [report](https://claude.ai/artifact/4rrNyMC1ED2XLrsWoaVNWz).
+  - **Owner's CNN: 95%, 95%, 95% held-out at 0.945–0.951× pure pursuit.** NatureCNN (E3 B): 95%, 90%, 90% at 0.946–0.950×. Same lap times, one more lap finished on two seeds.
+  - Failures: seeds 0 and 1 on track 10000 at 40% (the 6.9 m corner, Phase 1's hardest); seed 2 on track 10005 at 9%.
+  - **Edge enrichment** (median over every 5th step of all held-out attempts): steering 1.82, 1.83, 1.90 (NatureCNN 1.64–1.70); throttle 1.67–1.69 (NatureCNN 1.47–1.51).
+  - Saliency maps: steering lights up the road edges a few car-lengths ahead, especially where the road bends; throttle spreads further up the road.
 
 ## Gate check
 

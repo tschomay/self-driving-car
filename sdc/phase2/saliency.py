@@ -112,7 +112,13 @@ def analyze(run_dir: str | Path, tracks=trk.HELD_OUT_SEEDS, every: int = 5, pick
     class Rec(CameraPolicy):
         def __call__(self, b):
             a = super().__call__(b)
-            self.frames_log.append((self.stack.frames.copy(), b.v.copy(), b.curv[np.arange(b.n), b.idx].copy()))
+            if not hasattr(self, "done"):
+                self.done = np.zeros(b.n, bool)
+                self.moved = np.zeros(b.n, bool)
+            self.done |= self.moved & (b.steps == 0)    # a car back at step 0 has finished its one attempt
+            self.moved |= b.steps > 0
+            self.frames_log.append((self.stack.frames.copy(), b.v.copy(), b.curv[np.arange(b.n), b.idx].copy(),
+                                    ~self.done))
             return a
 
     pol = Rec(lambda o: model.predict(o, deterministic=True)[0], nf, use_speed)
@@ -122,10 +128,10 @@ def analyze(run_dir: str | Path, tracks=trk.HELD_OUT_SEEDS, every: int = 5, pick
     enr = {"steer": [], "throttle": []}
     fig_rows = []
     fig_i = seeds.index(track_for_figure) if track_for_figure in seeds else 0
-    for t, (frames, v, curv) in enumerate(pol.frames_log):
+    for t, (frames, v, curv, active) in enumerate(pol.frames_log):
         if t % every:
             continue
-        for i in range(len(seeds)):
+        for i in np.flatnonzero(active):   # only the lap attempt itself
             sal = smoothgrad(model, frames[i], v[i] / 25.0 if use_speed else None, n=8, seed=t)
             for k, name in enumerate(("steer", "throttle")):
                 enr[name].append(enrichment(sal[k], frames[i][-1]))
@@ -166,7 +172,7 @@ def analyze(run_dir: str | Path, tracks=trk.HELD_OUT_SEEDS, every: int = 5, pick
         fig.save(out)
     return dict(run=str(run_dir), label=m["label"], seed=m["seed"], edge_enrichment=stats,
                 edge_area_share=float(np.mean([edge_mask(f[0][i][-1]).mean() for f in pol.frames_log[::every]
-                                               for i in range(len(seeds))])))
+                                               for i in np.flatnonzero(f[3])])))
 
 
 def main():

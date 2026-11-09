@@ -95,8 +95,8 @@ Then the gate check, and the go/no-go on Phase 4.
   - Cost: about 4% slower at nominal (29.7 s vs. 28.0 s mean lap; 1.18× vs. 1.14× the hand-coded driver). Same nominal completion.
   - Learning speed no slower (at 150k steps: 45–90% vs. 30–75%).
   - Side effect: more robust to heavy mass (1.35×: 95% vs. 82%), though mass wasn't randomized.
-- **Explanation (owner, after the run):** _pending_
-- **Takeaway:** _pending_
+- **Explanation (owner, after the run):** "It doesn't know the situation until it's too late to react appropriately"
+- **Takeaway:** randomization only teaches caution as far as the car can sense the condition. Grip is felt only once the tires slide, so at low grip that's already too late in a corner. It buys a little robustness for about 4% speed.
 
 ## Gate check
 

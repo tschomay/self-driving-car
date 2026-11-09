@@ -113,7 +113,7 @@ def motion(policy, realism=2) -> dict:
     r = robust.laps(policy, record=True, realism=realism)
     ds, lock, slide = [], [], []
     for tr in r["trajectories"]:
-        st = np.array([s["steer"] for s in tr]) / dy.STEER_MAX
+        st = np.array([s["steer"] for s in tr])   # steering command, -1..1
         ds += list(np.abs(np.diff(st)))
         lock += list(np.abs(st) > 0.95)
         slide += [np.degrees(np.abs(s["slip"])).max() > 4 for s in tr]

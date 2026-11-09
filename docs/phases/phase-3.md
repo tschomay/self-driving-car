@@ -169,8 +169,14 @@ Then the gate check, and the go/no-go on Phase 4.
   - No change in sliding or speed. Slightly more reliable at nominal (both sensors: 20/20 in every seed); the steadiest training curves yet. Both sensors: better with sensor noise (87% at 6% noise vs. 70–77%).
   - Agent's read: the car can now feel the slide, but nothing pushes it to use that. Sliding past the peak costs little here (gentle fall-off, no drag), and the reward is only progress. Its real weakness is caution: full throttle on 2–3% of steps vs. 21%.
   - Gate-range weak spots: grip 0.4–0.6× (0–20%) and mass 0.65× (about 65%), neither ever trained on.
-- **Explanation (owner, after the run):** _pending_
-- **Takeaway:** _pending_
+- **Explanation (owner, after the run):** "Is it some of the variance we've added? It learns to be cautious because it never knows if it'll hit mud (I don't remember if we're still using sensor noise etc as well)"
+- **Check (agent):** E5 trained at nominal grip and mass, no sensor noise, delay 0–60 ms, and invisible dirt on every track. The hand-coded driver tests the dirt idea:
+  - knowing where the dirt is: 19/20, 25.3 s
+  - blind to dirt (assumes full grip everywhere): 2/20 (crashes on dirt corners)
+  - assuming every corner might be dirt (on a dirt-free track): 20/20, 29.1 s
+  
+  The RL car's 31–32 s sits near the "assume dirt everywhere" driver, so unseen dirt plausibly explains most of its caution.
+- **Takeaway:** a sense only changes behavior if the training makes it pay. Here the dominant risk (invisible dirt) is one no sensor reveals in time, so the car drives every corner as if it might be dirt.
 
 ## Gate check
 

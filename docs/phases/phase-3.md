@@ -206,8 +206,8 @@ Then the gate check, and the go/no-go on Phase 4.
 
   - Memory made it worse, and more training made it faster (fastest randomized car) but riskier.
   - Agent's read: the reward is metres gained; a crash costs only the reward it would have earned next (about 10 s at γ = 0.99), with no penalty. The gate counts finished laps. Longer training finds faster-but-riskier trades. Memory adds 54 mostly noisy inputs, and nothing in the reward asks for grip estimation.
-- **Explanation (owner, after the run):** _pending_
-- **Takeaway:** _pending_
+- **Explanation (owner, after the run):** "Reward is distant per step. Crashing later isn't punished now so it pays to take risks once you know how to drive the car"
+- **Takeaway:** the reward (metres per step) and the gate (finished laps) disagree about risk. Once the car can drive, more training spends that skill on speed, not reliability. Memory didn't help within 1M steps.
 
 ## Gate check
 

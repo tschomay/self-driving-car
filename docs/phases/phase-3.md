@@ -58,7 +58,8 @@ Each experiment is predict → run → explain. SB3 PPO, Phase 1 settings, 4 run
 | E4 | Does the car drive smoothly once the physics stops rewarding twitchiness? (added after E3, from the owner's observation) | E3's recipe vs. learning fixes (squashed actions, decaying learning rate) vs. a more realistic car (servo, sliding wheels, tire relaxation) vs. both | Sim fidelity vs. learning fixes; smooth driving and the friction peak |
 | E5 | Can it drive smoothly once it can feel the slide? (added after E4, from the owner's explanation) | E4 (d) vs. + sideways velocity vs. + accelerometer vs. both | What the car can sense limits what it can learn |
 | E6 | What does full randomization cost and buy? | Nominal vs. full train-range randomization (grip, mass, delay, noise); all four robustness curves, plus nominal lap time | The robustness vs. performance trade-off; sensor noise |
-| E7 | Can your own PPO drive the randomized car? | The owner's PPO (Phase 1) with E5/E6's observation and E6's randomization: the gate candidate | Reusing the owner's PPO under harder dynamics |
+| E7 | Can the car estimate grip from a short memory? (added after E6; owner chose option A of three: teach it to estimate grip / change the gate ranges / run the gate as is) | E6 (h) vs. + the last 1 s of own-motion readings (history), at 500k and 1M steps | System identification: adapting to conditions instead of being cautious about them |
+| E8 | Can your own PPO drive the randomized car? | The owner's PPO (Phase 1) with E7's observation and E6's randomization: the gate candidate | Reusing the owner's PPO under harder dynamics |
 
 Then the gate check, and the go/no-go on Phase 4.
 
@@ -190,6 +191,23 @@ Then the gate check, and the go/no-go on Phase 4.
   - Implication: a car perfect at grip ≥ 0.7× and hopeless below would score about 75%. The gate needs most laps at 0.5–0.7× grip to finish. The hand-coded driver does that (95%, about 35 s laps) because it knows the grip.
 - **Explanation (owner, after the run):** "It must not be learning grip as a variable to adjust to, but rather as noise to drive conservatively enough that it's ok in the range of what it has seen."
 - **Takeaway:** domain randomization without a way to identify the condition buys robustness only inside the trained range, by being cautious enough for its worst case. To handle grip it never saw, the car has to estimate grip as it drives and adapt to it.
+
+### E7 — Can the car estimate grip from a short memory?
+
+- **Prediction (owner, before the run):** "Yes to both." (memory lifts the low-grip laps, and it needs the extra training)
+- **Setup:** E6 (h) recipe (full train-range randomization, accelerometer, realism 2, squashed actions, LR decay) vs. + `history=10`: the previous 9 steps' own-motion readings (speed, commands, gyro, accelerometer; 71 inputs). (i) 500k steps, (j) 1M steps; seeds 0–2; 6 runs on 4 CPUs, 9 and 14 min.
+- **Result:** [report](https://claude.ai/artifact/1bWtSinzs1rmjRgyddyM6n)
+
+  | | Gate range per seed | Gate laps at grip 0.5–0.7× | Train range | Held-out nominal | Mean lap |
+  |---|---|---|---|---|---|
+  | (h) no memory, 500k | 51 / 72 / 50% | 9% | 74–92% | 20 / 20 / 20 | 33.5 s |
+  | (i) memory, 500k | 43 / 57 / 39% | 2% | 69–80% | 20 / 20 / 18 | 33.3 s |
+  | (j) memory, 1M | 37 / 45 / 45% | 2% | 36–57% | 14 / 18 / 18 | 29.3 s |
+
+  - Memory made it worse, and more training made it faster (fastest randomized car) but riskier.
+  - Agent's read: the reward is metres gained; a crash costs only the reward it would have earned next (about 10 s at γ = 0.99), with no penalty. The gate counts finished laps. Longer training finds faster-but-riskier trades. Memory adds 54 mostly noisy inputs, and nothing in the reward asks for grip estimation.
+- **Explanation (owner, after the run):** "Reward is distant per step. Crashing later isn't punished now so it pays to take risks once you know how to drive the car"
+- **Takeaway:** the reward (metres per step) and the gate (finished laps) disagree about risk. Once the car can drive, more training spends that skill on speed, not reliability. Memory didn't help within 1M steps.
 
 ## Gate check
 

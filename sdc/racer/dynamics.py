@@ -83,6 +83,9 @@ OBS_DIM = sim.N_RAYS + 4
 #   "accel"     accelerometer: forward and sideways acceleration the body feels, / G, averaged over
 #               the step (a cheap IMU chip)
 SENSORS = {"velocity": 1, "accel": 2}
+# history=k (Phase 3 E7): also append the car's own-motion readings (speed, last commands, gyro, and any
+# extra sensors) from the previous k-1 steps, newest first, so it can tell how the car has been
+# responding to its commands lately, e.g. to estimate the grip. Zeros before the episode's start.
 VY_SCALE = 5.0
 # realism=2 (Phase 3 E4 on; E1-E3 ran with realism=1, which has none of these):
 SERVO_TIME = 0.4         # s from full left to full right lock (a loaded RC servo; 0.2 s unloaded)
@@ -142,11 +145,16 @@ class DynamicRacerBatch(sim.RacerBatch):
     dirt: put the track's dirt patches down (True) or not.
     """
 
-    def __init__(self, n: int, physics="nominal", dirt: bool = True, realism: int = 2, sensors=(), **kw):
+    def __init__(self, n: int, physics="nominal", dirt: bool = True, realism: int = 2, sensors=(), history: int = 1,
+                 **kw):
         assert realism in (1, 2), realism
         self.sensors = tuple(sensors or ())
         assert all(x in SENSORS for x in self.sensors), self.sensors
-        self.obs_dim = OBS_DIM + sum(SENSORS[x] for x in self.sensors)
+        base_dim = OBS_DIM + sum(SENSORS[x] for x in self.sensors)
+        self.proprio = np.r_[sim.N_RAYS:base_dim]          # everything but the rays
+        self.history = int(history)
+        self.phist = np.zeros((n, max(self.history - 1, 0), len(self.proprio)), np.float32)
+        self.obs_dim = base_dim + self.phist.shape[1] * self.phist.shape[2]
         self._acc_sum = np.zeros((n, 2))
         self.accel = np.zeros((n, 2))   # body-frame specific force (what an accelerometer reads), m/s², step mean
         self.realism = realism
@@ -186,6 +194,7 @@ class DynamicRacerBatch(sim.RacerBatch):
         self.dirt_pts[i] = self._dirt(int(self.seeds[i])) if self.dirt else False
         self.vx[i] = self.vy[i] = self.yaw_rate[i] = 0.0
         self.accel[i] = 0.0
+        self.phist[i] = 0.0
         self.hist[i] = 0.0
         self.slip[i] = 0.0
         self.wheel[i] = 0.0
@@ -202,7 +211,15 @@ class DynamicRacerBatch(sim.RacerBatch):
     def reset(self) -> np.ndarray:
         super().reset()
         self._make_obs()
-        return self.obs()
+        out = self.obs()
+        self._push_history()
+        return out
+
+    def _push_history(self):
+        """Remember this step's own-motion readings for the next observations."""
+        if self.phist.shape[1]:
+            cur = self._obs[:, self.proprio]
+            self.phist = np.concatenate([cur[:, None], self.phist[:, :-1]], axis=1)
 
     def _make_obs(self):
         sig = self.noise[:, None]
@@ -217,6 +234,8 @@ class DynamicRacerBatch(sim.RacerBatch):
             else:
                 acc = self.accel / G + self.noise[:, None] * self.noise_rng.standard_normal((self.n, 2))
                 parts.append(np.clip(acc, -3, 3))
+        if self.phist.shape[1]:
+            parts.append(self.phist.reshape(self.n, -1))
         self._obs = np.concatenate(parts, axis=1).astype(np.float32)
 
     def obs(self) -> np.ndarray:
@@ -345,6 +364,7 @@ class DynamicRacerBatch(sim.RacerBatch):
             obs[done] = self._obs[done]
             fresh[done] = self._obs[done]
             self._obs = fresh
+        self._push_history()
         return obs, r.astype(np.float32), terminated, truncated, infos
 
 

@@ -30,7 +30,7 @@ from sdc.racer import dynamics as dy
 DEFAULTS = dict(n_envs=8, n_steps=256, batch_size=256, n_epochs=10, lr=3e-4, lr_decay=True, gamma=0.99, lam=0.95,
                 clip=0.2, vf_coef=0.5, max_grad_norm=0.5)
 ENV = dict(tracks="random", reward="progress", max_steps=1000, physics="train", dirt=True, realism=2,
-           sensors=["accel"], squash=True)
+           sensors=["accel"], squash=True, history=1)
 
 
 def train(seed=0, total_timesteps=500_000, out="runs/p3-mine", eval_every=50_000, label="my PPO", threads=1,
@@ -42,7 +42,7 @@ def train(seed=0, total_timesteps=500_000, out="runs/p3-mine", eval_every=50_000
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     squash = env_cfg["squash"]
-    car = dict(realism=env_cfg["realism"], sensors=tuple(env_cfg["sensors"]))
+    car = dict(realism=env_cfg["realism"], sensors=tuple(env_cfg["sensors"]), history=env_cfg["history"])
     batch = dy.DynamicRacerBatch(cfg["n_envs"], seed=seed, tracks=env_cfg["tracks"], reward=env_cfg["reward"],
                                  max_steps=env_cfg["max_steps"], physics=env_cfg["physics"], dirt=env_cfg["dirt"], **car)
     net = owner.ActorCritic(obs_dim=batch.obs_dim)
@@ -127,7 +127,8 @@ def train(seed=0, total_timesteps=500_000, out="runs/p3-mine", eval_every=50_000
 def load_policy(run_dir):
     """Greedy policy of a saved run (for the gate and GIFs)."""
     m = json.loads((Path(run_dir) / "metrics.json").read_text())
-    net = owner.ActorCritic(obs_dim=dy.OBS_DIM + sum(dy.SENSORS[s] for s in m["env"]["sensors"]))
+    probe = dy.DynamicRacerBatch(1, **p3.car_of(m["env"]))
+    net = owner.ActorCritic(obs_dim=probe.obs_dim)
     net.load_state_dict(torch.load(Path(run_dir) / "model.pt"))
     squash = m["env"]["squash"]
 

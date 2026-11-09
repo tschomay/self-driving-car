@@ -55,8 +55,9 @@ Each experiment is predict → run → explain. SB3 PPO, Phase 1 settings, 4 run
 | E1 | Does a perfect-grip driver survive real tires? | The Phase 1 ray policy, unchanged, in the dynamic car at nominal grip. Then PPO retrained in the dynamic car. Hand-coded driver as the yardstick. | Vehicle dynamics: slip, the friction circle, why perfect-traction policies fail |
 | E2 | Trained at one grip, how does it do at others? | PPO trained at nominal physics vs. trained with grip randomized 0.7–1.1×; robustness curve over grip 0.4–1.3× | Domain randomization; overfitting to the physics |
 | E3 | What does control delay do, and does knowing your last command help? | Train with 0 delay vs. 0–60 ms delay, with and without the last-command inputs; test at 0–150 ms | Latency, partial observability, the Markov property |
-| E4 | What does full randomization cost and buy? | Nominal vs. full train-range randomization (grip, mass, delay, noise); all four robustness curves, plus nominal lap time | The robustness vs. performance trade-off; sensor noise |
-| E5 | Can your own PPO drive the randomized car? | The owner's PPO (Phase 1) with the 15-number observation and E4's randomization: the gate candidate | Reusing the owner's PPO under harder dynamics |
+| E4 | Does the car drive smoothly once the physics stops rewarding twitchiness? (added after E3, from the owner's observation) | E3's recipe vs. learning fixes (squashed actions, decaying learning rate) vs. a more realistic car (servo, sliding wheels, tire relaxation) vs. both | Sim fidelity vs. learning fixes; smooth driving and the friction peak |
+| E5 | What does full randomization cost and buy? | Nominal vs. full train-range randomization (grip, mass, delay, noise); all four robustness curves, plus nominal lap time | The robustness vs. performance trade-off; sensor noise |
+| E6 | Can your own PPO drive the randomized car? | The owner's PPO (Phase 1) with the 15-number observation and E5's randomization: the gate candidate | Reusing the owner's PPO under harder dynamics |
 
 Then the gate check, and the go/no-go on Phase 4.
 
@@ -117,6 +118,35 @@ Then the gate check, and the go/no-go on Phase 4.
 - **Explanation (owner, after the run):** "It needs that feedback loop - here's what I was doing to get me here and how the car responded"
 - **Takeaway:** with delay, the commands still in flight are part of the state. A car that can see them (b) learns to drive through delay, and even drives better without it. A car that can't (c) gains nothing from practising with delay.
 - **Owner's observation (2026-11-09):** the GIFs show twitchy driving: lots of skids, steering flipping between full left and full right. Measured on held-out laps (seed 0): mean steering change per step 0.26 (a) and 0.64 (b) vs. 0.016 for the hand-coded driver; at full lock 51% / 37% of the time; sliding more than 4° on 72% / 79% of steps vs. 11%. The owner asked for a decaying learning rate (adopted) and ideas for smoother driving.
+
+### E4 — Does the car drive smoothly once the physics stops rewarding twitchiness?
+
+- **Why:** the owner saw twitchy driving in E3's GIFs (skids, steering flipping full left to full right) and asked for smoother driving without a reward penalty: "it can drive however it wants", but smooth should be faster and use traction better. The owner suspected the sim or the learning. Gaps found:
+  - Sim: locked or spinning wheels kept full front-to-back grip; steering was instant; tire force was instant.
+  - Learning: actions clipped at ±1 (switch-like); constant learning rate.
+  - Fixes, as `realism=2` (`sdc/racer/dynamics.py`, the default from now on; E1–E3 ran at `realism=1`):
+    - steering servo, 0.4 s lock to lock (the owner noted a loaded servo is slower than the 0.2 s unloaded spec)
+    - a locked or spinning wheel slides at 75% of peak grip with none left for turning
+    - tire relaxation length 0.5 m
+  - Learning fixes: tanh-squashed actions (`squash`) and a learning rate decaying linearly to 0 (owner asked for this).
+- **Prediction (owner, before the run):** "d will be smoothest and fastest, but there's a confounder that the front/back traction change means it's actually harder to drive laps, so it might measure slower"
+- **Setup:** all with E3 (b)'s recipe: delay 0–60 ms, 15 inputs, nominal grip, dirt. (a) E3 (b) itself. (b) learning fixes, old car. (c) new car, old learning. (d) both. 500k steps, seeds 0–2; 9 runs on 4 CPUs, about 14 min each. Smoothness measured over the 20 held-out laps (`train.motion`).
+- **Result:** [report](https://claude.ai/artifact/JBm7NGR7owAYGesuVz5R1n)
+
+  | 3-seed mean | Steering change/step | Full lock | Slip > 8° | Slip > 20° | Mean lap | Gate range |
+  |---|---|---|---|---|---|---|
+  | hand-coded | 0.02 | 0% | 1% | 0% | 25.3 s | 94% |
+  | (a) E3 recipe | 0.44 | 30% | 61% | 30% | 29.2 s | 44–49% |
+  | (b) learning fixes | 0.41 | 10% | 50% | 21% | 29.7 s | 40–48% |
+  | (c) new car | 0.33 | 17% | 39% | 7% | 29.9 s | 44–51% |
+  | (d) both | 0.34 | 7% | 45% | 7% | 32.0 s | 51–61% |
+
+  - Not faster: the hand-coded driver takes 25.3 s in both cars, so the new physics doesn't slow a smooth driver. RL cars average 8–9 m/s vs. 11, with full throttle on 2–6% of steps vs. 21%: they drive slowly and still slide, from steering.
+  - (d) is the most robust: delay 87–93% up to 120 ms, 72% at 150 ms (others 45–50%); best gate range.
+  - The new car fixed most of the training wobble: (c) and (d) stay at 85–100% held-out from 150k steps on.
+  - Agent's read: the car can't sense sideways sliding (gyro only, no sideways accelerometer); training may also be too short.
+- **Explanation (owner, after the run):** _pending_
+- **Takeaway:** _pending_
 
 ## Gate check
 

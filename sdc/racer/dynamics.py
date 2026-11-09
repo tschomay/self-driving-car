@@ -76,6 +76,14 @@ YAW_SCALE = 2.0          # rad/s that maps to 1.0 in the observation
 DIRT_GRIP = 0.65
 MAX_DELAY_STEPS = 3      # delays up to 0.3 s are supported
 OBS_DIM = sim.N_RAYS + 4
+# Optional extra sensors (appended after the 15 standard numbers, in this order; Phase 3 E5):
+#   "velocity"  sideways velocity of the car's centre in its own frame, / VY_SCALE: with forward speed,
+#               the velocity vector, so the angle between where it points and where it goes (a real
+#               car needs an optical-flow sensor or an estimator for this)
+#   "accel"     accelerometer: forward and sideways acceleration the body feels, / G, averaged over
+#               the step (a cheap IMU chip)
+SENSORS = {"velocity": 1, "accel": 2}
+VY_SCALE = 5.0
 # realism=2 (Phase 3 E4 on; E1-E3 ran with realism=1, which has none of these):
 SERVO_TIME = 0.4         # s from full left to full right lock (a loaded RC servo; 0.2 s unloaded)
 SERVO_RATE = 2 * STEER_MAX / SERVO_TIME
@@ -134,8 +142,13 @@ class DynamicRacerBatch(sim.RacerBatch):
     dirt: put the track's dirt patches down (True) or not.
     """
 
-    def __init__(self, n: int, physics="nominal", dirt: bool = True, realism: int = 2, **kw):
+    def __init__(self, n: int, physics="nominal", dirt: bool = True, realism: int = 2, sensors=(), **kw):
         assert realism in (1, 2), realism
+        self.sensors = tuple(sensors or ())
+        assert all(x in SENSORS for x in self.sensors), self.sensors
+        self.obs_dim = OBS_DIM + sum(SENSORS[x] for x in self.sensors)
+        self._acc_sum = np.zeros((n, 2))
+        self.accel = np.zeros((n, 2))   # body-frame specific force (what an accelerometer reads), m/s², step mean
         self.realism = realism
         self.wheel = np.zeros(n)                             # actual front wheel angle (servo), rad
         self.fy = np.zeros((n, 2))                           # current sideways tire forces (relaxation), N
@@ -153,7 +166,7 @@ class DynamicRacerBatch(sim.RacerBatch):
         self.dirt_pts = np.zeros((n, trk.N_POINTS), bool)
         self.hist = np.zeros((n, MAX_DELAY_STEPS + 1, 2))   # hist[:, k] = command issued k steps ago
         self.slip = np.zeros((n, 2))                         # last slip angles front, rear (rad)
-        self._obs = np.zeros((n, OBS_DIM), np.float32)
+        self._obs = np.zeros((n, self.obs_dim), np.float32)
         super().__init__(n, **kw)
         self.noise_rng = np.random.default_rng([kw.get("seed", 0), 7])
 
@@ -172,6 +185,7 @@ class DynamicRacerBatch(sim.RacerBatch):
         self.noise[i] = p.noise[0] + u[3] * (p.noise[1] - p.noise[0])
         self.dirt_pts[i] = self._dirt(int(self.seeds[i])) if self.dirt else False
         self.vx[i] = self.vy[i] = self.yaw_rate[i] = 0.0
+        self.accel[i] = 0.0
         self.hist[i] = 0.0
         self.slip[i] = 0.0
         self.wheel[i] = 0.0
@@ -195,8 +209,15 @@ class DynamicRacerBatch(sim.RacerBatch):
         rays = self.rays / sim.RAY_RANGE + sig * self.noise_rng.standard_normal((self.n, sim.N_RAYS))
         spd = self.vx / sim.V_MAX + self.noise * self.noise_rng.standard_normal(self.n)
         yaw = self.yaw_rate / YAW_SCALE + self.noise * self.noise_rng.standard_normal(self.n)
-        self._obs = np.concatenate([np.clip(rays, 0, 1.2), np.clip(spd, -0.2, 1.2)[:, None], self.hist[:, 0],
-                                    np.clip(yaw, -3, 3)[:, None]], axis=1).astype(np.float32)
+        parts = [np.clip(rays, 0, 1.2), np.clip(spd, -0.2, 1.2)[:, None], self.hist[:, 0], np.clip(yaw, -3, 3)[:, None]]
+        for name in self.sensors:
+            if name == "velocity":
+                vy = self.vy / VY_SCALE + self.noise * self.noise_rng.standard_normal(self.n)
+                parts.append(np.clip(vy, -3, 3)[:, None])
+            else:
+                acc = self.accel / G + self.noise[:, None] * self.noise_rng.standard_normal((self.n, 2))
+                parts.append(np.clip(acc, -3, 3))
+        self._obs = np.concatenate(parts, axis=1).astype(np.float32)
 
     def obs(self) -> np.ndarray:
         return self._obs.copy()
@@ -246,6 +267,7 @@ class DynamicRacerBatch(sim.RacerBatch):
             self.fy = self.fy + k[:, None] * (np.stack([fy_f, fy_r], 1) - self.fy)
             fy_f, fy_r = self.fy[:, 0], self.fy[:, 1]
         cd, sd = np.cos(delta), np.sin(delta)
+        self._acc_sum += np.stack([fx_f * cd - fy_f * sd + fx_r, fx_f * sd + fy_f * cd + fy_r], 1) / m[:, None]
         ax = (fx_f * cd - fy_f * sd + fx_r) / m + self.vy * self.yaw_rate
         ay = (fx_f * sd + fy_f * cd + fy_r) / m - self.vx * self.yaw_rate
         rdot = (LF * (fx_f * sd + fy_f * cd) - LR * fy_r) / iz
@@ -271,10 +293,12 @@ class DynamicRacerBatch(sim.RacerBatch):
         self.hist[:, 0] = a
         dt = sim.DT / SUBSTEPS
         rows = np.arange(self.n)
+        self._acc_sum = np.zeros((self.n, 2))
         for j in range(SUBSTEPS):
             # the command reaching the wheels at this instant was issued `delay` seconds ago
             lag = np.clip(np.ceil(np.round((self.delay - j * dt) / sim.DT, 9)), 0, MAX_DELAY_STEPS).astype(int)
             self._substep(self.hist[rows, lag], dt)
+        self.accel = self._acc_sum / SUBSTEPS
         self.v = np.hypot(self.vx, self.vy)
         self.steer = self.wheel.copy()
         ds = self._locate()

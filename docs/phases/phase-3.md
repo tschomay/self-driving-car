@@ -59,7 +59,8 @@ Each experiment is predict → run → explain. SB3 PPO, Phase 1 settings, 4 run
 | E5 | Can it drive smoothly once it can feel the slide? (added after E4, from the owner's explanation) | E4 (d) vs. + sideways velocity vs. + accelerometer vs. both | What the car can sense limits what it can learn |
 | E6 | What does full randomization cost and buy? | Nominal vs. full train-range randomization (grip, mass, delay, noise); all four robustness curves, plus nominal lap time | The robustness vs. performance trade-off; sensor noise |
 | E7 | Can the car estimate grip from a short memory? (added after E6; owner chose option A of three: teach it to estimate grip / change the gate ranges / run the gate as is) | E6 (h) vs. + the last 1 s of own-motion readings (history), at 500k and 1M steps | System identification: adapting to conditions instead of being cautious about them |
-| E8 | Can your own PPO drive the randomized car? | The owner's PPO (Phase 1) with E7's observation and E6's randomization: the gate candidate | Reusing the owner's PPO under harder dynamics |
+| E8 | Does making crashes costly make it finish more? (added after E7; owner chose both fixes, memory dropped) | E6 recipe at 1M steps vs. crash penalty 100 vs. horizon γ = 0.997 vs. both | Aligning the reward with the goal (finished laps) |
+| E9 | Can your own PPO drive the randomized car? | The owner's PPO (Phase 1) with E8's winning recipe and E6's randomization: the gate candidate | Reusing the owner's PPO under harder dynamics |
 
 Then the gate check, and the go/no-go on Phase 4.
 

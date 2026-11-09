@@ -98,6 +98,25 @@ Then the gate check, and the go/no-go on Phase 4.
 - **Explanation (owner, after the run):** "It doesn't know the situation until it's too late to react appropriately"
 - **Takeaway:** randomization only teaches caution as far as the car can sense the condition. Grip is felt only once the tires slide, so at low grip that's already too late in a corner. It buys a little robustness for about 4% speed.
 
+### E3 — What does control delay do, and does knowing your last command help?
+
+- **Prediction (owner, before the run):** "The delay risks that it won't be able to respond in time. But it also forces it to learn how to plan ahead. I think it could help. And seeing the last command might teach it how the car responds. I'm not confident, but I think b might help while c would just react late"
+- **Setup:** (a) E1's runs (trained without delay, 15 inputs). (b) Delay drawn 0–60 ms per episode, 15 inputs. (c) Same delay, 13 inputs: last steering and pedal commands removed (`obs_keep`). Nominal grip and mass, dirt on, SB3 PPO, 500k steps, seeds 0–2; 6 runs on 4 CPUs, about 9.5 min each. Test: held-out tracks at 0–150 ms delay.
+- **Result:** [report](https://claude.ai/artifact/KLGDbAQtYAzaV9XGnyc8h1)
+
+  | Delay | 0 | 40 ms | 60 ms | 80 ms | 100 ms | 120 ms | 150 ms |
+  |---|---|---|---|---|---|---|---|
+  | (a) no delay in training | 80% | 83% | 78% | 67% | 67% | 58% | 35% |
+  | (b) delay, sees last command | 90% | 85% | 95% | 92% | 77% | 70% | 47% |
+  | (c) delay, blind to last command | 77% | 80% | 78% | 75% | 72% | 62% | 58% |
+
+  - (b) also did better at physics it never trained on: grip 1.0× 90% vs. 80%, mass 0.65× 65% vs. 47%, mass 1.35× 98% vs. 82%. Cost: about 4% lap time.
+  - Uncertainty: about ±10 points per seed, about ±5 for a 3-seed mean.
+  - Recurring: held-out completion often peaks mid-training and falls by the end (e.g. (c) seed 0: 95% → 65%).
+  - Gate range: (a) 35–45%, (b) 44–49%, (c) 41–50%.
+- **Explanation (owner, after the run):** _pending_
+- **Takeaway:** _pending_
+
 ## Gate check
 
 ## Handoff to next phase

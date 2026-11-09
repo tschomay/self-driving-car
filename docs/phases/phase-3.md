@@ -114,8 +114,9 @@ Then the gate check, and the go/no-go on Phase 4.
   - Uncertainty: about ±10 points per seed, about ±5 for a 3-seed mean.
   - Recurring: held-out completion often peaks mid-training and falls by the end (e.g. (c) seed 0: 95% → 65%).
   - Gate range: (a) 35–45%, (b) 44–49%, (c) 41–50%.
-- **Explanation (owner, after the run):** _pending_
-- **Takeaway:** _pending_
+- **Explanation (owner, after the run):** "It needs that feedback loop - here's what I was doing to get me here and how the car responded"
+- **Takeaway:** with delay, the commands still in flight are part of the state. A car that can see them (b) learns to drive through delay, and even drives better without it. A car that can't (c) gains nothing from practising with delay.
+- **Owner's observation (2026-11-09):** the GIFs show twitchy driving: lots of skids, steering flipping between full left and full right. Measured on held-out laps (seed 0): mean steering change per step 0.26 (a) and 0.64 (b) vs. 0.016 for the hand-coded driver; at full lock 51% / 37% of the time; sliding more than 4° on 72% / 79% of steps vs. 11%. The owner asked for a decaying learning rate (adopted) and ideas for smoother driving.
 
 ## Gate check
 

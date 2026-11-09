@@ -10,14 +10,16 @@ from sdc.racer import sim
 
 
 class RacerVecEnv(VecEnv):
-    def __init__(self, n_envs: int, batch_cls=sim.RacerBatch, obs_keep=None, **sim_kwargs):
+    def __init__(self, n_envs: int, batch_cls=sim.RacerBatch, obs_keep=None, squash=False, **sim_kwargs):
         """batch_cls: sim.RacerBatch or dynamics.DynamicRacerBatch; obs_keep: observation indices to keep."""
         self.batch = batch_cls(n_envs, **sim_kwargs)
         self.keep = None if obs_keep is None else np.asarray(obs_keep)
         dim = self.batch.obs().shape[1] if self.keep is None else len(self.keep)
         obs_space = spaces.Box(-np.inf, np.inf, (dim,), np.float32) if batch_cls is not sim.RacerBatch \
             else spaces.Box(0.0, 1.0, (dim,), np.float32)
-        act_space = spaces.Box(-1.0, 1.0, (2,), np.float32)
+        # squash: actions go through tanh in the env, so the policy acts in a wider raw range
+        self.squash = squash
+        act_space = spaces.Box(-5.0, 5.0, (2,), np.float32) if squash else spaces.Box(-1.0, 1.0, (2,), np.float32)
         super().__init__(n_envs, obs_space, act_space)
         self._actions = None
 
@@ -28,7 +30,7 @@ class RacerVecEnv(VecEnv):
         return self._o(self.batch.reset())
 
     def step_async(self, actions):
-        self._actions = actions
+        self._actions = np.tanh(actions) if self.squash else actions
 
     def step_wait(self):
         obs, r, term, trunc, infos = self.batch.step(self._actions)

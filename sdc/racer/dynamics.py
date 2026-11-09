@@ -39,6 +39,14 @@ getting it), and sensor noise (std of the noise as a fraction of each sensor's f
 scale). Dirt patches: 2–4 stretches of 10–30 m per track at DIRT_GRIP (65%) × grip,
 placed from the track seed, so they are the same every time on a given track.
 
+Realism level 2 (default from Phase 3 E4; E1-E3 used level 1, without these):
+  - steering servo: the wheels turn toward the commanded angle at a limited rate, SERVO_TIME
+    (0.4 s, a loaded RC servo) from full left to full right
+  - locked/spinning wheels: asking a tire for more braking or drive force than its peak makes
+    it slide, and it then delivers only SLIDE_FRAC (75%) of the peak, with nothing for turning
+  - tire relaxation: sideways force builds up over RELAX_LEN (0.5 m) of rolling after the slip
+    angle changes, instead of instantly, so very fast steering changes do little
+
 Integration: 10 substeps of 10 ms per 0.1 s control step.
 """
 
@@ -68,6 +76,11 @@ YAW_SCALE = 2.0          # rad/s that maps to 1.0 in the observation
 DIRT_GRIP = 0.65
 MAX_DELAY_STEPS = 3      # delays up to 0.3 s are supported
 OBS_DIM = sim.N_RAYS + 4
+# realism=2 (Phase 3 E4 on; E1-E3 ran with realism=1, which has none of these):
+SERVO_TIME = 0.4         # s from full left to full right lock (a loaded RC servo; 0.2 s unloaded)
+SERVO_RATE = 2 * STEER_MAX / SERVO_TIME
+RELAX_LEN = 0.5          # m a tire rolls before its sideways force catches up with a new slip angle
+SLIDE_FRAC = 0.75        # a locked or spinning wheel's front-to-back grip, as a fraction of the peak
 
 
 @dataclass(frozen=True)
@@ -121,7 +134,12 @@ class DynamicRacerBatch(sim.RacerBatch):
     dirt: put the track's dirt patches down (True) or not.
     """
 
-    def __init__(self, n: int, physics="nominal", dirt: bool = True, **kw):
+    def __init__(self, n: int, physics="nominal", dirt: bool = True, realism: int = 2, **kw):
+        assert realism in (1, 2), realism
+        self.realism = realism
+        self.wheel = np.zeros(n)                             # actual front wheel angle (servo), rad
+        self.fy = np.zeros((n, 2))                           # current sideways tire forces (relaxation), N
+        self.locked = np.zeros((n, 2), bool)                 # axle sliding front-to-back (locked or spinning)
         self.physics = physics_range(physics)
         self.dirt = dirt
         self._dirt_cache: dict[int, np.ndarray] = {}
@@ -156,6 +174,9 @@ class DynamicRacerBatch(sim.RacerBatch):
         self.vx[i] = self.vy[i] = self.yaw_rate[i] = 0.0
         self.hist[i] = 0.0
         self.slip[i] = 0.0
+        self.wheel[i] = 0.0
+        self.fy[i] = 0.0
+        self.locked[i] = False
 
     def set_physics(self, i: int, grip=None, mass=None, delay=None, noise=None):
         """Override one car's drawn physics (robustness sweeps). Call after reset()."""
@@ -192,22 +213,38 @@ class DynamicRacerBatch(sim.RacerBatch):
         iz = IZ_PER_KG * m
         mu = self.surface_grip
         fz_f, fz_r = m * G * LR / sim.WHEELBASE, m * G * LF / sim.WHEELBASE
-        delta = cmd[:, 0] * STEER_MAX
+        if self.realism >= 2:   # the servo turns the wheels toward the command at a limited rate
+            self.wheel = self.wheel + np.clip(cmd[:, 0] * STEER_MAX - self.wheel, -SERVO_RATE * dt, SERVO_RATE * dt)
+        else:
+            self.wheel = cmd[:, 0] * STEER_MAX
+        delta = self.wheel
         thr = cmd[:, 1]
         f_drive = np.where(thr >= 0, thr * np.minimum(MASS0 * sim.ACCEL, POWER / np.maximum(self.vx, 1.0)), 0.0)
         f_brake = np.where(thr < 0, -thr * MASS0 * sim.BRAKE, 0.0) * (self.vx > 0.05)
         fx_f = DRIVE_SPLIT[0] * f_drive - BRAKE_SPLIT[0] * f_brake
         fx_r = DRIVE_SPLIT[1] * f_drive - BRAKE_SPLIT[1] * f_brake
         pk_f, pk_r = mu * fz_f, mu * fz_r
+        if self.realism >= 2:
+            # asking for more than the peak locks (brake) or spins (drive) the wheel: it slides, and a sliding
+            # tire grips less (SLIDE_FRAC of the peak) and has nothing left for turning
+            self.locked = np.stack([np.abs(fx_f) > pk_f, np.abs(fx_r) > pk_r], 1)
+            fx_f = np.where(self.locked[:, 0], np.sign(fx_f) * SLIDE_FRAC * pk_f, fx_f)
+            fx_r = np.where(self.locked[:, 1], np.sign(fx_r) * SLIDE_FRAC * pk_r, fx_r)
         fx_f, fx_r = np.clip(fx_f, -pk_f, pk_f), np.clip(fx_r, -pk_r, pk_r)
         # friction ellipse: what longitudinal force uses up is not available sideways
         left_f = np.sqrt(np.maximum(1 - (fx_f / pk_f) ** 2, 0.0))
         left_r = np.sqrt(np.maximum(1 - (fx_r / pk_r) ** 2, 0.0))
+        if self.realism >= 2:
+            left_f, left_r = np.where(self.locked[:, 0], 0.0, left_f), np.where(self.locked[:, 1], 0.0, left_r)
         vx_s = np.maximum(self.vx, V_KIN)
         a_f = np.arctan2(self.vy + LF * self.yaw_rate, vx_s) - delta
         a_r = np.arctan2(self.vy - LR * self.yaw_rate, vx_s)
         fy_f = tire_force(a_f, pk_f) * left_f
         fy_r = tire_force(a_r, pk_r) * left_r
+        if self.realism >= 2:   # relaxation: sideways force builds up over RELAX_LEN of rolling, not instantly
+            k = 1 - np.exp(-np.maximum(self.vx, V_KIN) * dt / RELAX_LEN)
+            self.fy = self.fy + k[:, None] * (np.stack([fy_f, fy_r], 1) - self.fy)
+            fy_f, fy_r = self.fy[:, 0], self.fy[:, 1]
         cd, sd = np.cos(delta), np.sin(delta)
         ax = (fx_f * cd - fy_f * sd + fx_r) / m + self.vy * self.yaw_rate
         ay = (fx_f * sd + fy_f * cd + fy_r) / m - self.vx * self.yaw_rate
@@ -239,7 +276,7 @@ class DynamicRacerBatch(sim.RacerBatch):
             lag = np.clip(np.ceil(np.round((self.delay - j * dt) / sim.DT, 9)), 0, MAX_DELAY_STEPS).astype(int)
             self._substep(self.hist[rows, lag], dt)
         self.v = np.hypot(self.vx, self.vy)
-        self.steer = self.hist[rows, 0, 0] * STEER_MAX
+        self.steer = self.wheel.copy()
         ds = self._locate()
         self.progress += ds
         self.steps += 1

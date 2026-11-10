@@ -166,6 +166,9 @@ def train(preset="base", seed=0, total_timesteps=1_000_000, out="runs/p3", overr
     cfg = json.loads(json.dumps(PRESETS[preset]))
     overrides = dict(overrides or {})
     n_envs = int(overrides.pop("n_envs", cfg.pop("n_envs")))
+    # std_cap [start, end]: cap the policy's exploration noise (std, before tanh), lowered linearly over
+    # training, so the car isn't fighting large random steering to the end (Phase 3 twitchiness finding)
+    std_cap = overrides.pop("std_cap", None)
     cfg["ppo"].update(overrides)
     env_cfg = {**ENV_DEFAULTS, **(env or {})}
     keep = env_cfg.pop("obs_keep")
@@ -179,6 +182,13 @@ def train(preset="base", seed=0, total_timesteps=1_000_000, out="runs/p3", overr
             self.episodes, self.evals = [], []
             self._next = 0
             self._t0 = time.perf_counter()
+
+        def _on_rollout_start(self):
+            if std_cap:
+                frac = min(self.num_timesteps / total_timesteps, 1.0)
+                cap = std_cap[0] + (std_cap[1] - std_cap[0]) * frac
+                with torch.no_grad():
+                    self.model.policy.log_std.clamp_(max=float(np.log(cap)))
 
         def _eval(self):
             pol = sb3_policy(self.model, keep, squash)
@@ -208,6 +218,8 @@ def train(preset="base", seed=0, total_timesteps=1_000_000, out="runs/p3", overr
     model.save(out / "model.zip")
     env_cfg["obs_keep"] = keep
     env_cfg["squash"] = squash
+    if std_cap:
+        cfg["ppo"]["std_cap"] = std_cap
     m = dict(label=label or out.name, preset=preset, seed=seed, threads=threads, n_envs=n_envs, ppo=cfg["ppo"],
              env={k: (dy.physics_range(v).to_dict() if k == "physics" else v) for k, v in env_cfg.items()},
              total_timesteps=total_timesteps, trained_timesteps=int(model.num_timesteps),

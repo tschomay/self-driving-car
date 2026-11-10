@@ -28,7 +28,8 @@ from sdc.racer import dynamics as dy
 
 # Same settings as the SB3 runs (Phase 1 preset) plus Phase 3's recipe: decaying LR, squash, accelerometer.
 DEFAULTS = dict(n_envs=8, n_steps=256, batch_size=256, n_epochs=10, lr=3e-4, lr_decay=True, gamma=0.99, lam=0.95,
-                clip=0.2, vf_coef=0.5, max_grad_norm=0.5)
+                clip=0.2, vf_coef=0.5, max_grad_norm=0.5, std_cap=None)
+# std_cap [start, end]: cap on the exploration noise (std, before tanh), lowered linearly over training
 ENV = dict(tracks="random", reward="progress", max_steps=1000, physics="train", dirt=True, realism=2,
            sensors=["accel"], squash=True, history=1)
 
@@ -64,6 +65,10 @@ def train(seed=0, total_timesteps=500_000, out="runs/p3-mine", eval_every=50_000
                               **p3._summary(robust.laps(greedy, **car)),
                               gate_range=robust.gate_laps(greedy, draws=1, **car)["completion"]))
             next_eval += eval_every
+        if cfg["std_cap"]:
+            cap = cfg["std_cap"][0] + (cfg["std_cap"][1] - cfg["std_cap"][0]) * min(steps / total_timesteps, 1.0)
+            with torch.no_grad():
+                net.log_std.clamp_(max=float(np.log(cap)))
         if cfg["lr_decay"]:
             for g in opt.param_groups:
                 g["lr"] = cfg["lr"] * (1 - steps / total_timesteps)

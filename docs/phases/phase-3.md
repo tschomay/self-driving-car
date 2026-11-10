@@ -350,7 +350,14 @@ Exploration-noise schedule (`std_cap=[start, end]`, SB3 and the owner's PPO): th
 
   - Smoother and faster, but less reliable. (p)'s validation gate range peaked at 85–95% around 300–600k steps in every seed, then fell to 35–50% by 1M as laps got faster. (o) peaked at 75–80%.
   - Agent's read: the reliability-for-speed trade (E7, twitchiness aside) is stronger now. Less late-training noise plus drag that rewards carrying speed push the car toward faster, riskier driving. We keep the final policy; choosing a checkpoint by the validation gate range would have scored much higher, and is legitimate now that the gate has a separate test set.
-- **Explanation (owner, after the run):** _pending_
-- **Takeaway:** _pending_
+- **Explanation (owner, after the run):** "The longer it trains, the more nuance it can pick up. So here we see it learn to drive first, then attempt to drive fast. First, it picks up the broad skill of driving, but then it moves into more of the finer reward of driving fast at the cost of driving at all."
+- **Takeaway:** the fixes made it smoother and faster, and showed that the final policy is the wrong one to keep: reliability peaks mid-training.
+- **Decision (owner, 2026-11-10):** early stopping. Pick the checkpoint with the best validation gate range ("tune to the behavior we want rather than the end behavior").
+- **Owner's idea (2026-11-10), for discussion:** change the training paradigm to match how a driver learns a track:
+  - drive a few slow sighting laps to learn the surface and how hard to push
+  - train on physics ranges much wider than reality, so reality is a subset (interpolation, not extrapolation), with exposure keeping it from being cautious everywhere
+  - later, learn a map of where the low-grip spots are
+  
+  The concern: constant probing (slamming the brakes every second) isn't wanted.
 
 ## Handoff to next phase

@@ -168,7 +168,12 @@ class DynamicRacerBatch(sim.RacerBatch):
         self.sensors = tuple(sensors or ())
         assert all(x in SENSORS for x in self.sensors), self.sensors
         base_dim = OBS_DIM + sum(SENSORS[x] for x in self.sensors)
-        self.proprio = np.r_[sim.N_RAYS:base_dim]          # everything but the rays
+        # own-motion readings remembered by `history`: everything but the rays and the oracle grip
+        self.grip_col = None
+        if "grip" in self.sensors:
+            off = sum(SENSORS[x] for x in self.sensors[:self.sensors.index("grip")])
+            self.grip_col = OBS_DIM + off
+        self.proprio = np.array([i for i in range(sim.N_RAYS, base_dim) if i != self.grip_col])
         self.history = int(history)
         self.phist = np.zeros((n, max(self.history - 1, 0), len(self.proprio)), np.float32)
         self.obs_dim = base_dim + self.phist.shape[1] * self.phist.shape[2]

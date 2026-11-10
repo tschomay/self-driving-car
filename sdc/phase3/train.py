@@ -169,6 +169,9 @@ def train(preset="base", seed=0, total_timesteps=1_000_000, out="runs/p3", overr
     # std_cap [start, end]: cap the policy's exploration noise (std, before tanh), lowered linearly over
     # training, so the car isn't fighting large random steering to the end (Phase 3 twitchiness finding)
     std_cap = overrides.pop("std_cap", None)
+    # select: save a checkpoint at every eval and, at the end, keep the one with the best VALIDATION gate
+    # range (100 laps) instead of the final policy: early stopping (owner's decision after E11)
+    select = bool(overrides.pop("select", False))
     cfg["ppo"].update(overrides)
     env_cfg = {**ENV_DEFAULTS, **(env or {})}
     keep = env_cfg.pop("obs_keep")
@@ -191,6 +194,9 @@ def train(preset="base", seed=0, total_timesteps=1_000_000, out="runs/p3", overr
                     self.model.policy.log_std.clamp_(max=float(np.log(cap)))
 
         def _eval(self):
+            if select and self.num_timesteps >= eval_every // 2:
+                (out / "ckpt").mkdir(exist_ok=True)
+                self.model.save(out / "ckpt" / f"{self.num_timesteps}.zip")
             pol = sb3_policy(self.model, keep, squash)
             self.evals.append(dict(timesteps=int(self.num_timesteps), wall_s=round(time.perf_counter() - self._t0, 2),
                                    **_summary(robust.laps(pol, **car)),
@@ -215,15 +221,29 @@ def train(preset="base", seed=0, total_timesteps=1_000_000, out="runs/p3", overr
     model.learn(total_timesteps=total_timesteps, callback=cb)
     cb._eval()
     train_s = time.perf_counter() - t0
+    selection = None
+    if select:
+        model.save(out / "final.zip")
+        scored = []
+        for ck in sorted((out / "ckpt").glob("*.zip"), key=lambda q: int(q.stem)):
+            cand = PPO.load(ck, device="cpu")
+            g = robust.gate_laps(sb3_policy(cand, keep, squash), **car)["completion"]
+            scored.append(dict(timesteps=int(ck.stem), gate_range=g))
+        best = max(scored, key=lambda r: (r["gate_range"], r["timesteps"]))
+        selection = dict(checkpoints=scored, chosen=best["timesteps"], final_gate_range=scored[-1]["gate_range"])
+        model = PPO.load(out / "ckpt" / f"{best['timesteps']}.zip", device="cpu")
     model.save(out / "model.zip")
     env_cfg["obs_keep"] = keep
     env_cfg["squash"] = squash
     if std_cap:
         cfg["ppo"]["std_cap"] = std_cap
+    if select:
+        cfg["ppo"]["select"] = True
     m = dict(label=label or out.name, preset=preset, seed=seed, threads=threads, n_envs=n_envs, ppo=cfg["ppo"],
              env={k: (dy.physics_range(v).to_dict() if k == "physics" else v) for k, v in env_cfg.items()},
              total_timesteps=total_timesteps, trained_timesteps=int(model.num_timesteps),
-             train_wall_s=round(train_s, 2), episodes=cb.episodes, evals=cb.evals, baseline=baseline)
+             train_wall_s=round(train_s, 2), episodes=cb.episodes, evals=cb.evals, baseline=baseline,
+             **({"selection": selection} if selection else {}))
     return finish(sb3_policy(model, keep, squash), out, m, gif, sweep)
 
 

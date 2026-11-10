@@ -251,8 +251,9 @@ The threshold and physics ranges are unchanged.
   | owner's PPO | 66 / 73 / 80% | 73% | 20 / 20 / 20 | 93–97% | 27% | 35.9 s |
 
   - Same average, wider spread. Seed 2 (80%) is the best run so far; seed 0, the gate policy, is the lowest of the six.
-- **Explanation (owner, after the run):** _pending_
-- **Takeaway:** _pending_
+- **Explanation (owner, after the run):** "Needs more training to converge?"
+- **Agent's note:** each seed's validation gate-range score swung between 55% and 95% from one 50k-step check to the next, right to the end, and the learning rate decays to zero by 1M. So each seed's final policy is partly a matter of where the swings stopped. The 100-lap score itself has about ±4.5 points of measurement noise.
+- **Takeaway:** the owner's PPO matches SB3 on the hardest recipe so far (73% mean). Seed-to-seed spread is large, so one seed is a noisy measure, which matters for a gate decided by one seed.
 
 ## Gate check
 

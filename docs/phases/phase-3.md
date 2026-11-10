@@ -283,8 +283,8 @@ Plan: a two-step version of Rapid Motor Adaptation (RMA). E10, oracle: give the 
   - It extrapolates, and it adapts its speed to the grip (seed 0's mean lap: 48.4 s at 0.4×, 38.5 s at 0.7×, 32.7 s at 1.0×, 28.8 s at 1.3×). Without the oracle the car laps 35–36 s at every grip.
   - Remaining gate-lap failures by grip: 0.5–0.6×: 62%, 0.6–0.7×: 77%, 0.7–0.9×: 81%, 0.9–1.1×: 96%, 1.1–1.3×: 91%. Light cars (mass < 0.8×): 57%, consistent with the review's grip cliff.
   - Smoothness unchanged (steering change about 0.34 per step).
-- **Explanation (owner, after the run):** _pending_
-- **Takeaway:** _pending_
+- **Explanation (owner, after the run):** "Knowing grip is a huge advantage on something that's difficult learn or infer. The fact that it's linear in acceleration means whatever you learn about it can be extrapolated. We can't keep the oracle, but we can add something to estimate traction."
+- **Takeaway:** with the grip as an input, the policy learns how to scale its driving to grip, and that scaling extrapolates far beyond the training range. Without it, randomization only teaches one cautious speed. An estimate of the grip is worth pursuing.
 - **Also launched (owner's request):** two background reviews: (1) a code review of the physics, controls and sensors for correctness and real-world sense; (2) an investigation of why the car saws the steering instead of holding a clean line (foresight/planning among the hypotheses).
 
 ### Sim review (2026-11-10)
@@ -296,5 +296,21 @@ A background code review of the physics, controls and sensors: [phase3-sim-revie
 - Smaller realism gaps.
 
 The owner added a hypothesis for the twitchiness investigation: sensor noise makes the car think it's off its line.
+
+### Twitchiness investigation (2026-11-10)
+
+Full write-up: [phase3-twitch-investigation.md](phase3-twitch-investigation.md).
+- The deterministic policy saws, but it costs almost nothing (smoothing it at evaluation halves sliding with no lap-time or completion change).
+- Root cause: PPO's exploration noise never shrinks (std about 0.5 to the end), and the policy learns negative feedback on its own last command to fight it.
+- Low initial noise removed the sawing (0.43 → 0.06 per step).
+- Sensor noise amplifies sawing but doesn't cause it.
+- Foresight is ruled out for steering: a clone of the hand-coded driver's steering from the same rays drives a clean line.
+- The slowness is throttle caution.
+- Aside: one 300k-step run scored 98% validation gate range; longer training trades reliability for speed.
+
+**Decision (owner, 2026-11-10):** bundle all fixes and continue with them in place:
+- realism 3: the review's physics fixes
+- an exploration-noise schedule (no reward penalty)
+- E11, a learned grip estimator
 
 ## Handoff to next phase

@@ -34,7 +34,8 @@ PRESETS: dict[str, dict] = {
     "base": dict(n_envs=8, ppo=dict(n_steps=256, batch_size=256)),
 }
 ENV_DEFAULTS = dict(tracks="random", reward="progress", crash_penalty=0.0, max_steps=1000, physics="nominal",
-                    dirt=True, obs_keep=None, realism=2, squash=False, sensors=[], history=1)
+                    dirt=True, obs_keep=None, realism=2, squash=False, sensors=[], history=1,
+                    crash_cost=None, lap_bonus=0.0)
 # squash: the policy's raw output passes through tanh before reaching the car, so it eases toward ±1
 # instead of being clipped at it (realism=1 runs, E1-E3, predate both options).
 PHASE1_EXPERT = "runs/p1-e1-s1/model.zip"

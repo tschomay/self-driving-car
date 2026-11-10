@@ -30,7 +30,7 @@ This repo is a learning project that runs phase by phase. When the owner says **
 9. **Gate check.** Run the gate evaluation on held-out tracks and record the verdict in the log. Update the README status column ("Gate passed" or "In progress, gate failed"), then fill in the handoff section.
 10. **Stay low touch.** Do research yourself. Bring the owner only predictions, explanations, learner-owned code, and decisions that are genuinely theirs: money, time, scope, interest.
 
-Compute: the cloud container has 4 CPU, 15 GB RAM, and no GPU. Run at most 4 training runs at once: Phase 3 runs use about 3 GB each, and 12 at once got one killed for memory (Phase 3 E8). Check every run produced its results; a killed run leaves an empty log, . The CPU is enough for Phases 0–1. Modal (free $30/month) needs an account and an API token, requested via the credential form when Phase 2 needs it. Budget ceiling: $0 until then, $30/month after.
+Compute: the cloud container has 4 CPU, 15 GB RAM, and no GPU. Run at most 4 training runs at once: Phase 3 runs use about 3 GB each, and 12 at once got one killed for memory (Phase 3 E8). Check every run produced its results; a killed run leaves an empty log. The CPU is enough for Phases 0–1. Modal (free $30/month) needs an account and an API token, requested via the credential form when Phase 2 needs it. Budget ceiling: $0 until then, $30/month after.
 
 ## Lessons from working with the owner
 

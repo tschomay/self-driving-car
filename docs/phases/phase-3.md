@@ -359,5 +359,9 @@ Exploration-noise schedule (`std_cap=[start, end]`, SB3 and the owner's PPO): th
   - later, learn a map of where the low-grip spots are
   
   The concern: constant probing (slamming the brakes every second) isn't wanted.
+- **Decisions (owner, 2026-11-10), after discussing the idea:**
+  - the gate protocol gets an out-lap: one lap to learn the conditions, then the counted lap
+  - track memory (a map of low-grip spots) is deferred to a later phase
+  - plan: E12 early stopping; E13 grip estimator (1 s window vs. a whole-drive running estimate, with and without the out-lap); then decide on much wider training ranges and the gate rerun
 
 ## Handoff to next phase

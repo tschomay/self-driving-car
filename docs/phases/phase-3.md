@@ -225,8 +225,8 @@ Then the gate check, and the go/no-go on Phase 4.
 
   - (l): consistent across seeds; delay, mass and noise curves flat at 90–100% across the gate range. Remaining gap is grip below 0.7×.
   - Crash penalty: 2 of 3 seeds in both (k) and (m) learned to barely move (0.1–3.8 m/s in training): never crash, never pay. Phase 1 E2's parking hack again. The one (k) seed that drove is the best single car (77% gate range, 97% train range).
-- **Explanation (owner, after the run):** _pending_
-- **Takeaway:** _pending_
+- **Explanation (owner, after the run):** "Crash penalty is stronger than drive reward. Maybe could be tuned but it's likely not the right approach. Looking ahead just means you don't set yourself up for failure."
+- **Takeaway:** a longer horizon aligns the reward with finishing without adding a term the car can game. A crash penalty big enough to matter makes standing still the safest policy.
 
 ## Gate check
 

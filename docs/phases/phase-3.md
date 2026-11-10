@@ -313,4 +313,26 @@ Full write-up: [phase3-twitch-investigation.md](phase3-twitch-investigation.md).
 - an exploration-noise schedule (no reward penalty)
 - E11, a learned grip estimator
 
+### Realism 3 and the noise schedule (built 2026-11-10)
+
+`dynamics.py` `realism=3` (`_substep3`); realism 1 and 2 are kept unchanged for reproducing E1–E10:
+- A sliding tire (locked by the brake, or spinning under drive) pushes with 75% of peak against its slip velocity, so a spinning wheel still corners.
+- Cornering stiffness scales with axle load.
+- Aero drag (CdA 0.8 m²) and rolling resistance (0.015).
+- Relaxation length 0.3 m.
+- The low-speed blend uses total speed and doesn't depend on the substep.
+- The accelerometer reads the acceleration the car actually gets.
+
+Checks against the review:
+- A low-speed slide survives (sideways speed 8.0 m/s kept, was 0).
+- Full left + full brake no longer turns right.
+- Full throttle on dirt keeps cornering (yaw 0.31 rad/s, was 0.06).
+- Sawing on a straight now costs 6% of distance (was 1.3%).
+- Coasting from 20 m/s loses 0.3 m/s per second.
+- Hand-coded driver: 95–100% held-out at nominal, 0.5× grip, 0.65× mass and 120 ms delay; 97% validation gate range.
+
+Not changed: the servo position isn't observed; the off-track test uses the centre of mass; the speed sensor is ideal.
+
+Exploration-noise schedule (`std_cap=[start, end]`, SB3 and the owner's PPO): the policy's noise std (before tanh) is capped, and the cap is lowered linearly over training.
+
 ## Handoff to next phase

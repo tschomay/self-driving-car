@@ -59,7 +59,8 @@ Each experiment is predict → run → explain. SB3 PPO, Phase 1 settings, 4 run
 | E5 | Can it drive smoothly once it can feel the slide? (added after E4, from the owner's explanation) | E4 (d) vs. + sideways velocity vs. + accelerometer vs. both | What the car can sense limits what it can learn |
 | E6 | What does full randomization cost and buy? | Nominal vs. full train-range randomization (grip, mass, delay, noise); all four robustness curves, plus nominal lap time | The robustness vs. performance trade-off; sensor noise |
 | E7 | Can the car estimate grip from a short memory? (added after E6; owner chose option A of three: teach it to estimate grip / change the gate ranges / run the gate as is) | E6 (h) vs. + the last 1 s of own-motion readings (history), at 500k and 1M steps | System identification: adapting to conditions instead of being cautious about them |
-| E8 | Can your own PPO drive the randomized car? | The owner's PPO (Phase 1) with E7's observation and E6's randomization: the gate candidate | Reusing the owner's PPO under harder dynamics |
+| E8 | Does making crashes costly make it finish more? (added after E7; owner chose both fixes, memory dropped) | E6 recipe at 1M steps vs. crash penalty 100 vs. horizon γ = 0.997 vs. both | Aligning the reward with the goal (finished laps) |
+| E9 | Can your own PPO drive the randomized car? | The owner's PPO (Phase 1) with E8's winning recipe and E6's randomization: the gate candidate | Reusing the owner's PPO under harder dynamics |
 
 Then the gate check, and the go/no-go on Phase 4.
 
@@ -208,6 +209,35 @@ Then the gate check, and the go/no-go on Phase 4.
   - Agent's read: the reward is metres gained; a crash costs only the reward it would have earned next (about 10 s at γ = 0.99), with no penalty. The gate counts finished laps. Longer training finds faster-but-riskier trades. Memory adds 54 mostly noisy inputs, and nothing in the reward asks for grip estimation.
 - **Explanation (owner, after the run):** "Reward is distant per step. Crashing later isn't punished now so it pays to take risks once you know how to drive the car"
 - **Takeaway:** the reward (metres per step) and the gate (finished laps) disagree about risk. Once the car can drive, more training spends that skill on speed, not reliability. Memory didn't help within 1M steps.
+
+### E8 — Does making crashes costly make it finish more?
+
+- **Prediction (owner, before the run):** "K makes it slow and careful, l runs the risk of losing sight of what's in front of you and struggling to drive at all. Hopefully m means you can weight each a little less and get all the benefit. Maybe a little faster if it actually works because the twitchiness could also come from not looking far enough ahead (it does in real life)"
+- **Setup:** E6 recipe (full train-range randomization, accelerometer, no memory, realism 2, squashed actions, LR decay), 1M steps, seeds 0–2: (h′) no change; (k) `crash_penalty=100` (about 10 s of top-speed reward); (l) γ = 0.997 (about 30 s horizon); (m) both. 12 runs launched at once; one, (k) seed 0, was killed for running out of memory (about 3 GB per run; 15 GB container) and rerun alone (same seed and thread count, so the same result). From now on: at most 4 runs at once.
+- **Result:** [report](https://claude.ai/artifact/PiKxMurtiPYnCcZ4f5GBoa)
+
+  | | Gate range per seed | Train range | Held-out /20 | Mean lap | Gate laps at grip 0.5–0.7× |
+  |---|---|---|---|---|---|
+  | (h′) no change | 36 / 47 / 45% | 45–69% | 20 / 20 / 11 | 29.7 s | 0% |
+  | (k) crash penalty | 23 / 0 / 77% | 0–97% | 9 / 0 / 20 | 36.8 s | 16% |
+  | (l) γ 0.997 | **73 / 72 / 75%** | 94–97% | 20 / 20 / 20 | 35.8 s | 30% |
+  | (m) both | 2 / 6 / 58% | 0–72% | 0 / 0 / 15 | 46.3 s | 16% |
+
+  - (l): consistent across seeds; delay, mass and noise curves flat at 90–100% across the gate range. Remaining gap is grip below 0.7×.
+  - Crash penalty: 2 of 3 seeds in both (k) and (m) learned to barely move (0.1–3.8 m/s in training): never crash, never pay. Phase 1 E2's parking hack again. The one (k) seed that drove is the best single car (77% gate range, 97% train range).
+- **Explanation (owner, after the run):** "Crash penalty is stronger than drive reward. Maybe could be tuned but it's likely not the right approach. Looking ahead just means you don't set yourself up for failure."
+- **Takeaway:** a longer horizon aligns the reward with finishing without adding a term the car can game. A crash penalty big enough to matter makes standing still the safest policy.
+
+### Decision: a separate test set for the gate (owner, 2026-11-10)
+
+The owner asked whether testing on the held-out tracks in every experiment is like tuning on the test set. It is. Tracks 10000–10019 and the fixed 100 gate-range physics draws scored every experiment since Phase 1, and recipes were chosen partly by them. The network never trains on them, but the recipe choices did see them. Phases 1 and 2 ran their gates on the same tracks.
+
+From now on:
+- Tracks 10000–10019 and physics seed 12345 are the **validation set** that experiments report on.
+- The gate uses a fresh **test set**: tracks 20000–20019 (`track.TEST_SEEDS`) with physics seed 54321 (`robust.TEST_PHYSICS_SEED`), looked at once.
+- The gate report shows both numbers; the gap measures overfitting by choice.
+
+The threshold and physics ranges are unchanged.
 
 ## Gate check
 

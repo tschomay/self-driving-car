@@ -335,4 +335,22 @@ Not changed: the servo position isn't observed; the off-track test uses the cent
 
 Exploration-noise schedule (`std_cap=[start, end]`, SB3 and the owner's PPO): the policy's noise std (before tanh) is capped, and the cap is lowered linearly over training.
 
+### E11 — The fixed car with calmer exploration
+
+- **Prediction (owner, before the run):** "Smoother steering but not fixed. Better gate scores, lap times similar"
+- **Setup:** E8 (l)'s recipe (full train-range randomization, accelerometer, γ 0.997, 1M steps, SB3) on realism 3 with `std_cap=[0.5, 0.1]`. (o) no grip information; (p) + oracle grip. Seeds 0–2, at most 4 runs at once, about 11 min each. Compared with E8 (l) and E10 (realism 2, free noise).
+- **Result (validation set):** [report](https://claude.ai/artifact/EYjRn3NgFUByWfiYvJkJzf)
+
+  | | Steering change/step | Slip > 4° | Mean lap | Gate range per seed | Held-out /20 |
+  |---|---|---|---|---|---|
+  | E8 (l), no grip info | 0.46 | 68% | 35.8 s | 73 / 72 / 75% | 20 / 20 / 20 |
+  | **(o)** fixed car, calm noise | **0.17** | 40% | **30.0 s** | 57 / 55 / 60% | 20 / 19 / 20 |
+  | E10, oracle | 0.34 | 74% | 33.3 s | 83 / 81 / 88% | 20 / 18 / 20 |
+  | **(p)** fixed car, calm noise, oracle | **0.16** | 47% | **28.7 s** | 52 / 58 / 61% | 17 / 17 / 16 |
+
+  - Smoother and faster, but less reliable. (p)'s validation gate range peaked at 85–95% around 300–600k steps in every seed, then fell to 35–50% by 1M as laps got faster. (o) peaked at 75–80%.
+  - Agent's read: the reliability-for-speed trade (E7, twitchiness aside) is stronger now. Less late-training noise plus drag that rewards carrying speed push the car toward faster, riskier driving. We keep the final policy; choosing a checkpoint by the validation gate range would have scored much higher, and is legitimate now that the gate has a separate test set.
+- **Explanation (owner, after the run):** _pending_
+- **Takeaway:** _pending_
+
 ## Handoff to next phase

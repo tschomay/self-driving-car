@@ -100,3 +100,43 @@ def test_history_remembers_recent_own_motion():
     base = dy.OBS_DIM + 2
     assert np.allclose(o2[:, base:base + p], o1[:, b.proprio])            # 1 step ago
     assert np.allclose(o2[0, base + 1:base + 3], [0.2, 1.0])              # ...including the command then
+
+
+def test_oracle_grip_sensor():
+    b = dy.DynamicRacerBatch(1, tracks=[10000], start="line", dirt=True, physics=dict(grip=0.6), sensors=("grip",))
+    o = b.reset()
+    assert o.shape == (1, dy.OBS_DIM + 1)
+    expect = 0.6 * (dy.DIRT_GRIP if dy.dirt_mask(10000)[b.idx[0]] else 1.0)
+    assert np.isclose(o[0, -1], expect)
+
+
+def _car3(**physics):
+    b = dy.DynamicRacerBatch(1, tracks=[10001], start="line", physics=physics or "nominal", dirt=False, realism=3)
+    b.reset()
+    return b
+
+
+def _run3(b, cmd, n):
+    for _ in range(n):
+        b._substep3(np.array([cmd], float), 0.01)
+
+
+def test_realism3_fixes_review_findings():
+    b = _car3()
+    b.vx[:], b.vy[:], b.yaw_rate[:] = 0.5, 8.0, 2.0
+    _run3(b, [0, 0], 1)
+    assert b.vy[0] > 7 and b.yaw_rate[0] > 1.5           # a low-speed slide isn't wiped out
+    b = _car3()
+    b.vx[:] = 15.0
+    b.wheel[:] = dy.STEER_MAX
+    _run3(b, [1, -1], 30)
+    assert b.yaw_rate[0] > -0.05                          # locked fronts no longer turn the car the wrong way
+    b = _car3(grip=dy.DIRT_GRIP)
+    b.vx[:] = 8.0
+    b.wheel[:] = 0.25 * dy.STEER_MAX
+    _run3(b, [0.25, 1.0], 30)
+    assert b.locked[0].all() and b.yaw_rate[0] > 0.15     # spinning wheels still corner
+    b = _car3()
+    b.vx[:] = 20.0
+    _run3(b, [0, 0], 100)
+    assert 19.0 < b.vx[0] < 19.95                         # drag and rolling resistance slow a coasting car

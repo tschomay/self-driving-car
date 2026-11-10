@@ -82,7 +82,9 @@ OBS_DIM = sim.N_RAYS + 4
 #               car needs an optical-flow sensor or an estimator for this)
 #   "accel"     accelerometer: forward and sideways acceleration the body feels, / G, averaged over
 #               the step (a cheap IMU chip)
-SENSORS = {"velocity": 1, "accel": 2}
+#   "grip"      ORACLE (sim only, Phase 3 E10): the true grip under the car right now (episode grip ×
+#               dirt), / GRIP0. No real car has this; it measures what knowing the grip would be worth.
+SENSORS = {"velocity": 1, "accel": 2, "grip": 1}
 # history=k (Phase 3 E7): also append the car's own-motion readings (speed, last commands, gyro, and any
 # extra sensors) from the previous k-1 steps, newest first, so it can tell how the car has been
 # responding to its commands lately, e.g. to estimate the grip. Zeros before the episode's start.
@@ -92,6 +94,21 @@ SERVO_TIME = 0.4         # s from full left to full right lock (a loaded RC serv
 SERVO_RATE = 2 * STEER_MAX / SERVO_TIME
 RELAX_LEN = 0.5          # m a tire rolls before its sideways force catches up with a new slip angle
 SLIDE_FRAC = 0.75        # a locked or spinning wheel's front-to-back grip, as a fraction of the peak
+# realism=3 (Phase 3, after the sim review in docs/phases/phase3-sim-review.md):
+#   - a sliding tire (locked by the brake, or spinning under drive) pushes with SLIDE_FRAC × peak against its
+#     slip velocity: a locked wheel against the direction the contact patch moves, a spinning wheel mostly
+#     forward but still partly sideways (no more "zero cornering force" cliff)
+#   - cornering stiffness scales with the load on the axle (a heavier car's tires are stiffer)
+#   - aero drag and rolling resistance (coasting and scrubbing cost speed)
+#   - shorter relaxation length; the low-speed blend uses total speed and is independent of the substep
+#   - the accelerometer reads the acceleration the car actually gets (also at the speed cap)
+RELAX_LEN3 = 0.3         # m
+SPIN_SLIP = 3.0          # m/s of wheel-surface slip per unit of drive demand above the peak (plus SPIN_SLIP0)
+SPIN_SLIP0 = 0.5
+CDA = 0.8                # m², drag area
+RHO = 1.2                # kg/m³, air
+CRR = 0.015              # rolling resistance coefficient
+BLEND_TAU = 0.05         # s, how fast the low-speed blend pulls toward the no-slip model
 
 
 @dataclass(frozen=True)
@@ -147,11 +164,16 @@ class DynamicRacerBatch(sim.RacerBatch):
 
     def __init__(self, n: int, physics="nominal", dirt: bool = True, realism: int = 2, sensors=(), history: int = 1,
                  **kw):
-        assert realism in (1, 2), realism
+        assert realism in (1, 2, 3), realism
         self.sensors = tuple(sensors or ())
         assert all(x in SENSORS for x in self.sensors), self.sensors
         base_dim = OBS_DIM + sum(SENSORS[x] for x in self.sensors)
-        self.proprio = np.r_[sim.N_RAYS:base_dim]          # everything but the rays
+        # own-motion readings remembered by `history`: everything but the rays and the oracle grip
+        self.grip_col = None
+        if "grip" in self.sensors:
+            off = sum(SENSORS[x] for x in self.sensors[:self.sensors.index("grip")])
+            self.grip_col = OBS_DIM + off
+        self.proprio = np.array([i for i in range(sim.N_RAYS, base_dim) if i != self.grip_col])
         self.history = int(history)
         self.phist = np.zeros((n, max(self.history - 1, 0), len(self.proprio)), np.float32)
         self.obs_dim = base_dim + self.phist.shape[1] * self.phist.shape[2]
@@ -231,6 +253,8 @@ class DynamicRacerBatch(sim.RacerBatch):
             if name == "velocity":
                 vy = self.vy / VY_SCALE + self.noise * self.noise_rng.standard_normal(self.n)
                 parts.append(np.clip(vy, -3, 3)[:, None])
+            elif name == "grip":
+                parts.append((self.surface_grip / GRIP0)[:, None])
             else:
                 acc = self.accel / G + self.noise[:, None] * self.noise_rng.standard_normal((self.n, 2))
                 parts.append(np.clip(acc, -3, 3))
@@ -306,6 +330,73 @@ class DynamicRacerBatch(sim.RacerBatch):
         self.pos = self.pos + np.stack([c * vmid_x - s * vmid_y, s * vmid_x + c * vmid_y], 1) * dt
         self.slip = np.stack([a_f, a_r], 1)
 
+    def _substep3(self, cmd, dt):
+        """Realism 3 (see the constants above): sliding tires push against their slip, load-scaled stiffness,
+        drag and rolling resistance, and a substep-independent low-speed blend."""
+        m = MASS0 * self.mass
+        iz = IZ_PER_KG * m
+        mu = self.surface_grip
+        fz = np.stack([m * G * LR / sim.WHEELBASE, m * G * LF / sim.WHEELBASE], 1)          # (n, 2) front, rear
+        pk = mu[:, None] * fz
+        c_alpha = C_ALPHA * fz / (MASS0 * G / 2)
+        self.wheel = self.wheel + np.clip(cmd[:, 0] * STEER_MAX - self.wheel, -SERVO_RATE * dt, SERVO_RATE * dt)
+        delta = self.wheel
+        cd, sd = np.cos(delta), np.sin(delta)
+        thr = cmd[:, 1]
+        f_drive = np.where(thr >= 0, thr * np.minimum(MASS0 * sim.ACCEL, POWER / np.maximum(self.vx, 1.0)), 0.0)
+        f_brake = np.where(thr < 0, -thr * MASS0 * sim.BRAKE, 0.0) * (self.vx > 0.05)
+        fx_req = np.stack([DRIVE_SPLIT[0] * f_drive - BRAKE_SPLIT[0] * f_brake,
+                           DRIVE_SPLIT[1] * f_drive - BRAKE_SPLIT[1] * f_brake], 1)
+        # contact-patch velocity in each wheel's frame: u along the wheel, w sideways
+        vfy = self.vy + LF * self.yaw_rate
+        u = np.stack([self.vx * cd + vfy * sd, self.vx], 1)
+        w = np.stack([-self.vx * sd + vfy * cd, self.vy - LR * self.yaw_rate], 1)
+        alpha = np.arctan2(w, np.maximum(np.abs(u), V_KIN))
+        demand = np.abs(fx_req) / np.maximum(pk, 1e-6)
+        sliding = demand > 1
+        self.locked = sliding
+        # gripping tire: longitudinal as asked, sideways from the tire curve, within the friction ellipse
+        left = np.sqrt(np.maximum(1 - np.minimum(demand, 1) ** 2, 0.0))
+        B = c_alpha / (PAC_C * np.maximum(pk, 1e-6))
+        fy_grip = -pk * np.sin(PAC_C * np.arctan(B * alpha)) * left
+        # sliding tire: SLIDE_FRAC × peak against the slip velocity (braking: the patch velocity itself;
+        # spinning: the tire surface runs ahead of the ground by spin_slip)
+        braking = fx_req < 0
+        spin_slip = SPIN_SLIP0 + SPIN_SLIP * np.maximum(demand - 1, 0)
+        sx = np.where(braking, np.maximum(u, 0.0), -spin_slip)
+        sy = w
+        norm = np.maximum(np.hypot(sx, sy), 1e-6)
+        fx_slide = -SLIDE_FRAC * pk * sx / norm
+        fy_slide = -SLIDE_FRAC * pk * sy / norm
+        fx = np.where(sliding, fx_slide, fx_req)
+        fy_target = np.where(sliding, fy_slide, fy_grip)
+        k = 1 - np.exp(-np.maximum(np.abs(u), V_KIN) * dt / RELAX_LEN3)
+        self.fy = self.fy + k * (fy_target - self.fy)
+        fy = self.fy
+        speed = np.hypot(self.vx, self.vy)
+        resist = 0.5 * RHO * CDA * self.vx * np.abs(self.vx) + CRR * m * G * np.tanh(self.vx / 0.5)
+        fbx = fx[:, 0] * cd - fy[:, 0] * sd + fx[:, 1] - resist
+        fby = fx[:, 0] * sd + fy[:, 0] * cd + fy[:, 1]
+        rdot = (LF * (fx[:, 0] * sd + fy[:, 0] * cd) - LR * fy[:, 1]) / iz
+        vx_free = self.vx + (fbx / m + self.vy * self.yaw_rate) * dt
+        vx = np.clip(vx_free, 0.0, sim.V_MAX)
+        # accelerometer: what the body actually experiences (the speed cap and the no-reverse clamp included)
+        self._acc_sum += np.stack([fbx / m - (vx_free - vx) / dt, fby / m], 1)
+        vy = self.vy + (fby / m - self.vx * self.yaw_rate) * dt
+        r = self.yaw_rate + rdot * dt
+        # walking pace: pull toward the no-slip model, at a rate that doesn't depend on the substep
+        lam = np.clip((speed - V_KIN) / (V_DYN - V_KIN), 0, 1)
+        kb = (1 - lam) * (1 - np.exp(-dt / BLEND_TAU))
+        r_kin = vx * np.tan(delta) / sim.WHEELBASE
+        r = r + kb * (r_kin - r)
+        vy = vy + kb * (r_kin * LR - vy)
+        vmid_x, vmid_y = 0.5 * (self.vx + vx), 0.5 * (self.vy + vy)
+        self.vx, self.vy, self.yaw_rate = vx, vy, r
+        self.heading = self.heading + r * dt
+        c, s_ = np.cos(self.heading), np.sin(self.heading)
+        self.pos = self.pos + np.stack([c * vmid_x - s_ * vmid_y, s_ * vmid_x + c * vmid_y], 1) * dt
+        self.slip = alpha
+
     def step(self, action: np.ndarray):
         a = np.clip(np.asarray(action, dtype=float).reshape(self.n, 2), -1, 1)
         self.hist = np.roll(self.hist, 1, axis=1)
@@ -316,7 +407,7 @@ class DynamicRacerBatch(sim.RacerBatch):
         for j in range(SUBSTEPS):
             # the command reaching the wheels at this instant was issued `delay` seconds ago
             lag = np.clip(np.ceil(np.round((self.delay - j * dt) / sim.DT, 9)), 0, MAX_DELAY_STEPS).astype(int)
-            self._substep(self.hist[rows, lag], dt)
+            (self._substep3 if self.realism >= 3 else self._substep)(self.hist[rows, lag], dt)
         self.accel = self._acc_sum / SUBSTEPS
         self.v = np.hypot(self.vx, self.vy)
         self.steer = self.wheel.copy()

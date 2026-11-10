@@ -29,18 +29,21 @@ GATE_SPAN = {k: getattr(dy.GATE_DR, k) for k in SWEEPS}
 DRAWS = 5
 
 
-def laps(policy, physics="nominal", dirt=True, seeds=trk.HELD_OUT_SEEDS, record=False, seed=0, setup=None, **car):
-    """car: DynamicRacerBatch options describing the car itself (realism, sensors)."""
+def laps(policy, physics="nominal", dirt=True, seeds=trk.HELD_OUT_SEEDS, record=False, seed=0, setup=None,
+         outlap=False, **car):
+    """car: DynamicRacerBatch options describing the car itself (realism, sensors, history).
+    outlap: an out-lap before the counted lap (the gate protocol from Phase 3 E13 on)."""
     mk = functools.partial(dy.DynamicRacerBatch, physics=physics, dirt=dirt, seed=seed, **car)
-    return evaluate.run_laps(policy, seeds, record=record, make_batch=mk, setup=setup)
+    return evaluate.run_laps(policy, seeds, record=record, make_batch=mk, setup=setup, outlap=outlap)
 
 
-def sweep(policy, knobs=("grip", "delay", "mass", "noise"), dirt=True, seeds=trk.HELD_OUT_SEEDS, **car) -> dict:
+def sweep(policy, knobs=("grip", "delay", "mass", "noise"), dirt=True, seeds=trk.HELD_OUT_SEEDS, outlap=False,
+          **car) -> dict:
     out = {}
     for k in knobs:
         rows = []
         for v in SWEEPS[k]:
-            r = laps(policy, physics={k: v}, dirt=dirt, seeds=seeds, **car)
+            r = laps(policy, physics={k: v}, dirt=dirt, seeds=seeds, outlap=outlap, **car)
             rows.append(dict(value=v, completion=r["completion"], mean_lap_time=r["mean_lap_time"]))
         out[k] = rows
     return out
@@ -49,7 +52,8 @@ def sweep(policy, knobs=("grip", "delay", "mass", "noise"), dirt=True, seeds=trk
 TEST_PHYSICS_SEED = 54321   # physics draws for the gate's test laps (never used before the gate)
 
 
-def gate_laps(policy, physics=dy.GATE_DR, draws=DRAWS, dirt=True, seed=12345, seeds=trk.HELD_OUT_SEEDS, **car) -> dict:
+def gate_laps(policy, physics=dy.GATE_DR, draws=DRAWS, dirt=True, seed=12345, seeds=trk.HELD_OUT_SEEDS, outlap=False,
+              **car) -> dict:
     """DRAWS laps per track, each lap with physics drawn from `physics`. Reproducible.
 
     Defaults are the validation set (held-out tracks, physics seed 12345) that experiments report on.
@@ -57,7 +61,7 @@ def gate_laps(policy, physics=dy.GATE_DR, draws=DRAWS, dirt=True, seed=12345, se
     """
     rows = []
     for d in range(draws):
-        r = laps(policy, physics=physics, dirt=dirt, seed=seed + d, seeds=seeds, **car)
+        r = laps(policy, physics=physics, dirt=dirt, seed=seed + d, seeds=seeds, outlap=outlap, **car)
         for t in r["tracks"]:
             rows.append(dict(t, draw=d))
     done = [r["finished"] for r in rows]

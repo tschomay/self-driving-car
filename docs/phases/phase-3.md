@@ -228,6 +228,17 @@ Then the gate check, and the go/no-go on Phase 4.
 - **Explanation (owner, after the run):** "Crash penalty is stronger than drive reward. Maybe could be tuned but it's likely not the right approach. Looking ahead just means you don't set yourself up for failure."
 - **Takeaway:** a longer horizon aligns the reward with finishing without adding a term the car can game. A crash penalty big enough to matter makes standing still the safest policy.
 
+### Decision: a separate test set for the gate (owner, 2026-11-10)
+
+The owner asked whether testing on the held-out tracks in every experiment is like tuning on the test set. It is. Tracks 10000–10019 and the fixed 100 gate-range physics draws scored every experiment since Phase 1, and recipes were chosen partly by them. The network never trains on them, but the recipe choices did see them. Phases 1 and 2 ran their gates on the same tracks.
+
+From now on:
+- Tracks 10000–10019 and physics seed 12345 are the **validation set** that experiments report on.
+- The gate uses a fresh **test set**: tracks 20000–20019 (`track.TEST_SEEDS`) with physics seed 54321 (`robust.TEST_PHYSICS_SEED`), looked at once.
+- The gate report shows both numbers; the gap measures overfitting by choice.
+
+The threshold and physics ranges are unchanged.
+
 ### E9 — Can your own PPO drive the randomized car?
 
 - **Prediction (owner, before the run):** "I expect mine to be slightly better but not pass. I'm interested in pursuing better traction handling if that's the case"
@@ -242,17 +253,6 @@ Then the gate check, and the go/no-go on Phase 4.
   - Same average, wider spread. Seed 2 (80%) is the best run so far; seed 0, the gate policy, is the lowest of the six.
 - **Explanation (owner, after the run):** _pending_
 - **Takeaway:** _pending_
-
-### Decision: a separate test set for the gate (owner, 2026-11-10)
-
-The owner asked whether testing on the held-out tracks in every experiment is like tuning on the test set. It is. Tracks 10000–10019 and the fixed 100 gate-range physics draws scored every experiment since Phase 1, and recipes were chosen partly by them. The network never trains on them, but the recipe choices did see them. Phases 1 and 2 ran their gates on the same tracks.
-
-From now on:
-- Tracks 10000–10019 and physics seed 12345 are the **validation set** that experiments report on.
-- The gate uses a fresh **test set**: tracks 20000–20019 (`track.TEST_SEEDS`) with physics seed 54321 (`robust.TEST_PHYSICS_SEED`), looked at once.
-- The gate report shows both numbers; the gap measures overfitting by choice.
-
-The threshold and physics ranges are unchanged.
 
 ## Gate check
 

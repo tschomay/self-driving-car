@@ -100,3 +100,11 @@ def test_history_remembers_recent_own_motion():
     base = dy.OBS_DIM + 2
     assert np.allclose(o2[:, base:base + p], o1[:, b.proprio])            # 1 step ago
     assert np.allclose(o2[0, base + 1:base + 3], [0.2, 1.0])              # ...including the command then
+
+
+def test_oracle_grip_sensor():
+    b = dy.DynamicRacerBatch(1, tracks=[10000], start="line", dirt=True, physics=dict(grip=0.6), sensors=("grip",))
+    o = b.reset()
+    assert o.shape == (1, dy.OBS_DIM + 1)
+    expect = 0.6 * (dy.DIRT_GRIP if dy.dirt_mask(10000)[b.idx[0]] else 1.0)
+    assert np.isclose(o[0, -1], expect)

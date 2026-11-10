@@ -82,7 +82,9 @@ OBS_DIM = sim.N_RAYS + 4
 #               car needs an optical-flow sensor or an estimator for this)
 #   "accel"     accelerometer: forward and sideways acceleration the body feels, / G, averaged over
 #               the step (a cheap IMU chip)
-SENSORS = {"velocity": 1, "accel": 2}
+#   "grip"      ORACLE (sim only, Phase 3 E10): the true grip under the car right now (episode grip ×
+#               dirt), / GRIP0. No real car has this; it measures what knowing the grip would be worth.
+SENSORS = {"velocity": 1, "accel": 2, "grip": 1}
 # history=k (Phase 3 E7): also append the car's own-motion readings (speed, last commands, gyro, and any
 # extra sensors) from the previous k-1 steps, newest first, so it can tell how the car has been
 # responding to its commands lately, e.g. to estimate the grip. Zeros before the episode's start.
@@ -231,6 +233,8 @@ class DynamicRacerBatch(sim.RacerBatch):
             if name == "velocity":
                 vy = self.vy / VY_SCALE + self.noise * self.noise_rng.standard_normal(self.n)
                 parts.append(np.clip(vy, -3, 3)[:, None])
+            elif name == "grip":
+                parts.append((self.surface_grip / GRIP0)[:, None])
             else:
                 acc = self.accel / G + self.noise[:, None] * self.noise_rng.standard_normal((self.n, 2))
                 parts.append(np.clip(acc, -3, 3))

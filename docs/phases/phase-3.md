@@ -210,6 +210,24 @@ Then the gate check, and the go/no-go on Phase 4.
 - **Explanation (owner, after the run):** "Reward is distant per step. Crashing later isn't punished now so it pays to take risks once you know how to drive the car"
 - **Takeaway:** the reward (metres per step) and the gate (finished laps) disagree about risk. Once the car can drive, more training spends that skill on speed, not reliability. Memory didn't help within 1M steps.
 
+### E8 — Does making crashes costly make it finish more?
+
+- **Prediction (owner, before the run):** "K makes it slow and careful, l runs the risk of losing sight of what's in front of you and struggling to drive at all. Hopefully m means you can weight each a little less and get all the benefit. Maybe a little faster if it actually works because the twitchiness could also come from not looking far enough ahead (it does in real life)"
+- **Setup:** E6 recipe (full train-range randomization, accelerometer, no memory, realism 2, squashed actions, LR decay), 1M steps, seeds 0–2: (h′) no change; (k) `crash_penalty=100` (about 10 s of top-speed reward); (l) γ = 0.997 (about 30 s horizon); (m) both. 12 runs launched at once; one, (k) seed 0, was killed for running out of memory (about 3 GB per run; 15 GB container) and rerun alone (same seed and thread count, so the same result). From now on: at most 4 runs at once.
+- **Result:** [report](https://claude.ai/artifact/PiKxMurtiPYnCcZ4f5GBoa)
+
+  | | Gate range per seed | Train range | Held-out /20 | Mean lap | Gate laps at grip 0.5–0.7× |
+  |---|---|---|---|---|---|
+  | (h′) no change | 36 / 47 / 45% | 45–69% | 20 / 20 / 11 | 29.7 s | 0% |
+  | (k) crash penalty | 23 / 0 / 77% | 0–97% | 9 / 0 / 20 | 36.8 s | 16% |
+  | (l) γ 0.997 | **73 / 72 / 75%** | 94–97% | 20 / 20 / 20 | 35.8 s | 30% |
+  | (m) both | 2 / 6 / 58% | 0–72% | 0 / 0 / 15 | 46.3 s | 16% |
+
+  - (l): consistent across seeds; delay, mass and noise curves flat at 90–100% across the gate range. Remaining gap is grip below 0.7×.
+  - Crash penalty: 2 of 3 seeds in both (k) and (m) learned to barely move (0.1–3.8 m/s in training): never crash, never pay. Phase 1 E2's parking hack again. The one (k) seed that drove is the best single car (77% gate range, 97% train range).
+- **Explanation (owner, after the run):** _pending_
+- **Takeaway:** _pending_
+
 ## Gate check
 
 ## Handoff to next phase

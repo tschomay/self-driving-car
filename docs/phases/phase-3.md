@@ -273,6 +273,28 @@ Plan: a two-step version of Rapid Motor Adaptation (RMA). E10, oracle: give the 
 
 - **Prediction (owner, before the run):** "the task is still extrapolation. However, acceleration is linear in friction and all the cars controls set acceleration, so I think that should be ok to extrapolate."
 - **Setup:** E8 (l)'s recipe (full train-range randomization, grip 0.7–1.1×; accelerometer; γ 0.997; 1M steps; SB3) plus the oracle `grip` sensor (true grip under the car / nominal, including dirt). Seeds 0–2, 3 runs in parallel. Compared with E8 (l).
+- **Result (validation set):** [report](https://claude.ai/artifact/WbYJa9x5WDjTfEmEMywM29)
+
+  | | Gate range per seed | Grip 0.5× sweep | Grip 0.4× sweep | Held-out /20 | Mean lap (nominal) |
+  |---|---|---|---|---|---|
+  | E8 (l), no oracle | 73 / 72 / 75% | 13% | 2% | 20 / 20 / 20 | 35.8 s |
+  | oracle grip | **83 / 81 / 88%** | **93%** | **68%** | 20 / 18 / 20 | 33.3 s |
+
+  - It extrapolates, and it adapts its speed to the grip (seed 0's mean lap: 48.4 s at 0.4×, 38.5 s at 0.7×, 32.7 s at 1.0×, 28.8 s at 1.3×). Without the oracle the car laps 35–36 s at every grip.
+  - Remaining gate-lap failures by grip: 0.5–0.6×: 62%, 0.6–0.7×: 77%, 0.7–0.9×: 81%, 0.9–1.1×: 96%, 1.1–1.3×: 91%. Light cars (mass < 0.8×): 57%, consistent with the review's grip cliff.
+  - Smoothness unchanged (steering change about 0.34 per step).
+- **Explanation (owner, after the run):** _pending_
+- **Takeaway:** _pending_
 - **Also launched (owner's request):** two background reviews: (1) a code review of the physics, controls and sensors for correctness and real-world sense; (2) an investigation of why the car saws the steering instead of holding a clean line (foresight/planning among the hypotheses).
+
+### Sim review (2026-11-10)
+
+A background code review of the physics, controls and sensors: [phase3-sim-review.md](phase3-sim-review.md). The core equations are right. Found:
+- Two bugs: the low-speed blend erases slides and spins; a locked front tire pushes along the wheel.
+- A grip cliff (verified): fixed drive force vs. grip-scaled tire peak, so full throttle on dirt or light cars spins both axles and leaves zero cornering force.
+- Sawing is nearly free: no drag or rolling resistance; the speed cap hides losses.
+- Smaller realism gaps.
+
+The owner added a hypothesis for the twitchiness investigation: sensor noise makes the car think it's off its line.
 
 ## Handoff to next phase

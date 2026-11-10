@@ -364,4 +364,27 @@ Exploration-noise schedule (`std_cap=[start, end]`, SB3 and the owner's PPO): th
   - track memory (a map of low-grip spots) is deferred to a later phase
   - plan: E12 early stopping; E13 grip estimator (1 s window vs. a whole-drive running estimate, with and without the out-lap); then decide on much wider training ranges and the gate rerun
 
+### E12 — Early stopping
+
+- **Prediction (owner, before the run):** "From what you said earlier, I'd expect around 300k and lap times to be a little over 30 seconds"
+- **Setup:** E11's runs repeated exactly (same seeds; the final policies reproduce E11's numbers), with `select=true`: a checkpoint every 100k steps; the one with the best validation gate range (100 laps) is kept. (o′) no grip info, (p′) oracle grip. 6 runs, 4 then 2 in parallel.
+- **Owner's question during the run:** adjust the rewards instead (e.g. a decay)? Agent's options:
+  - an even longer horizon (γ 0.999)
+  - a "lose the lap" crash cost (take back the progress earned since the last start-line crossing; parking has nothing to lose, so it can't be gamed the way E8's fixed penalty was)
+  - a lap-completion bonus
+  - a reward weight schedule
+  
+  Recommended: keep early stopping and test "lose the lap" next. Owner's decision pending.
+- **Result (validation set):** [report](https://claude.ai/artifact/2Gubj9FYKiHrtc587oZeRq)
+
+  | | Chosen checkpoint | Gate range, chosen | Gate range, final | Mean lap, chosen | Mean lap, final |
+  |---|---|---|---|---|---|
+  | (o′) no grip info | 200k / 500k / 600k | 80 / 72 / 86% | 57 / 55 / 60% | 34.5 s | 30.0 s |
+  | (p′) oracle grip | 300k / 500k / 100k | **92 / 93 / 90%** | 52 / 58 / 61% | 34.1 s | 28.7 s |
+
+  - The chosen validation numbers are flattered: each is the best of 10 on that same score. The test set is the honest check.
+  - Oracle checkpoints: gate laps at grip 0.5–0.6×: 90%; light cars: 86%; 20/20 nominal in every seed. Without grip info the weak spot is still low grip (0.5–0.6×: 40%).
+- **Explanation (owner, after the run):** _pending_
+- **Takeaway:** _pending_
+
 ## Handoff to next phase

@@ -228,6 +228,21 @@ Then the gate check, and the go/no-go on Phase 4.
 - **Explanation (owner, after the run):** "Crash penalty is stronger than drive reward. Maybe could be tuned but it's likely not the right approach. Looking ahead just means you don't set yourself up for failure."
 - **Takeaway:** a longer horizon aligns the reward with finishing without adding a term the car can game. A crash penalty big enough to matter makes standing still the safest policy.
 
+### E9 — Can your own PPO drive the randomized car?
+
+- **Prediction (owner, before the run):** "I expect mine to be slightly better but not pass. I'm interested in pursuing better traction handling if that's the case"
+- **Setup:** `sdc/phase3/my_ppo.py`: the owner's Phase 1 PPO (advantages, textbook clipped loss, value loss imported unchanged) with E8 (l)'s recipe: full train-range randomization, accelerometer, realism 2, squashed actions, LR decay, γ 0.997, 1M steps, seeds 0–2 (3 runs in parallel, about 11 min each). Compared with E8 (l), SB3 on the same recipe. Seed 0 was fixed as the gate policy before the run.
+- **Result (validation set):** [report](https://claude.ai/artifact/7YNoj4TU3b4UvceKaS9e7J)
+
+  | | Gate range per seed | Mean | Held-out /20 | Train range | Grip 0.5–0.7× laps | Mean lap |
+  |---|---|---|---|---|---|---|
+  | SB3 (E8 l) | 73 / 72 / 75% | 73% | 20 / 20 / 20 | 94–97% | 30% | 35.8 s |
+  | owner's PPO | 66 / 73 / 80% | 73% | 20 / 20 / 20 | 93–97% | 27% | 35.9 s |
+
+  - Same average, wider spread. Seed 2 (80%) is the best run so far; seed 0, the gate policy, is the lowest of the six.
+- **Explanation (owner, after the run):** _pending_
+- **Takeaway:** _pending_
+
 ### Decision: a separate test set for the gate (owner, 2026-11-10)
 
 The owner asked whether testing on the held-out tracks in every experiment is like tuning on the test set. It is. Tracks 10000–10019 and the fixed 100 gate-range physics draws scored every experiment since Phase 1, and recipes were chosen partly by them. The network never trains on them, but the recipe choices did see them. Phases 1 and 2 ran their gates on the same tracks.

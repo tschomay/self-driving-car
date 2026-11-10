@@ -35,12 +35,12 @@ def laps(policy, physics="nominal", dirt=True, seeds=trk.HELD_OUT_SEEDS, record=
     return evaluate.run_laps(policy, seeds, record=record, make_batch=mk, setup=setup)
 
 
-def sweep(policy, knobs=("grip", "delay", "mass", "noise"), dirt=True, **car) -> dict:
+def sweep(policy, knobs=("grip", "delay", "mass", "noise"), dirt=True, seeds=trk.HELD_OUT_SEEDS, **car) -> dict:
     out = {}
     for k in knobs:
         rows = []
         for v in SWEEPS[k]:
-            r = laps(policy, physics={k: v}, dirt=dirt, **car)
+            r = laps(policy, physics={k: v}, dirt=dirt, seeds=seeds, **car)
             rows.append(dict(value=v, completion=r["completion"], mean_lap_time=r["mean_lap_time"]))
         out[k] = rows
     return out

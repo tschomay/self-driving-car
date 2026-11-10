@@ -4,7 +4,7 @@
 - **Goal / gate:** dynamic bicycle model with tire slip, throttle/brake, low-grip "dirt" patches, actuation latency, sensor noise, and **domain randomization** of friction, mass, and latency. **Gate:** on held-out tracks, with physics parameters drawn from a range *wider* than training, completion is ≥ 85% and the robustness curve is published. **Go/no-go:** after this phase, decide whether to go 3D (cost, interest, time).
 - **Learn:** vehicle dynamics, why perfect-traction policies fail, domain randomization as sim-to-real insurance, robustness evaluation; drifting may emerge on its own.
 - **Code:** `sdc/racer/dynamics.py` (dynamic car, dirt, delay, noise, physics ranges, hand-coded driver, Phase 1 policy adapter), `sdc/phase3/robust.py` (robustness sweeps, gate laps), `sdc/phase3/train.py` (SB3 PPO on the dynamic car), `tests/test_dynamics.py`
-- **How to reproduce the gate:** to be written (`python -m sdc.phase3.gate`)
+- **How to reproduce the gate:** `python -m sdc.phase3.gate` (trains the owner's PPO, seed 0, 1M steps, then evaluates once on the test set; about 15 min)
 - **Previous gate:** Phase 2 passed (2026-11-09).
 
 ## Phase-entry decisions (owner, 2026-11-09)

@@ -374,7 +374,7 @@ Exploration-noise schedule (`std_cap=[start, end]`, SB3 and the owner's PPO): th
   - a lap-completion bonus
   - a reward weight schedule
   
-  Recommended: keep early stopping and test "lose the lap" next. Owner's decision pending.
+  Recommended: keep early stopping and test "lose the lap" next. **Owner's decision:** test options 2 and 3 ("lose the lap" and the lap-completion bonus).
 - **Result (validation set):** [report](https://claude.ai/artifact/2Gubj9FYKiHrtc587oZeRq)
 
   | | Chosen checkpoint | Gate range, chosen | Gate range, final | Mean lap, chosen | Mean lap, final |
@@ -384,7 +384,9 @@ Exploration-noise schedule (`std_cap=[start, end]`, SB3 and the owner's PPO): th
 
   - The chosen validation numbers are flattered: each is the best of 10 on that same score. The test set is the honest check.
   - Oracle checkpoints: gate laps at grip 0.5–0.6×: 90%; light cars: 86%; 20/20 nominal in every seed. Without grip info the weak spot is still low grip (0.5–0.6×: 40%).
-- **Explanation (owner, after the run):** _pending_
-- **Takeaway:** _pending_
+- **Explanation (owner, after the run):** "The Oracle car must be getting more confident"
+- **Takeaway:** the best behavior appears mid-training, and how much of it survives to the end depends on how confident the car gets. The oracle car becomes confident fastest, so it has the most to lose by the end. Early stopping keeps the reliable version, at about 4–5 s per lap.
+
+Plan from here: E13 grip estimator (on E12's best oracle checkpoints); E14 reward options ("lose the lap" crash cost, lap-completion bonus); then decide on much wider training ranges and the gate rerun (with an out-lap).
 
 ## Handoff to next phase

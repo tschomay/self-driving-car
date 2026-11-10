@@ -265,4 +265,14 @@ The threshold and physics ranges are unchanged.
   - Robustness curves (test tracks, one knob at a time): delay, mass and noise stay at 90–100% across the gate range; grip falls from 90% at 0.7× to 35% at 0.6× and 5% at 0.5×. Published in the gate report.
 - **Verdict:** **FAIL.** Everything but low grip is handled; grip below the training range (0.5–0.7×) is not. The owner chose to continue on traction handling.
 
+## After the gate: traction handling (owner chose to continue, 2026-11-10)
+
+Plan: a two-step version of Rapid Motor Adaptation (RMA). E10, oracle: give the policy the true grip under the car (sim only) and check that it can extrapolate below its 0.7× training grip. E11, estimator: learn to predict grip from the last 1 s of readings, supervised by the sim's true grip, and feed the estimate to the policy. The gate isn't rerun until a candidate is ready; a rerun uses the same test set and threshold.
+
+### E10 — With perfect grip knowledge, can it drive grip it never trained on?
+
+- **Prediction (owner, before the run):** "the task is still extrapolation. However, acceleration is linear in friction and all the cars controls set acceleration, so I think that should be ok to extrapolate."
+- **Setup:** E8 (l)'s recipe (full train-range randomization, grip 0.7–1.1×; accelerometer; γ 0.997; 1M steps; SB3) plus the oracle `grip` sensor (true grip under the car / nominal, including dirt). Seeds 0–2, 3 runs in parallel. Compared with E8 (l).
+- **Also launched (owner's request):** two background reviews: (1) a code review of the physics, controls and sensors for correctness and real-world sense; (2) an investigation of why the car saws the steering instead of holding a clean line (foresight/planning among the hypotheses).
+
 ## Handoff to next phase

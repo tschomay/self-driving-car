@@ -1,6 +1,6 @@
 # Phase 3 — Realistic dynamics and robustness
 
-- **Status:** in progress (started 2026-11-09)
+- **Status:** in progress, gate failed (70% vs. 85%, 2026-11-10); started 2026-11-09
 - **Goal / gate:** dynamic bicycle model with tire slip, throttle/brake, low-grip "dirt" patches, actuation latency, sensor noise, and **domain randomization** of friction, mass, and latency. **Gate:** on held-out tracks, with physics parameters drawn from a range *wider* than training, completion is ≥ 85% and the robustness curve is published. **Go/no-go:** after this phase, decide whether to go 3D (cost, interest, time).
 - **Learn:** vehicle dynamics, why perfect-traction policies fail, domain randomization as sim-to-real insurance, robustness evaluation; drifting may emerge on its own.
 - **Code:** `sdc/racer/dynamics.py` (dynamic car, dirt, delay, noise, physics ranges, hand-coded driver, Phase 1 policy adapter), `sdc/phase3/robust.py` (robustness sweeps, gate laps), `sdc/phase3/train.py` (SB3 PPO on the dynamic car), `tests/test_dynamics.py`
@@ -256,5 +256,13 @@ The threshold and physics ranges are unchanged.
 - **Takeaway:** the owner's PPO matches SB3 on the hardest recipe so far (73% mean). Seed-to-seed spread is large, so one seed is a noisy measure, which matters for a gate decided by one seed.
 
 ## Gate check
+
+- **Run:** 2026-11-10, `python -m sdc.phase3.gate --run runs/p3-e9-s0` (the gate policy is E9 seed 0, trained by the same code and settings `python -m sdc.phase3.gate` uses), commit 936435f. Owner's PPO, full train-range randomization, accelerometer, γ 0.997, 1M steps, seed 0 (fixed before E9's results were seen), 1 torch thread, cloud container (4 CPU, no GPU). [Gate report](https://claude.ai/artifact/6bd3xNLDQNKNFxDipMP1bv)
+- **Result vs. threshold:**
+  - Test set (tracks 20000–20019, never used before; gate-range physics, 5 draws per track, physics seed 54321): **70/100 = 70%** vs. ≥ 85%: **fail**.
+  - Same policy on the validation set: 66%. The 4-point gap is within the noise of 100 laps, so there's no sign that choosing recipes on the validation set flattered the numbers.
+  - By grip in the draw: 0.5–0.7×: 15% (26 laps); 0.7–0.9×: 73% (22); 0.9–1.1×: 97% (29); 1.1–1.3×: 96% (23). Light cars (mass < 0.8×): 55%. Test tracks at nominal: 20/20. The hand-coded driver (knows the grip) on the same 100 laps: 93%.
+  - Robustness curves (test tracks, one knob at a time): delay, mass and noise stay at 90–100% across the gate range; grip falls from 90% at 0.7× to 35% at 0.6× and 5% at 0.5×. Published in the gate report.
+- **Verdict:** **FAIL.** Everything but low grip is handled; grip below the training range (0.5–0.7×) is not. The owner chose to continue on traction handling.
 
 ## Handoff to next phase

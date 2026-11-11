@@ -85,7 +85,8 @@ Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop t
   - It does read the map, but only to slow down for dirt: lied to that the track is clean, it crashes more and is barely faster (31.5–34 s).
   - Checked: lookahead isn't the limit. The hand-coded driver needs only 20 m of planning to lap in 25.4 s (95%); the rays reach 40 m.
   - This revises E2: with the grip estimate the RL car matches the hand-coded driver, but given better information only the hand-coded driver gets faster (29.9 s with true grip, 25.4 s with the map). The RL car's pace on clean track is the limit.
-- **Explanation (owner, after the run):** _pending_
+- **Explanation (owner, after the run):** "Maybe it hasn't explored that space enough? Like it just never tried going faster so it doesn't know that would be ok?"
+- **Takeaway:** better information doesn't make the RL car faster; its clean-track pace is the limit. Owner's hypothesis to test next: it never explored fast driving.
 
 ## Gate check
 

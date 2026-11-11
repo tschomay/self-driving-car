@@ -69,6 +69,11 @@ Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop t
 - **Explanation (owner, after the run):** "Agreed on learning the track." (after the agent's summary: the RL car is at the ceiling its information allows, so the gap is knowledge, not technique.)
 - **Takeaway:** with only its own sensors, even a tuned expert laps in about 35 s. The 30.5 s bar needs knowledge of the track's grip (dirt alone is worth about 4.5 s), so the phase turns to track memory.
 
+### E3 — What a perfect track map is worth
+
+- **Prediction (owner, before the run):** "28" (seconds).
+- **Setup:** E1's recipe plus the oracle `gripmap` sensor (true grip / nominal at 5, 10, …, 40 m ahead on the centerline, from the exact position): `--env sensors='["accel","grip","gripmap"]'`. Seeds 0–2, 1M steps, 3 in parallel. Scored with true grip and true map (an upper bound, no estimator); pick = fastest checkpoint with ≥ 90% validation gate range (`sdc.phase35.e1 score|pick`).
+
 ## Gate check
 
 ## Handoff to next phase

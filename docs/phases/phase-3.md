@@ -410,6 +410,28 @@ Exploration-noise schedule (`std_cap=[start, end]`, SB3 and the owner's PPO): th
 - **Takeaway:** the same readings that E7's policy ignored give an accurate grip estimate within about 5 s once a network is trained to predict grip from them. An explicit target turns memory into information; RL alone didn't discover it in 1M steps. The out-lap helps the counted lap but costs crashes, because the policy drives it like any other lap.
 - **Owner's question:** should the out-lap have a different reward? "I would drive cautiously with some bursts to get a feel for it."
 
+### E13b — A careful out-lap
+
+- **Options discussed:**
+  1. a learned out-lap mode (an input flag, plus a reward that values caution and getting the grip estimate settled)
+  2. a throttle cap during the out-lap, as a rule
+  3. dropping the out-lap from the count
+  
+  The owner chose to test option 2 now and keep option 1 as a candidate for later.
+- **Prediction (owner, before the run):** "60, yes" (a 60% cap works best, and a careful out-lap beats the no-out-lap score)
+- **Setup:** `sdc/phase3/outlap.py`. E13's six cars (both estimators, seeds 0–2), no retraining. Throttle capped at 40 / 60 / 80% during the out-lap only, plus the uncapped baseline in the same harness, on validation gate-range laps with the out-lap. A first pass ran without pinning the torch thread count and without the uncapped baseline in the same harness; it was rerun with threads pinned to 1. The uncapped rerun reproduced E13 exactly.
+- **Result:** [report](https://claude.ai/artifact/RefVLwFRGo9eTxPHTqMfFr)
+
+  | Estimator | No cap | Cap 80% | Cap 60% | Cap 40% | No out-lap (E13) |
+  |---|---|---|---|---|---|
+  | 1 s window (mean of 3) | 83% | 79% | 80% | 80% | 90% |
+  | whole drive (mean of 3) | 83% | 80% | 81% | 85% | 88% |
+
+  - No cap helps beyond seed noise (±5–10 points). The cars rarely use more than 60% throttle (mean about 0.15), so the cap seldom binds.
+  - Out-lap crashes happen 30–55% of the way round (median 42%), half at grip below 0.7×: the same corner failures as the counted lap, not early mistakes from an unsettled estimate. A careful out-lap would need careful cornering, not less throttle.
+- **Explanation (owner, after the run):** _pending_
+- **Takeaway:** _pending_
+
 Plan from here: E13 grip estimator (on E12's best oracle checkpoints); E14 reward options ("lose the lap" crash cost, lap-completion bonus); then decide on much wider training ranges and the gate rerun (with an out-lap).
 
 ## Handoff to next phase

@@ -40,8 +40,8 @@ Starting point: Phase 3's winning recipe (the owner's PPO, realism 3, true grip 
   - Hand-coded driver: 25.4 s; gate bar 1.2× = 30.5 s.
   - Seed 0 reproduces Phase 3's gate car (picked at 250k again, 41 s); the new rule saves 4.4 s there. Seeds 1–2 already picked late checkpoints, so nothing changes.
   - Every checkpoint of every run laps in 31–43 s. The late, less reliable checkpoints are only about 1–2 s faster (32–34 s, 75–89% gate range), not the 28.5 s the Phase 3 handoff quoted (that was the E12 runs without the lap bonus).
-- **Explanation (owner, after the run):** _pending_
-- **Takeaway:** _pending_
+- **Explanation (owner, after the run):** "It isn't learning good racing technique, it's just getting by. That has me wonder if we're missing something.. more/better sensors, bigger model, longer training, etc. But also has me wondering if that's just the max with the constraints we've imposed (noisy sensors etc)."
+- **Takeaway:** checkpoint choice is worth up to about 4 s, but every checkpoint is at 31 s or slower, so the gap is in what the car learns, not in which snapshot we keep. Next: measure the ceiling under the car's own constraints (E2).
 
 ## Gate check
 

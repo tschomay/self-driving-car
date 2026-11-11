@@ -59,8 +59,8 @@ Starting point: Phase 3's winning recipe (the owner's PPO, realism 3, true grip 
   - With the RL car's information, the hand-coded driver is no faster than the RL car. Not knowing the dirt costs about 4.5 s; estimating the grip instead of knowing it costs another 4.9 s.
   - Surprise, checked: the first try reused the RL car's estimator; on the hand-coded driver's driving it was off by 0.21 (15% low) against 0.05 on the RL car's (best: 86%, 38.4 s). An estimator trained on the hand-coded driver's own driving is still off by about 0.17: the hand-coded driver never pushes the tires near their limit, so its driving reveals little about the grip. The RL car slides more.
   - Caveat: the hand-coded driver still knows the track shape ahead and reads speed and position without noise, so (c) is a slightly generous ceiling.
-- **Explanation (owner, after the run):** _pending_
-- **Takeaway:** _pending_
+- **Explanation (owner, after the run):** "Agreed on learning the track." (after the agent's summary: the RL car is at the ceiling its information allows, so the gap is knowledge, not technique.)
+- **Takeaway:** with only its own sensors, even a tuned expert laps in about 35 s. The 30.5 s bar needs knowledge of the track's grip (dirt alone is worth about 4.5 s), so the phase turns to track memory.
 
 ## Gate check
 

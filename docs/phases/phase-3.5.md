@@ -109,6 +109,11 @@ Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop t
 - **Explanation (owner, after the run):** "With highly varied exploration, it learns fear/caution because it knows how bad things can get. Less noise means it never hits the worst scenarios so it doesn't have to prepare for them."
 - **Takeaway:** the car never found fast driving on its own; started there, PPO keeps most of it, and less exploration noise keeps more. Next: the same car on its own map and grip estimate.
 
+### E5 — The car builds its own map
+
+- **Prediction (owner, before the run):** "Seems like it wasn't very reliable even with perfect knowledge, so I expect this to less reliable. But similarly fast because it doesn't know to be less confident. But that balance comes from how conservative it is with grip estimation and location."
+- **Setup:** `sdc/phase35/selfmap.py`. No oracle inputs: grip from a 1 s window estimator trained on this car's own driving (4 DAgger rounds, 240k samples); position from an odometer (noisy speed reading × dt), reset at each start-line crossing. On the out-lap the car records its grip estimate in 5 m odometer bins, while its map input says "everything ahead may be dirt" (running mean estimate × 0.65). On the timed lap the map input is its recording at odometer + 5…40 m. Gate protocol: out-lap + timed lap, both must finish, timed lap's time counts. Candidates: E4's seed 0 picks, low noise (25.8 s with oracle inputs) and high noise (30.3 s). Validation set; the same cars with oracle inputs on the same protocol for comparison.
+
 ## Gate check
 
 ## Handoff to next phase

@@ -28,7 +28,8 @@ from sdc.racer import dynamics as dy
 
 # Same settings as the SB3 runs (Phase 1 preset) plus Phase 3's recipe: decaying LR, squash, accelerometer.
 DEFAULTS = dict(n_envs=8, n_steps=256, batch_size=256, n_epochs=10, lr=3e-4, lr_decay=True, gamma=0.99, lam=0.95,
-                clip=0.2, vf_coef=0.5, max_grad_norm=0.5, std_cap=None, select=False)
+                clip=0.2, vf_coef=0.5, max_grad_norm=0.5, std_cap=None, select=False, init=None)
+# init: a saved state_dict (model.pt) to start from instead of random weights (Phase 3.5 E4: behaviour cloning)
 # select: save a checkpoint at every eval; keep the one with the best validation gate range (early stopping)
 # std_cap [start, end]: cap on the exploration noise (std, before tanh), lowered linearly over training
 ENV = dict(tracks="random", reward="progress", max_steps=1000, physics="train", dirt=True, realism=2,
@@ -49,6 +50,8 @@ def train(seed=0, total_timesteps=500_000, out="runs/p3-mine", eval_every=50_000
                                  max_steps=env_cfg["max_steps"], physics=env_cfg["physics"], dirt=env_cfg["dirt"],
                                  crash_cost=env_cfg["crash_cost"], lap_bonus=env_cfg["lap_bonus"], **car)
     net = owner.ActorCritic(obs_dim=batch.obs_dim)
+    if cfg["init"]:
+        net.load_state_dict(torch.load(cfg["init"]))
     opt = torch.optim.Adam(net.parameters(), lr=cfg["lr"], eps=1e-5)
     owner.POLICY_LOSS_VARIANT = "textbook"
 

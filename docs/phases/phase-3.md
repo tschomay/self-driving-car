@@ -445,8 +445,9 @@ Exploration-noise schedule (`std_cap=[start, end]`, SB3 and the owner's PPO): th
   | (t) lap bonus | **78 / 82 / 72%** | **93 / 98 / 86%** | 33.9 s |
 
   - The lap bonus roughly halves the late-training slide: once a seed reaches about 85%, it mostly stays at 70–98%. Lose the lap learned slowly (0–24% for the first 200–300k steps in every seed) and drove slower in training, and one seed never got past 71%.
-- **Explanation (owner, after the run):** _pending_
-- **Takeaway:** _pending_
+- **Explanation (owner, after the run):** "Lap bonus only kicks in once you know how to complete a lap. Then it goes away if you lose that ability."
+- **Takeaway:** reward the outcome you want (finished laps) once the car can reach it, rather than punishing the failure from the start. The bonus protects the skill; the crash cost slows learning it.
+- **Decision (owner, 2026-11-11):** rerun the gate with the owner's PPO trained on the best recipe (oracle grip as a training-time input, lap bonus, early stopping), driving on the learned grip estimate, not the oracle, "so it isn't cheating".
 
 Plan from here: E13 grip estimator (on E12's best oracle checkpoints); E14 reward options ("lose the lap" crash cost, lap-completion bonus); then decide on much wider training ranges and the gate rerun (with an out-lap).
 

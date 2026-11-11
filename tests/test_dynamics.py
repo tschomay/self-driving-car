@@ -140,3 +140,17 @@ def test_realism3_fixes_review_findings():
     b.vx[:] = 20.0
     _run3(b, [0, 0], 100)
     assert 19.0 < b.vx[0] < 19.95                         # drag and rolling resistance slow a coasting car
+
+
+def test_lose_the_lap_and_lap_bonus():
+    b = dy.DynamicRacerBatch(1, tracks=[10001], start="line", dirt=False, realism=3, crash_cost="lap", lap_bonus=50.0)
+    b.reset()
+    b.lap_reward[:] = 30.0
+    b.pos = b.pos + 5.0 * b.normal[0, 0]          # put the car off the road
+    _, r, term, _, _ = b.step(np.zeros((1, 2)))
+    assert term[0] and np.isclose(r[0], -30.0)     # the lap's progress reward is taken back
+    b.reset()
+    b.progress[:] = b.length[0] - 0.01             # about to complete a lap's distance
+    b.vx[:] = 10.0
+    _, r, _, _, _ = b.step(np.array([[0.0, 0.5]]))
+    assert r[0] > 50.0 and b.lap_reward[0] == 0.0

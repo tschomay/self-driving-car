@@ -163,7 +163,14 @@ class DynamicRacerBatch(sim.RacerBatch):
     """
 
     def __init__(self, n: int, physics="nominal", dirt: bool = True, realism: int = 2, sensors=(), history: int = 1,
-                 **kw):
+                 crash_cost: str | None = None, lap_bonus: float = 0.0, **kw):
+        """crash_cost="lap": leaving the road takes back the progress reward earned since the car last completed
+        a lap's distance ("lose the lap"; Phase 3 E14). lap_bonus: extra reward each time the car completes a
+        lap's distance. Laps count from the episode's start point."""
+        assert crash_cost in (None, "lap"), crash_cost
+        self.crash_cost, self.lap_bonus = crash_cost, float(lap_bonus)
+        self.lap_reward = np.zeros(n)   # progress reward earned since the last completed lap
+        self.laps_done = np.zeros(n, dtype=int)
         assert realism in (1, 2, 3), realism
         self.sensors = tuple(sensors or ())
         assert all(x in SENSORS for x in self.sensors), self.sensors
@@ -217,6 +224,8 @@ class DynamicRacerBatch(sim.RacerBatch):
         self.vx[i] = self.vy[i] = self.yaw_rate[i] = 0.0
         self.accel[i] = 0.0
         self.phist[i] = 0.0
+        self.lap_reward[i] = 0.0
+        self.laps_done[i] = 0
         self.hist[i] = 0.0
         self.slip[i] = 0.0
         self.wheel[i] = 0.0
@@ -421,7 +430,13 @@ class DynamicRacerBatch(sim.RacerBatch):
             r = np.ones(self.n)
         else:
             r = 1 - np.minimum(np.abs(self.lateral) / sim.OFFTRACK_LIMIT, 1)
-        r = np.where(off, -self.crash_penalty, r)
+        laps_now = np.floor(np.maximum(self.progress, 0) / self.length).astype(int)
+        crossed = laps_now > self.laps_done
+        self.laps_done = np.maximum(self.laps_done, laps_now)
+        lost = self.lap_reward.copy() if self.crash_cost == "lap" else 0.0
+        self.lap_reward = np.where(crossed, 0.0, self.lap_reward + r)
+        r = r + self.lap_bonus * crossed
+        r = np.where(off, -self.crash_penalty - lost, r)
         self.ep_return += r
         lap_done = (self.progress >= self.length * self.laps) if self.laps else np.zeros(self.n, bool)
         terminated = off

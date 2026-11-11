@@ -16,16 +16,24 @@ from sdc.racer import track as trk
 MAX_LAP_S = 120.0
 
 
-def run_laps(policy, seeds=trk.HELD_OUT_SEEDS, record: bool = False, make_batch=None, setup=None) -> dict:
-    """make_batch(**kw) builds the batch (default sim.RacerBatch); setup(b) runs after reset (e.g. set physics)."""
+def run_laps(policy, seeds=trk.HELD_OUT_SEEDS, record: bool = False, make_batch=None, setup=None,
+             outlap: bool = False) -> dict:
+    """make_batch(**kw) builds the batch (default sim.RacerBatch); setup(b) runs after reset (e.g. set physics).
+
+    outlap: drive one out-lap first (to learn the conditions), then the counted lap, without stopping
+    (owner's decision, Phase 3). Finishing needs both laps; lap_time is the counted lap only. `laps` is the
+    fraction of the whole attempt (out-lap + lap).
+    """
     seeds = list(seeds)
     make_batch = make_batch or sim.RacerBatch
-    b = make_batch(len(seeds), tracks=seeds, laps=1, start="line", max_steps=int(MAX_LAP_S / sim.DT))
+    n_laps = 2 if outlap else 1
+    b = make_batch(len(seeds), tracks=seeds, laps=n_laps, start="line", max_steps=int(n_laps * MAX_LAP_S / sim.DT))
     b.reset()
     if setup is not None:
         setup(b)
     n = b.n
     active = np.ones(n, bool)
+    lap1_step = np.full(n, -1)
     rows = [None] * n
     traj = [[] for _ in range(n)] if record else None
 
@@ -46,13 +54,17 @@ def run_laps(policy, seeds=trk.HELD_OUT_SEEDS, record: bool = False, make_batch=
             for i in np.flatnonzero(active):
                 snap(i, a)
         _, _, term, trunc, infos = b.step(a)
+        if outlap:
+            crossed = active & (lap1_step < 0) & (b.progress >= b.length)
+            lap1_step[crossed] = b.steps[crossed]
         for i in np.flatnonzero(active & (term | trunc)):
             info = infos[i]
-            finished = not info["crashed"] and info["laps"] >= 1.0 - 1e-6
+            finished = not info["crashed"] and info["laps"] >= n_laps - 1e-6
+            steps_counted = int(info["episode"]["l"] - (max(int(lap1_step[i]), 0) if outlap else 0))
             rows[i] = dict(track=seeds[i], finished=bool(finished), crashed=bool(info["crashed"]),
                            **({"physics": info["physics"]} if "physics" in info else {}),
-                           lap_time=round(info["episode"]["l"] * sim.DT, 2) if finished else None,
-                           laps=round(min(info["laps"], 1.0), 3), steps=info["episode"]["l"])
+                           lap_time=round(steps_counted * sim.DT, 2) if finished else None,
+                           laps=round(min(info["laps"], n_laps) / n_laps, 3), steps=info["episode"]["l"])
             if record:
                 fs = info["final_state"]
                 traj[i].append(dict(pos=fs["pos"], heading=fs["heading"], v=fs["v"], rays=fs["rays"],

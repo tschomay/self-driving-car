@@ -472,3 +472,86 @@ Exploration-noise schedule (`std_cap=[start, end]`, SB3 and the owner's PPO): th
 Plan from here: E13 grip estimator (on E12's best oracle checkpoints); E14 reward options ("lose the lap" crash cost, lap-completion bonus); then decide on much wider training ranges and the gate rerun (with an out-lap).
 
 ## Handoff to next phase
+
+**Phase 3 exit decision (owner, 2026-11-11):** go to Phase 4, but first a **Phase 3.5 speed detour**: close the lap-time gap while staying reliable. Phase 3.5 starts in a new session. The 3D engine choice (and Modal setup) move to Phase 4 entry.
+
+**Built and reusable**
+- **The dynamic car:** `sdc/racer/dynamics.py`, `DynamicRacerBatch`.
+  - `realism` 1/2/3; use 3. 1 and 2 are kept only to reproduce E1–E10.
+  - Physics ranges `NOMINAL` / `TRAIN_DR` / `GATE_DR`; dirt patches.
+  - `sensors`: `accel` (real), `velocity` (needs an optical-flow sensor on a real car), `grip` (sim-only oracle).
+  - `history`, `crash_cost="lap"`, `lap_bonus`.
+  - Also: `DynamicPursuit` (hand-coded, knows grip and dirt; 25.4 s at nominal, realism 3) and the `phase1_policy` adapter.
+- **Evaluation:**
+  - `sdc/racer/evaluate.run_laps(outlap=...)`.
+  - `sdc/phase3/robust.py`: `laps`, `sweep`, `gate_laps` (validation by default; test via `seeds=trk.TEST_SEEDS, seed=TEST_PHYSICS_SEED`).
+  - `sdc/racer/track.TEST_SEEDS`: tracks 20000–20019, used once by this gate.
+- **Training:**
+  - `sdc/phase3/train.py` (SB3): `std_cap`, `select` (early stopping), `squash`, linear LR, `--regif`; `motion()` smoothness metrics.
+  - `sdc/phase3/my_ppo.py`: the owner's PPO with the same options plus `Predictor` / `load_net`.
+- **Grip estimator:** `sdc/phase3/grip_estimator.py` (1 s window or whole-drive GRU, DAgger rounds, works with SB3 or the owner's PPO).
+- **Other tools:** `sdc/phase3/outlap.py` (careful out-lap rule), `sdc/phase3/report.py` (robustness curves), `sdc/phase3/gate.py` and `gate2.py`.
+- **GIFs:** steering and pedal gauges, skid marks (owner's request).
+- **Reviews:** [phase3-sim-review.md](phase3-sim-review.md) and [phase3-twitch-investigation.md](phase3-twitch-investigation.md).
+
+**The winning recipe (gate pass, 96% test):** a teacher–student setup.
+- **Training:** the owner's PPO on realism 3; full train-range randomization; accelerometer plus the true grip as a training-only input; γ 0.997; lap bonus 100; `std_cap=[0.5, 0.1]`; linear LR decay; tanh-squashed actions; 1M steps; early stopping by validation gate range.
+- **Driving:** a 1 s window grip estimator, trained by regression on the true grip, replaces the true grip.
+
+**What the owner learned (in their words, condensed)**
+- Grip is a shared budget; full brake locks the wheels, and sliding wheels grip less (E1).
+- A car can't react to grip it only discovers too late (E2).
+- With delay, it needs the feedback loop of what it just did and how the car responded (E3).
+- It needs to see where it's going vs. where it's pointed (E4); invisible dirt makes it cautious everywhere (E5).
+- Randomization teaches grip as noise to be careful about, not a variable to adapt to (E6).
+- A per-step distance reward doesn't punish later crashes, so a car that can drive takes risks (E7).
+- A big crash penalty outweighs the drive reward; looking ahead avoids setting yourself up for failure (E8).
+- Knowing grip is a huge advantage, and grip scales acceleration linearly, so what's learned extrapolates (E10).
+- The car learns to drive first, then trades driving at all for driving fast (E11); the oracle car gets more confident (E12).
+- E7's memory had no instructions for what to do with it (E13). Throttle never goes high anyway (E13b).
+- A lap bonus only kicks in once you can finish a lap, and goes away if you lose that ability (E14).
+
+**Owner's ideas and questions that shaped the phase**
+- Twitchy steering bugged them, which led to the sim review and twitchiness investigation.
+- "Is the gate a test set or a validation set?", which led to the separate test set.
+- Sighting laps and learning the surface, which led to the grip estimator and the out-lap tests.
+- Early stopping, and rewarding finished laps.
+
+**Surprises worth remembering**
+- The first gate failed (70%). Every miss was grip below the training range; delay, mass and noise were handled.
+- Exploration noise never shrinks on its own (std about 0.5 to the end), and the policy learns to fight it, which is the steering sawing. A noise schedule fixes most of it.
+- Reliability peaks mid-training, then gets traded for speed. Keep the best validation checkpoint, not the last.
+- A fixed crash penalty teaches parking (E8, as in Phase 1).
+- Physics bugs can masquerade as learning problems: the zero-cornering cliff on spinning wheels, and the free sawing.
+- A learned grip estimate settles within about 5 s, so a long memory and an out-lap add nothing. The out-lap only adds crash exposure.
+- More than 4 parallel runs risks running out of memory (about 3 GB each). Background waits must check the processes are still alive.
+
+**Deferred (saved for later)**
+- A learned out-lap mode (an input flag and a reward that values caution and settling the estimate; "cautious with bursts").
+- Track memory: a map of where the low-grip spots are; needs position on the track.
+- Training ranges much wider than reality (the owner's idea; would make the gate interpolation, so redefine the gate if adopted).
+- Sim gaps not fixed: the servo position isn't observed; the off-track test uses the centre of mass; the speed sensor is ideal; the control rate (10 Hz) is slow for a 1/10 RC car (use 30–50 Hz on the real car).
+
+**For Phase 3.5 (speed)**
+- **The gap:**
+  - Gate car (seed 0): 41.9 s at nominal (test tracks).
+  - Same recipe, seeds 1–2: about 34.5 s (validation).
+  - Hand-coded driver, which knows the grip and the dirt: 25.4 s.
+  - Final (non-early-stopped) policies: about 28.5 s, but unreliable.
+- **Where the time goes** (E5, twitchiness investigation):
+  - Throttle caution: mean throttle about 0.15, full throttle on 1–3% of steps.
+  - Steering is not the bottleneck: a clone of the hand-coded steering plus the RL throttle was only 1 s faster.
+  - Invisible dirt costs a lot: the hand-coded driver assuming every corner might be dirt laps in 29.1 s.
+- **Ideas to explore:**
+  - Select checkpoints for speed under a reliability constraint, e.g. the fastest checkpoint with ≥ 90% validation gate range.
+  - Track memory or a dirt-aware input, so it can push where it's grippy.
+  - Longer training with the lap bonus.
+  - An estimator-in-the-loop fine-tune.
+  - A speed or lap-time term in the reward.
+  - `sdc/racer/min_lap.py` estimates the fastest possible lap (realism 1 physics; would need updating).
+- **Gate:** to be set at Phase 3.5 entry. Something like keeping ≥ 85% on a fresh test set (TEST_SEEDS are now used; generate new ones) while bringing the mean lap within about 1.15× of the hand-coded driver.
+- **Compute:** CPU only, $0. The owner's PPO runs about 11 min per 1M steps; SB3 about 10–15 min; at most 4 at once. Modal waits for Phase 4.
+
+**For Phase 4 (after 3.5)**
+- Choose the 3D engine (MuJoCo/MJX, Isaac Lab, Genesis) and set up a Modal account and token. The roadmap gate is ≥ 80% of jumps landed wheels-down within $30/month.
+- Carry over: the teacher–student grip estimator, early stopping, the lap bonus, the noise schedule, and the test-set discipline.

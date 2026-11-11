@@ -449,6 +449,11 @@ Exploration-noise schedule (`std_cap=[start, end]`, SB3 and the owner's PPO): th
 - **Takeaway:** reward the outcome you want (finished laps) once the car can reach it, rather than punishing the failure from the start. The bonus protects the skill; the crash cost slows learning it.
 - **Decision (owner, 2026-11-11):** rerun the gate with the owner's PPO trained on the best recipe (oracle grip as a training-time input, lap bonus, early stopping), driving on the learned grip estimate, not the oracle, "so it isn't cheating".
 
+### Gate candidate and protocol (2026-11-11)
+
+- **Candidate** (fixed before any result): the owner's PPO (`sdc/phase3/my_ppo.py`), **seed 0**. Trained on the realism 3 car with the true grip as a sim-only input, lap bonus 100, `std_cap=[0.5, 0.1]`, γ 0.997, 1M steps, early stopping by validation gate range. It drives the gate on the learned 1 s window grip estimate, never the true grip (owner: "so it isn't cheating"). Seeds 1–2 are trained only to show the spread.
+- **Protocol (owner's decision):** **(b) a single lap from a standing start**, as in the first gate. This reverses the earlier out-lap decision after E13/E13b showed the estimate settles within about 5 s and the out-lap only adds crash exposure. The validation numbers were held back until the choice was made. The out-lap result is reported alongside but doesn't decide the verdict.
+
 Plan from here: E13 grip estimator (on E12's best oracle checkpoints); E14 reward options ("lose the lap" crash cost, lap-completion bonus); then decide on much wider training ranges and the gate rerun (with an out-lap).
 
 ## Handoff to next phase

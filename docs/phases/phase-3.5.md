@@ -16,11 +16,18 @@
 
 Starting point: Phase 3's winning recipe (the owner's PPO, realism 3, true grip as a training-only input, lap bonus 100, `std_cap=[0.5, 0.1]`, γ 0.997, 1M steps, driving on the 1 s window grip estimate). Phase 3's checkpoints didn't survive the container, so E1 retrains it.
 
-1. **E1 — Pick for speed, not just safety.** Score every checkpoint for both reliability and lap time; choose the fastest with ≥ 90% validation gate range instead of the most reliable. How much speed did early stopping throw away?
-2. **E2 — Train longer.** 2–3M steps with the lap bonus: does it keep getting faster without the late reliability slide?
-3. **E3 — Reward speed directly.** A per-step time cost or a lap-time bonus: the speed vs. reliability trade-off as a reward.
-4. **E4 — Train with the grip estimate.** Fine-tune with the estimator in the loop, so the car learns to trust the estimate.
-5. **E5 — Track memory (only if still short).** A grip map built on an out-lap; the out-lap rule gets decided first.
+1. **E1 — Pick for speed, not just safety.** Score every checkpoint for both reliability and lap time; choose the fastest with ≥ 90% validation gate range. *Done: worth up to 4 s, but nothing gets under about 31 s.*
+2. **E2 — The ceiling under the car's own constraints.** The hand-coded driver given only what the RL car knows. *Done: 34.8 s, the same as the RL car; the gap is knowledge of the track.*
+3. **E3 — What a perfect track map is worth.** The RL car sees the true grip for the next 40 m (oracle map, exact position): the upper bound for track memory.
+4. **E4 — A map the car builds itself.** On an out-lap the car records the grip it feels and localizes itself from telemetry and its sensors, with a lap-line signal.
+5. **Gate.** (E3–E4 may take 2–3 experiments.)
+
+Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop training. E2 showed the car is already at the ceiling its information allows.
+
+**Track memory decisions (owner, 2026-11-11):**
+- **Gate protocol:** an out-lap, then a timed lap. Both must be finished to count toward the 85%; only the timed lap's time counts.
+- **Position:** the car is told when it crosses the start line (a lap counter). Otherwise it must localize itself from its own telemetry (speed, gyro, accelerometer) and sensors (the rays). Fallback if that proves too hard: tracks are laid out to a plan, so the car can be given a technical drawing (the centerline). The owner prefers not to use this.
+- **The map:** the grip the car felt on the out-lap (from the grip estimator), averaged over short stretches (about 5 m); while driving it sees the grip profile for the next ~40 m.
 
 ## Experiments
 

@@ -154,3 +154,16 @@ def test_lose_the_lap_and_lap_bonus():
     b.vx[:] = 10.0
     _, r, _, _, _ = b.step(np.array([[0.0, 0.5]]))
     assert r[0] > 50.0 and b.lap_reward[0] == 0.0
+
+
+def test_gripmap_sensor_reads_dirt_ahead():
+    import numpy as np
+    from sdc.racer import dynamics as dy
+    b = dy.DynamicRacerBatch(2, sensors=("accel", "gripmap"), realism=3, history=3, seed=0)
+    o = b.reset()
+    assert o.shape[1] == b.obs_dim == dy.OBS_DIM + 2 + 8 + 2 * (len(b.proprio))
+    gm = o[:, dy.OBS_DIM + 2:dy.OBS_DIM + 10]
+    assert np.allclose(gm, b.grip_ahead(dy.GRIPMAP_AHEAD))
+    assert set(np.round(np.unique(gm / b.grip[:, None]), 3)) <= {1.0, round(dy.DIRT_GRIP, 3)}
+    # the map isn't in the remembered own-motion readings
+    assert not set(range(dy.OBS_DIM + 2, dy.OBS_DIM + 10)) & set(b.proprio.tolist())

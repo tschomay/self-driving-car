@@ -88,6 +88,13 @@ Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop t
 - **Explanation (owner, after the run):** "Maybe it hasn't explored that space enough? Like it just never tried going faster so it doesn't know that would be ok?"
 - **Takeaway:** better information doesn't make the RL car faster; its clean-track pace is the limit. Owner's hypothesis to test next: it never explored fast driving.
 
+### E4 — Show it fast driving, then PPO (did it never explore going fast?)
+
+- **Prediction (owner, before the run):** "I think it'll drift back (even though this was my idea)."
+- **Setup:**
+  - **Behaviour cloning** (`python -m sdc.phase35.bc --seed S`): the owner's network copies the full-knowledge hand-coded driver (25.4 s) with E3's inputs. DAgger, 5 rounds × 50k states on training tracks and training-range physics; squared error on tanh(actor mean). The critic is then regressed on discounted returns (γ 0.997, lap bonus 100) of the clone's own noisy driving.
+  - **Then PPO** from the clone (`my_ppo --set init=runs/p35-e4-bc-sS/model.pt`, new plumbing option), E3's recipe otherwise. Two noise schedules: `std_cap=[0.5, 0.1]` (as E3) and `[0.15, 0.05]` (low noise). Seeds 0–1, 4 runs in parallel. Same scoring and pick as E1/E3.
+
 ## Gate check
 
 ## Handoff to next phase

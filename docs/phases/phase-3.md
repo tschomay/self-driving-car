@@ -420,7 +420,7 @@ Exploration-noise schedule (`std_cap=[start, end]`, SB3 and the owner's PPO): th
   The owner chose to test option 2 now and keep option 1 as a candidate for later.
 - **Prediction (owner, before the run):** "60, yes" (a 60% cap works best, and a careful out-lap beats the no-out-lap score)
 - **Setup:** `sdc/phase3/outlap.py`. E13's six cars (both estimators, seeds 0–2), no retraining. Throttle capped at 40 / 60 / 80% during the out-lap only, plus the uncapped baseline in the same harness, on validation gate-range laps with the out-lap. A first pass ran without pinning the torch thread count and without the uncapped baseline in the same harness; it was rerun with threads pinned to 1. The uncapped rerun reproduced E13 exactly.
-- **Result:** [report](https://claude.ai/artifact/RefVLwFRGo9eTxPHTqMfFr)
+- **Result:** [report](https://claude.ai/artifact/KUZUQcwHjRiQyWurhr68kB)
 
   | Estimator | No cap | Cap 80% | Cap 60% | Cap 40% | No out-lap (E13) |
   |---|---|---|---|---|---|

@@ -128,6 +128,22 @@ Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop t
 - **Explanation (owner, after the run):** "Grip is hard to determine in a short spanse, so it ends up averaging over everything it sees."
 - **Takeaway:** self-mapping and odometry work; the speed bar is met (26.7 s vs. 28.7 s), but the grip estimate shrinks toward its training range, which costs reliability on slippery tracks (55%).
 
+**Decisions after E5 (owner, 2026-11-11):**
+- Fix grip estimation with a **brake test on the out-lap** (E6), then the gate. Not chosen: wider training ranges (would make the gate interpolation), stopping here.
+- **Speed bar on the gate protocol:** with an out-lap the timed lap has a flying start, so the bar is 1.2× the hand-coded driver's flying lap on the same tracks (23.9 s on validation, so 28.7 s), not 30.5 s.
+
+### E6 — A brake test on the out-lap
+
+- **Prediction (owner, before the run):** "Small improvements but it has to do multiple brake tests so it see the full range of surfaces."
+- **Setup:** `sdc/phase35/braketest.py`. At the start of the out-lap the car keeps its own steering while the throttle is overridden: accelerate to 8 m/s, then full brake for up to 1 s. Locked-wheel deceleration (accelerometer, readings after 0.3 s and above 1.5 m/s) × K gives the grip level. K = 1.61 from a least-squares fit on training-range physics only (the tire model predicts 1/(0.75 × 0.85) = 1.57). Check on gate-range physics (not used for fitting): mean error 0.03 at grip 0.5–0.7×, 0.04 at 0.7–0.9×, 0.08 at 0.9–1.1×, 0.14 at 1.1–1.3×. After the test, grip input = test level × (window estimate / median estimate so far on the lap, clipped to 0.6–1); the map records the same (as E5). Known weakness: a start on dirt reads dirt grip (validation track 10000 does). Car: E5's low-noise car and estimator. Validation set, out-lap + timed lap. `python -m sdc.phase35.braketest calibrate|eval`; report `python -m sdc.phase35.e6_report`.
+- **Result (validation set):** [report](https://claude.ai/artifact/9yULEP789F1wRukvj2ARPd). Gate range **39%** (E5: 55%), nominal 60% (E5: 100%), timed lap 24.7 s (E5: 26.7 s). By grip: 0.7–0.9×: 9/26, 0.9–1.1×: 13/28, <0.7×: 9/27, >1.1×: 8/19.
+  - Failures are on the timed lap (61 of 61 at gate range past 5% of the attempt, mostly 60–90%).
+  - Checked: the map is blind to dirt. On the timed lap its map rates true dirt at 0.945 of the brake-test level and clean track at 0.949; it flags 2% of dirt (1% false flags). The cautious out-lap barely loads the tires, so the window estimator can't tell dirt from tarmac. E5's overall underestimate (−0.2 at 1.0×) had hidden this by making the car cautious everywhere.
+  - The brake test itself reads 1.05 at nominal grip (0.69 where the start is on dirt).
+- **Explanation (owner, after the run):** the car needs to test the surface more than once to see every surface (as predicted). "[Probing repeatedly is] what I thought you were doing for the reason I gave."
+- **Takeaway:** the brake test reads the grip level well, but one test reads one surface. The gentle out-lap leaves the map blind to dirt.
+- **Decision (owner, 2026-11-11):** one more experiment (E7): probe the surface repeatedly on the out-lap, then the gate.
+
 ## Gate check
 
 ## Handoff to next phase

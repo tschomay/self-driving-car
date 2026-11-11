@@ -147,7 +147,20 @@ Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop t
 ### E7 — Probe the surface repeatedly on the out-lap
 
 - **Prediction (owner, before the run):** "Small improvement to both."
-- **Setup:** `sdc/phase35/probe.py`. On the out-lap the car keeps its own steering; every 6 m of odometer, when its steering is nearly straight (|command| < 0.35), it gives a 0.4 s full-brake pulse and reads the locked-wheel deceleration (readings from the third step, above 1.5 m/s) × K. Below 6 m/s when a probe is due, the throttle goes to full first (only while nearly straight). Readings fill the 5 m odometer map (median per bin, gaps interpolated). While mapping: grip input = latest reading, map input = median reading × 0.65. Timed lap: grip input and map input both from the map; no window estimator. K = 1.53 from training-range physics (rmse 0.046, about 30 probes per out-lap); gate-range check (not fitted): mean error 0.034, bias −0.018. Car: E5's low-noise car. Validation set, out-lap + timed lap.
+- **Setup:** `sdc/phase35/probe.py`. On the out-lap the car keeps its own steering; every 6 m of odometer, when its steering is nearly straight (|command| < 0.35), it gives a 0.4 s full-brake pulse and reads the locked-wheel deceleration (readings from the third step, above 1.5 m/s) × K. Below 6 m/s when a probe is due, the throttle goes to full first (only while nearly straight). Readings fill the 5 m odometer map (median per bin, gaps interpolated). While mapping: grip input = latest reading, map input = median reading × 0.65. Timed lap: grip input and map input both from the map; no window estimator. K = 1.53 from training-range physics (rmse 0.046, about 30 probes per out-lap); gate-range check (not fitted): mean error 0.034, bias −0.018. Car: E5's low-noise car. Validation set, out-lap + timed lap. `python -m sdc.phase35.probe calibrate|eval`; report `python -m sdc.phase35.e7_report`.
+- **Result (validation set):** [report](https://claude.ai/artifact/ULDERFVfy38Q8ZnuDYT4pb)
+
+  | Grip knowledge | Gate range | Nominal | Timed lap |
+  |---|---|---|---|
+  | true grip and map | 86% | 100% | 24.2 s |
+  | E5: window estimate | 55% | 100% | 26.7 s |
+  | E6: one brake test | 39% | 60% | 24.7 s |
+  | **E7: probes every 6 m** | **78%** | **100%** | **24.5 s** |
+
+  - By grip: below 0.7×: 18/27 (E5: 1/27); 0.7–0.9×: 19/26; 0.9–1.1×: 26/28; above 1.1×: 15/19.
+  - Map error on the timed lap 0.05 (E5: 0.24); about 30 probes per out-lap. Of 22 failures, 3 on the out-lap and 19 on the timed lap: unprobed dirt in corners and the position shift between the out-lap and timed-lap lines.
+  - Speed bar met (24.5 s vs. 28.7 s); reliability 7 points short on validation.
+- **Explanation (owner, after the run):** _pending_
 
 ## Gate check
 

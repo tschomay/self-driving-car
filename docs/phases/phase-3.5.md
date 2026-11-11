@@ -16,11 +16,18 @@
 
 Starting point: Phase 3's winning recipe (the owner's PPO, realism 3, true grip as a training-only input, lap bonus 100, `std_cap=[0.5, 0.1]`, γ 0.997, 1M steps, driving on the 1 s window grip estimate). Phase 3's checkpoints didn't survive the container, so E1 retrains it.
 
-1. **E1 — Pick for speed, not just safety.** Score every checkpoint for both reliability and lap time; choose the fastest with ≥ 90% validation gate range instead of the most reliable. How much speed did early stopping throw away?
-2. **E2 — Train longer.** 2–3M steps with the lap bonus: does it keep getting faster without the late reliability slide?
-3. **E3 — Reward speed directly.** A per-step time cost or a lap-time bonus: the speed vs. reliability trade-off as a reward.
-4. **E4 — Train with the grip estimate.** Fine-tune with the estimator in the loop, so the car learns to trust the estimate.
-5. **E5 — Track memory (only if still short).** A grip map built on an out-lap; the out-lap rule gets decided first.
+1. **E1 — Pick for speed, not just safety.** Score every checkpoint for both reliability and lap time; choose the fastest with ≥ 90% validation gate range. *Done: worth up to 4 s, but nothing gets under about 31 s.*
+2. **E2 — The ceiling under the car's own constraints.** The hand-coded driver given only what the RL car knows. *Done: 34.8 s, the same as the RL car; the gap is knowledge of the track.*
+3. **E3 — What a perfect track map is worth.** The RL car sees the true grip for the next 40 m (oracle map, exact position): the upper bound for track memory.
+4. **E4 — A map the car builds itself.** On an out-lap the car records the grip it feels and localizes itself from telemetry and its sensors, with a lap-line signal.
+5. **Gate.** (E3–E4 may take 2–3 experiments.)
+
+Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop training. E2 showed the car is already at the ceiling its information allows.
+
+**Track memory decisions (owner, 2026-11-11):**
+- **Gate protocol:** an out-lap, then a timed lap. Both must be finished to count toward the 85%; only the timed lap's time counts.
+- **Position:** the car is told when it crosses the start line (a lap counter). Otherwise it must localize itself from its own telemetry (speed, gyro, accelerometer) and sensors (the rays). Fallback if that proves too hard: tracks are laid out to a plan, so the car can be given a technical drawing (the centerline). The owner prefers not to use this.
+- **The map:** the grip the car felt on the out-lap (from the grip estimator), averaged over short stretches (about 5 m); while driving it sees the grip profile for the next ~40 m.
 
 ## Experiments
 
@@ -61,6 +68,25 @@ Starting point: Phase 3's winning recipe (the owner's PPO, realism 3, true grip 
   - Caveat: the hand-coded driver still knows the track shape ahead and reads speed and position without noise, so (c) is a slightly generous ceiling.
 - **Explanation (owner, after the run):** "Agreed on learning the track." (after the agent's summary: the RL car is at the ceiling its information allows, so the gap is knowledge, not technique.)
 - **Takeaway:** with only its own sensors, even a tuned expert laps in about 35 s. The 30.5 s bar needs knowledge of the track's grip (dirt alone is worth about 4.5 s), so the phase turns to track memory.
+
+### E3 — What a perfect track map is worth
+
+- **Prediction (owner, before the run):** "28" (seconds).
+- **Setup:** E1's recipe plus the oracle `gripmap` sensor (true grip / nominal at 5, 10, …, 40 m ahead on the centerline, from the exact position): `--env sensors='["accel","grip","gripmap"]'`. Seeds 0–2, 1M steps, 3 in parallel. Scored with true grip and true map (an upper bound, no estimator); pick = fastest checkpoint with ≥ 90% validation gate range (`sdc.phase35.e1 score|pick`). Report: `python -m sdc.phase35.e3_report`.
+- **Result (validation set):** [report](https://claude.ai/artifact/PCNQgGd1MjTFUUUnthXRRg)
+
+  | Seed | Fastest with ≥ 90% | True map | Map says no dirt | Map says all dirt |
+  |---|---|---|---|---|
+  | 0 | 550k, 92% | 90%, 32.8 s | 70%, 31.8 s | 100%, 43.5 s |
+  | 1 | 950k, 97% | 95%, 33.7 s | 55%, 31.5 s | 100%, 41.7 s |
+  | 2 | 600k, 95% | 95%, 34.2 s | 85%, 33.9 s | 95%, 35.5 s |
+
+  - A perfect map is worth about 1 s to the RL car (34.1 s without it, E1 with true grip), against 4.5 s to the hand-coded driver.
+  - It does read the map, but only to slow down for dirt: lied to that the track is clean, it crashes more and is barely faster (31.5–34 s).
+  - Checked: lookahead isn't the limit. The hand-coded driver needs only 20 m of planning to lap in 25.4 s (95%); the rays reach 40 m.
+  - This revises E2: with the grip estimate the RL car matches the hand-coded driver, but given better information only the hand-coded driver gets faster (29.9 s with true grip, 25.4 s with the map). The RL car's pace on clean track is the limit.
+- **Explanation (owner, after the run):** "Maybe it hasn't explored that space enough? Like it just never tried going faster so it doesn't know that would be ok?"
+- **Takeaway:** better information doesn't make the RL car faster; its clean-track pace is the limit. Owner's hypothesis to test next: it never explored fast driving.
 
 ## Gate check
 

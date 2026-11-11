@@ -84,7 +84,11 @@ OBS_DIM = sim.N_RAYS + 4
 #               the step (a cheap IMU chip)
 #   "grip"      ORACLE (sim only, Phase 3 E10): the true grip under the car right now (episode grip ×
 #               dirt), / GRIP0. No real car has this; it measures what knowing the grip would be worth.
-SENSORS = {"velocity": 1, "accel": 2, "grip": 1}
+#   "gripmap"   ORACLE track memory (Phase 3.5): the true grip (episode grip × dirt) / GRIP0 at GRIPMAP_AHEAD
+#               metres ahead along the centerline, from the car's exact position. The upper bound for a
+#               map the car builds itself on an out-lap.
+SENSORS = {"velocity": 1, "accel": 2, "grip": 1, "gripmap": 8}
+GRIPMAP_AHEAD = (5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0)   # metres
 # history=k (Phase 3 E7): also append the car's own-motion readings (speed, last commands, gyro, and any
 # extra sensors) from the previous k-1 steps, newest first, so it can tell how the car has been
 # responding to its commands lately, e.g. to estimate the grip. Zeros before the episode's start.
@@ -180,7 +184,11 @@ class DynamicRacerBatch(sim.RacerBatch):
         if "grip" in self.sensors:
             off = sum(SENSORS[x] for x in self.sensors[:self.sensors.index("grip")])
             self.grip_col = OBS_DIM + off
-        self.proprio = np.array([i for i in range(sim.N_RAYS, base_dim) if i != self.grip_col])
+        oracle = set() if self.grip_col is None else {self.grip_col}
+        if "gripmap" in self.sensors:
+            off = OBS_DIM + sum(SENSORS[x] for x in self.sensors[:self.sensors.index("gripmap")])
+            oracle |= set(range(off, off + SENSORS["gripmap"]))
+        self.proprio = np.array([i for i in range(sim.N_RAYS, base_dim) if i not in oracle])
         self.history = int(history)
         self.phist = np.zeros((n, max(self.history - 1, 0), len(self.proprio)), np.float32)
         self.obs_dim = base_dim + self.phist.shape[1] * self.phist.shape[2]
@@ -264,6 +272,8 @@ class DynamicRacerBatch(sim.RacerBatch):
                 parts.append(np.clip(vy, -3, 3)[:, None])
             elif name == "grip":
                 parts.append((self.surface_grip / GRIP0)[:, None])
+            elif name == "gripmap":
+                parts.append(self.grip_ahead(GRIPMAP_AHEAD))
             else:
                 acc = self.accel / G + self.noise[:, None] * self.noise_rng.standard_normal((self.n, 2))
                 parts.append(np.clip(acc, -3, 3))
@@ -279,6 +289,12 @@ class DynamicRacerBatch(sim.RacerBatch):
         """Current μ under the car (dirt patches lower it)."""
         on_dirt = self.dirt_pts[np.arange(self.n), self.idx]
         return GRIP0 * self.grip * np.where(on_dirt, DIRT_GRIP, 1.0)
+
+    def grip_ahead(self, dists) -> np.ndarray:
+        """(n, len(dists)) true grip / GRIP0 at the centerline points `dists` metres ahead of the car."""
+        r = np.arange(self.n)[:, None]
+        k = (self.idx[:, None] + np.round(np.asarray(dists)[None] / self.ds[:, None]).astype(int)) % trk.N_POINTS
+        return self.grip[:, None] * np.where(self.dirt_pts[r, k], DIRT_GRIP, 1.0)
 
     # ---- dynamics -----------------------------------------------------------------------
     def _substep(self, cmd, dt):

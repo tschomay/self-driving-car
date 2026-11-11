@@ -43,6 +43,25 @@ Starting point: Phase 3's winning recipe (the owner's PPO, realism 3, true grip 
 - **Explanation (owner, after the run):** "It isn't learning good racing technique, it's just getting by. That has me wonder if we're missing something.. more/better sensors, bigger model, longer training, etc. But also has me wondering if that's just the max with the constraints we've imposed (noisy sensors etc)."
 - **Takeaway:** checkpoint choice is worth up to about 4 s, but every checkpoint is at 31 s or slower, so the gap is in what the car learns, not in which snapshot we keep. Next: measure the ceiling under the car's own constraints (E2).
 
+### E2 — The ceiling under the car's own constraints
+
+- **Prediction (owner, before the run):** "30.5" (seconds, for the hand-coded driver given only what the RL car knows).
+- **Setup:** the hand-coded driver (`dy.DynamicPursuit`) with its privileges removed step by step: (a) full knowledge; (b) no dirt map, nominal mass assumed, true grip; (c) as (b) but the grip from a 1 s window estimator. Safety margins swept (cornering 0.4–0.8, braking 0.3–0.5, 15 settings); the answer is the fastest setting with ≥ 90% validation gate range. `python -m sdc.phase35.e2 --variant full|blind|blind_est [--est DIR]`; `--fit-est runs/p35-e2-est` trains an estimator on the hand-coded driver's own driving (4 DAgger rounds, 240k samples). No RL training; about 15 min.
+- **Result (validation set):** [report](https://claude.ai/artifact/6CMfCFdVTt42HGPhu8g7gx)
+
+  | Driver | Fastest with ≥ 90% gate range |
+  |---|---|
+  | (a) hand-coded, knows grip, mass, dirt | 25.4 s (97%) |
+  | (b) no dirt map, no mass, true grip | 29.9 s (91%) |
+  | (c) no dirt map, no mass, estimated grip | **34.8 s** (91%) |
+  | RL car (E1, seeds 1–2) | 34.5 s (95–97%) |
+
+  - With the RL car's information, the hand-coded driver is no faster than the RL car. Not knowing the dirt costs about 4.5 s; estimating the grip instead of knowing it costs another 4.9 s.
+  - Surprise, checked: the first try reused the RL car's estimator; on the hand-coded driver's driving it was off by 0.21 (15% low) against 0.05 on the RL car's (best: 86%, 38.4 s). An estimator trained on the hand-coded driver's own driving is still off by about 0.17: the hand-coded driver never pushes the tires near their limit, so its driving reveals little about the grip. The RL car slides more.
+  - Caveat: the hand-coded driver still knows the track shape ahead and reads speed and position without noise, so (c) is a slightly generous ceiling.
+- **Explanation (owner, after the run):** _pending_
+- **Takeaway:** _pending_
+
 ## Gate check
 
 ## Handoff to next phase

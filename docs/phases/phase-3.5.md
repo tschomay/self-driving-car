@@ -24,6 +24,25 @@ Starting point: Phase 3's winning recipe (the owner's PPO, realism 3, true grip 
 
 ## Experiments
 
+### E1 — Pick for speed, not just safety
+
+- **Prediction (owner, before the run):** "Maybe 1 s faster but that's all."
+- **Setup:** Phase 3's gate recipe retrained: `python -m sdc.phase3.my_ppo --seed S --steps 1000000 --env realism=3 --env sensors='["accel","grip"]' --env lap_bonus=100 --set std_cap='[0.5,0.1]' --set select=true --set gamma=0.997`, seeds 0–2, 1 torch thread, 3 runs in parallel. Every checkpoint (every 50k steps) is scored on validation gate range (100 laps, true grip, as Phase 3's early stopping did) and nominal lap time. Two picks per seed: **most reliable** (Phase 3's rule) and **fastest with ≥ 90%**. Both get a 1 s window grip estimator and are re-scored driving on the estimate.
+  - Commands: `python -m sdc.phase35.e1 score|pick --run runs/p35-e1-sS`, then `python -m sdc.phase3.grip_estimator --policy runs/p35-e1-sS-{reliable,fast} --kind window --seed S`. Training 11.5 min per seed; whole pipeline about 45 min.
+- **Result (validation set, driving on the grip estimate):** [report](https://claude.ai/artifact/PpaDqfZmue4PeaWXNPAiXy)
+
+  | Seed | Most reliable: checkpoint, gate range, lap | Fastest with ≥ 90%: checkpoint, gate range, lap | Fastest checkpoint of the run (any reliability) |
+  |---|---|---|---|
+  | 0 | 250k, 100%, 41.1 s | 650k, 93%, **36.7 s** | 32.8 s (150k, 54%) |
+  | 1 | 800k, 97%, 34.5 s | same | 31.1 s (100k, 25%) |
+  | 2 | 800k, 95%, 34.6 s | same | 32.1 s (350k, 66%) |
+
+  - Hand-coded driver: 25.4 s; gate bar 1.2× = 30.5 s.
+  - Seed 0 reproduces Phase 3's gate car (picked at 250k again, 41 s); the new rule saves 4.4 s there. Seeds 1–2 already picked late checkpoints, so nothing changes.
+  - Every checkpoint of every run laps in 31–43 s. The late, less reliable checkpoints are only about 1–2 s faster (32–34 s, 75–89% gate range), not the 28.5 s the Phase 3 handoff quoted (that was the E12 runs without the lap bonus).
+- **Explanation (owner, after the run):** "It isn't learning good racing technique, it's just getting by. That has me wonder if we're missing something.. more/better sensors, bigger model, longer training, etc. But also has me wondering if that's just the max with the constraints we've imposed (noisy sensors etc)."
+- **Takeaway:** checkpoint choice is worth up to about 4 s, but every checkpoint is at 31 s or slower, so the gap is in what the car learns, not in which snapshot we keep. Next: measure the ceiling under the car's own constraints (E2).
+
 ## Gate check
 
 ## Handoff to next phase

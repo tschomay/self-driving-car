@@ -24,6 +24,11 @@ Starting point: Phase 3's winning recipe (the owner's PPO, realism 3, true grip 
 
 ## Experiments
 
+### E1 — Pick for speed, not just safety
+
+- **Prediction (owner, before the run):** "Maybe 1 s faster but that's all."
+- **Setup:** Phase 3's gate recipe retrained: `python -m sdc.phase3.my_ppo --seed S --steps 1000000 --env realism=3 --env sensors='["accel","grip"]' --env lap_bonus=100 --set std_cap='[0.5,0.1]' --set select=true --set gamma=0.997`, seeds 0–2, 1 torch thread, 3 runs in parallel. Every checkpoint (every 50k steps) is scored on validation gate range (100 laps, true grip, as Phase 3's early stopping did) and nominal lap time. Two picks per seed: **most reliable** (Phase 3's rule) and **fastest with ≥ 90%**. Both get a 1 s window grip estimator and are re-scored driving on the estimate.
+
 ## Gate check
 
 ## Handoff to next phase

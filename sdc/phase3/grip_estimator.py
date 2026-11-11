@@ -176,11 +176,20 @@ def _pad(batch):
     return torch.as_tensor(xb), torch.as_tensor(yb), torch.as_tensor(mb)
 
 
+def load_model(policy_dir):
+    """The oracle policy's network: SB3 (model.zip) or the owner's PPO (model.pt), with .predict()."""
+    policy_dir = Path(policy_dir)
+    if (policy_dir / "model.pt").exists():
+        from sdc.phase3 import my_ppo
+        return my_ppo.Predictor(my_ppo.load_net(policy_dir)[0])
+    from stable_baselines3 import PPO
+    return PPO.load(policy_dir / "model.zip", device="cpu")
+
+
 def load(run_dir):
     """(policy, metrics) for a saved estimator run."""
-    from stable_baselines3 import PPO
     m = json.loads((Path(run_dir) / "metrics.json").read_text())
-    model = PPO.load(Path(m["policy"]) / "model.zip", device="cpu")
+    model = load_model(m["policy"])
     est = _new(m["kind"])
     est.load_state_dict(torch.load(Path(run_dir) / "estimator.pt"))
     return make_policy(model, est), m
@@ -193,7 +202,6 @@ def _new(kind):
 
 
 def main():
-    from stable_baselines3 import PPO
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--policy", required=True, help="an oracle-grip run directory (its model.zip is used)")
     p.add_argument("--kind", choices=["window", "drive"], default="drive")
@@ -209,7 +217,7 @@ def main():
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     src = json.loads((Path(a.policy) / "metrics.json").read_text())
-    model = PPO.load(Path(a.policy) / "model.zip", device="cpu")
+    model = load_model(a.policy)
     est = _new(a.kind)
     data, rounds = [], []
     for r in range(a.rounds):
@@ -227,8 +235,8 @@ def main():
             errs.append(np.abs(pred - y))
     by_time = {}
     for lo, hi in ((0, 50), (50, 150), (150, 300), (300, 1000)):
-        e = np.concatenate([q[lo:hi] for q in errs if len(q) > lo])
-        by_time[f"{lo / 10:g}-{hi / 10:g} s"] = round(float(e.mean()), 4) if len(e) else None
+        parts = [q[lo:hi] for q in errs if len(q) > lo]
+        by_time[f"{lo / 10:g}-{hi / 10:g} s"] = round(float(np.concatenate(parts).mean()), 4) if parts else None
     err = dict(mean_abs=round(float(np.concatenate(errs).mean()), 4), mean_abs_by_time=by_time)
     print(err, flush=True)
     label = a.label or f"oracle policy + {a.kind} grip estimate"

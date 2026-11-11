@@ -28,10 +28,11 @@ from sdc.racer import dynamics as dy
 
 # Same settings as the SB3 runs (Phase 1 preset) plus Phase 3's recipe: decaying LR, squash, accelerometer.
 DEFAULTS = dict(n_envs=8, n_steps=256, batch_size=256, n_epochs=10, lr=3e-4, lr_decay=True, gamma=0.99, lam=0.95,
-                clip=0.2, vf_coef=0.5, max_grad_norm=0.5, std_cap=None)
+                clip=0.2, vf_coef=0.5, max_grad_norm=0.5, std_cap=None, select=False)
+# select: save a checkpoint at every eval; keep the one with the best validation gate range (early stopping)
 # std_cap [start, end]: cap on the exploration noise (std, before tanh), lowered linearly over training
 ENV = dict(tracks="random", reward="progress", max_steps=1000, physics="train", dirt=True, realism=2,
-           sensors=["accel"], squash=True, history=1)
+           sensors=["accel"], squash=True, history=1, crash_cost=None, lap_bonus=0.0)
 
 
 def train(seed=0, total_timesteps=500_000, out="runs/p3-mine", eval_every=50_000, label="my PPO", threads=1,
@@ -45,7 +46,8 @@ def train(seed=0, total_timesteps=500_000, out="runs/p3-mine", eval_every=50_000
     squash = env_cfg["squash"]
     car = dict(realism=env_cfg["realism"], sensors=tuple(env_cfg["sensors"]), history=env_cfg["history"])
     batch = dy.DynamicRacerBatch(cfg["n_envs"], seed=seed, tracks=env_cfg["tracks"], reward=env_cfg["reward"],
-                                 max_steps=env_cfg["max_steps"], physics=env_cfg["physics"], dirt=env_cfg["dirt"], **car)
+                                 max_steps=env_cfg["max_steps"], physics=env_cfg["physics"], dirt=env_cfg["dirt"],
+                                 crash_cost=env_cfg["crash_cost"], lap_bonus=env_cfg["lap_bonus"], **car)
     net = owner.ActorCritic(obs_dim=batch.obs_dim)
     opt = torch.optim.Adam(net.parameters(), lr=cfg["lr"], eps=1e-5)
     owner.POLICY_LOSS_VARIANT = "textbook"
@@ -61,6 +63,9 @@ def train(seed=0, total_timesteps=500_000, out="runs/p3-mine", eval_every=50_000
     t0 = time.perf_counter()
     while steps < total_timesteps:
         if steps >= next_eval:
+            if cfg["select"] and steps >= eval_every // 2:
+                (out / "ckpt").mkdir(exist_ok=True)
+                torch.save(net.state_dict(), out / "ckpt" / f"{steps}.pt")
             evals.append(dict(timesteps=steps, wall_s=round(time.perf_counter() - t0, 2),
                               **p3._summary(robust.laps(greedy, **car)),
                               gate_range=robust.gate_laps(greedy, draws=1, **car)["completion"]))
@@ -121,12 +126,44 @@ def train(seed=0, total_timesteps=500_000, out="runs/p3-mine", eval_every=50_000
                       **p3._summary(robust.laps(greedy, **car)),
                       gate_range=robust.gate_laps(greedy, draws=1, **car)["completion"]))
     train_s = time.perf_counter() - t0
+    selection = None
+    if cfg["select"]:
+        (out / "ckpt").mkdir(exist_ok=True)
+        torch.save(net.state_dict(), out / "ckpt" / f"{steps}.pt")
+        torch.save(net.state_dict(), out / "final.pt")
+        scored = []
+        for ck in sorted((out / "ckpt").glob("*.pt"), key=lambda q: int(q.stem)):
+            net.load_state_dict(torch.load(ck))
+            scored.append(dict(timesteps=int(ck.stem), gate_range=robust.gate_laps(greedy, **car)["completion"]))
+        best = max(scored, key=lambda r: (r["gate_range"], r["timesteps"]))
+        net.load_state_dict(torch.load(out / "ckpt" / f"{best['timesteps']}.pt"))
+        selection = dict(checkpoints=scored, chosen=best["timesteps"], final_gate_range=scored[-1]["gate_range"])
     torch.save(net.state_dict(), out / "model.pt")
     m = dict(label=label, preset="mine", seed=seed, threads=threads, n_envs=cfg["n_envs"], ppo=cfg,
              env={**env_cfg, "physics": dy.physics_range(env_cfg["physics"]).to_dict()},
              total_timesteps=total_timesteps, trained_timesteps=steps, train_wall_s=round(train_s, 2),
-             episodes=episodes, evals=evals, baseline=p3.baseline_laps(**car))
+             episodes=episodes, evals=evals, baseline=p3.baseline_laps(**car),
+             **({"selection": selection} if selection else {}))
     return p3.finish(greedy, out, m, gif, sweep)
+
+
+class Predictor:
+    """SB3-style .predict() for the owner's network (used by the grip estimator)."""
+
+    def __init__(self, net):
+        self.net = net
+
+    def predict(self, obs, deterministic=True):
+        with torch.no_grad():
+            return self.net.actor(torch.as_tensor(np.asarray(obs, np.float32))).numpy(), None
+
+
+def load_net(run_dir):
+    m = json.loads((Path(run_dir) / "metrics.json").read_text())
+    probe = dy.DynamicRacerBatch(1, **p3.car_of(m["env"]))
+    net = owner.ActorCritic(obs_dim=probe.obs_dim)
+    net.load_state_dict(torch.load(Path(run_dir) / "model.pt"))
+    return net, m
 
 
 def load_policy(run_dir):

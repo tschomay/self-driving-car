@@ -109,6 +109,25 @@ Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop t
 - **Explanation (owner, after the run):** "With highly varied exploration, it learns fear/caution because it knows how bad things can get. Less noise means it never hits the worst scenarios so it doesn't have to prepare for them."
 - **Takeaway:** the car never found fast driving on its own; started there, PPO keeps most of it, and less exploration noise keeps more. Next: the same car on its own map and grip estimate.
 
+### E5 — The car builds its own map
+
+- **Prediction (owner, before the run):** "Seems like it wasn't very reliable even with perfect knowledge, so I expect this to less reliable. But similarly fast because it doesn't know to be less confident. But that balance comes from how conservative it is with grip estimation and location."
+- **Setup:** `sdc/phase35/selfmap.py`. No oracle inputs: grip from a 1 s window estimator trained on this car's own driving (4 DAgger rounds, 240k samples); position from an odometer (noisy speed reading × dt), reset at each start-line crossing. On the out-lap the car records its grip estimate in 5 m odometer bins, while its map input says "everything ahead may be dirt" (running mean estimate × 0.65). On the timed lap the map input is its recording at odometer + 5…40 m. Gate protocol: out-lap + timed lap, both must finish, timed lap's time counts. Candidates: E4's seed 0 picks, low noise (25.8 s with oracle inputs) and high noise (30.3 s). Validation set; the same cars with oracle inputs on the same protocol for comparison. Report: `python -m sdc.phase35.e5_report`.
+- **Result (validation set, out-lap + timed lap):** [report](https://claude.ai/artifact/DVJTYQG91DrfjfCDKLmNVv)
+
+  | Car | Inputs | Gate range | Nominal | Timed lap |
+  |---|---|---|---|---|
+  | low noise | true grip and map | 86% | 100% | 24.2 s (1.01×) |
+  | low noise | **own estimate and map** | **55%** | 100% | **26.7 s (1.11×)** |
+  | high noise | true grip and map | 88% | 90% | 28.8 s (1.20×) |
+  | high noise | own estimate and map | 77% | 95% | 30.7 s (1.28×) |
+
+  - **The bar moves with the protocol:** after an out-lap the timed lap has a flying start. The hand-coded driver's flying lap is 23.9 s, so 1.2× is 28.7 s (not 30.5 s). The gate defined the bar as the hand-coded driver on the same tracks; the agent applies it on the same protocol too.
+  - Failures by grip (low-noise car, own map): below 0.7×: 1/27 finished (24/27 with the true grip and map); 0.7–0.9×: 10/26; 0.9–1.1×: 25/28; above 1.1×: 19/19.
+  - Checked: the estimator's readings pull toward the middle of its training range (0.7–1.1×). Low-noise car: +0.16 at 0.55× grip (overconfident), −0.03 at 0.8×, −0.20 at 1.0×, −0.38 at 1.2× (overcautious). Map error on the timed lap: 0.24 (high-noise car: 0.12). Odometer vs. centerline distance: about 3.5 m, under one 5 m bin.
+- **Explanation (owner, after the run):** "Grip is hard to determine in a short spanse, so it ends up averaging over everything it sees."
+- **Takeaway:** self-mapping and odometry work; the speed bar is met (26.7 s vs. 28.7 s), but the grip estimate shrinks toward its training range, which costs reliability on slippery tracks (55%).
+
 ## Gate check
 
 ## Handoff to next phase

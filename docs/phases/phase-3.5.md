@@ -140,7 +140,9 @@ Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop t
   - Failures are on the timed lap (61 of 61 at gate range past 5% of the attempt, mostly 60–90%).
   - Checked: the map is blind to dirt. On the timed lap its map rates true dirt at 0.945 of the brake-test level and clean track at 0.949; it flags 2% of dirt (1% false flags). The cautious out-lap barely loads the tires, so the window estimator can't tell dirt from tarmac. E5's overall underestimate (−0.2 at 1.0×) had hidden this by making the car cautious everywhere.
   - The brake test itself reads 1.05 at nominal grip (0.69 where the start is on dirt).
-- **Explanation (owner, after the run):** _pending_
+- **Explanation (owner, after the run):** the car needs to test the surface more than once to see every surface (as predicted). "[Probing repeatedly is] what I thought you were doing for the reason I gave."
+- **Takeaway:** the brake test reads the grip level well, but one test reads one surface. The gentle out-lap leaves the map blind to dirt.
+- **Decision (owner, 2026-11-11):** one more experiment (E7): probe the surface repeatedly on the out-lap, then the gate.
 
 ## Gate check
 

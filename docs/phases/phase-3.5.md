@@ -125,7 +125,8 @@ Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop t
   - **The bar moves with the protocol:** after an out-lap the timed lap has a flying start. The hand-coded driver's flying lap is 23.9 s, so 1.2× is 28.7 s (not 30.5 s). The gate defined the bar as the hand-coded driver on the same tracks; the agent applies it on the same protocol too.
   - Failures by grip (low-noise car, own map): below 0.7×: 1/27 finished (24/27 with the true grip and map); 0.7–0.9×: 10/26; 0.9–1.1×: 25/28; above 1.1×: 19/19.
   - Checked: the estimator's readings pull toward the middle of its training range (0.7–1.1×). Low-noise car: +0.16 at 0.55× grip (overconfident), −0.03 at 0.8×, −0.20 at 1.0×, −0.38 at 1.2× (overcautious). Map error on the timed lap: 0.24 (high-noise car: 0.12). Odometer vs. centerline distance: about 3.5 m, under one 5 m bin.
-- **Explanation (owner, after the run):** _pending_
+- **Explanation (owner, after the run):** "Grip is hard to determine in a short spanse, so it ends up averaging over everything it sees."
+- **Takeaway:** self-mapping and odometry work; the speed bar is met (26.7 s vs. 28.7 s), but the grip estimate shrinks toward its training range, which costs reliability on slippery tracks (55%).
 
 ## Gate check
 

@@ -406,8 +406,9 @@ Exploration-noise schedule (`std_cap=[start, end]`, SB3 and the owner's PPO): th
 
   - The estimators keep almost all of the oracle's benefit. Both settle within about 5 s (error 0.08–0.10 in the first 5 s, about 0.055 after); the whole-drive memory adds no accuracy.
   - The out-lap lowers the gate range, because finishing means surviving two laps: 30–37 of about 50 failures happen in the out-lap. The counted lap after a survived out-lap does better (92–95% vs. 88–90%), most for the whole-drive estimator. The policy doesn't drive its out-lap more carefully. The counted lap is 1.5–3 s faster (flying start).
-- **Explanation (owner, after the run):** _pending_
-- **Takeaway:** _pending_
+- **Explanation (owner, after the run):** "E7 didn't tell it what to do with that memory."
+- **Takeaway:** the same readings that E7's policy ignored give an accurate grip estimate within about 5 s once a network is trained to predict grip from them. An explicit target turns memory into information; RL alone didn't discover it in 1M steps. The out-lap helps the counted lap but costs crashes, because the policy drives it like any other lap.
+- **Owner's question:** should the out-lap have a different reward? "I would drive cautiously with some bursts to get a feel for it."
 
 Plan from here: E13 grip estimator (on E12's best oracle checkpoints); E14 reward options ("lose the lap" crash cost, lap-completion bonus); then decide on much wider training ranges and the gate rerun (with an out-lap).
 

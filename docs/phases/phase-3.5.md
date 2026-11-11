@@ -72,7 +72,20 @@ Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop t
 ### E3 — What a perfect track map is worth
 
 - **Prediction (owner, before the run):** "28" (seconds).
-- **Setup:** E1's recipe plus the oracle `gripmap` sensor (true grip / nominal at 5, 10, …, 40 m ahead on the centerline, from the exact position): `--env sensors='["accel","grip","gripmap"]'`. Seeds 0–2, 1M steps, 3 in parallel. Scored with true grip and true map (an upper bound, no estimator); pick = fastest checkpoint with ≥ 90% validation gate range (`sdc.phase35.e1 score|pick`).
+- **Setup:** E1's recipe plus the oracle `gripmap` sensor (true grip / nominal at 5, 10, …, 40 m ahead on the centerline, from the exact position): `--env sensors='["accel","grip","gripmap"]'`. Seeds 0–2, 1M steps, 3 in parallel. Scored with true grip and true map (an upper bound, no estimator); pick = fastest checkpoint with ≥ 90% validation gate range (`sdc.phase35.e1 score|pick`). Report: `python -m sdc.phase35.e3_report`.
+- **Result (validation set):** [report](https://claude.ai/artifact/PCNQgGd1MjTFUUUnthXRRg)
+
+  | Seed | Fastest with ≥ 90% | True map | Map says no dirt | Map says all dirt |
+  |---|---|---|---|---|
+  | 0 | 550k, 92% | 90%, 32.8 s | 70%, 31.8 s | 100%, 43.5 s |
+  | 1 | 950k, 97% | 95%, 33.7 s | 55%, 31.5 s | 100%, 41.7 s |
+  | 2 | 600k, 95% | 95%, 34.2 s | 85%, 33.9 s | 95%, 35.5 s |
+
+  - A perfect map is worth about 1 s to the RL car (34.1 s without it, E1 with true grip), against 4.5 s to the hand-coded driver.
+  - It does read the map, but only to slow down for dirt: lied to that the track is clean, it crashes more and is barely faster (31.5–34 s).
+  - Checked: lookahead isn't the limit. The hand-coded driver needs only 20 m of planning to lap in 25.4 s (95%); the rays reach 40 m.
+  - This revises E2: with the grip estimate the RL car matches the hand-coded driver, but given better information only the hand-coded driver gets faster (29.9 s with true grip, 25.4 s with the map). The RL car's pace on clean track is the limit.
+- **Explanation (owner, after the run):** _pending_
 
 ## Gate check
 

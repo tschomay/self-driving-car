@@ -429,6 +429,22 @@ Exploration-noise schedule (`std_cap=[start, end]`, SB3 and the owner's PPO): th
 
   - No cap helps beyond seed noise (±5–10 points). The cars rarely use more than 60% throttle (mean about 0.15), so the cap seldom binds.
   - Out-lap crashes happen 30–55% of the way round (median 42%), half at grip below 0.7×: the same corner failures as the counted lap, not early mistakes from an unsettled estimate. A careful out-lap would need careful cornering, not less throttle.
+- **Explanation (owner, after the run):** "Throttle never goes that high anyway."
+- **Takeaway:** the out-lap's risk is in the corners, not the throttle. Owner's decision: save option 1 (a learned out-lap mode) for later. It doesn't seem necessary now, since the estimators settle in about 5 s anyway.
+
+### E14 — Rewarding finished laps
+
+- **Prediction (owner):** "I think lose a lap will make it too cautious. But the lap completion bonus might work because it only kicks in after it learns how to complete a lap and then it'll lock in being able to complete at least one lap." **Given after the runs finished but before any result was shown:** the agent launched E14 without asking first (a protocol slip).
+- **Setup:** E12 (p′)'s recipe (oracle grip, realism 3, `std_cap=[0.5, 0.1]`, γ 0.997, 1M steps, `select=true`). (s) `crash_cost="lap"`: leaving the road takes back the progress reward earned since the last completed lap's distance. (t) `lap_bonus=100` per completed lap's distance (about one lap's progress reward). Seeds 0–2. Compared with E12 (p′).
+- **Result (validation set):** [report](https://claude.ai/artifact/7eTFxLDeqp2LTJsmuQobAa)
+
+  | Reward | Final policy, gate range per seed | Best checkpoint, gate range per seed | Lap (best checkpoint) |
+  |---|---|---|---|
+  | progress only (E12 p′) | 52 / 58 / 61% | 92 / 93 / 90% | 34.1 s |
+  | (s) lose the lap | 52 / 71 / 66% | 88 / 94 / 71% | 34.4 s |
+  | (t) lap bonus | **78 / 82 / 72%** | **93 / 98 / 86%** | 33.9 s |
+
+  - The lap bonus roughly halves the late-training slide: once a seed reaches about 85%, it mostly stays at 70–98%. Lose the lap learned slowly (0–24% for the first 200–300k steps in every seed) and drove slower in training, and one seed never got past 71%.
 - **Explanation (owner, after the run):** _pending_
 - **Takeaway:** _pending_
 

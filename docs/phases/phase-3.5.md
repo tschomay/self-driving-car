@@ -128,6 +128,10 @@ Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop t
 - **Explanation (owner, after the run):** "Grip is hard to determine in a short spanse, so it ends up averaging over everything it sees."
 - **Takeaway:** self-mapping and odometry work; the speed bar is met (26.7 s vs. 28.7 s), but the grip estimate shrinks toward its training range, which costs reliability on slippery tracks (55%).
 
+**Decisions after E5 (owner, 2026-11-11):**
+- Fix grip estimation with a **brake test on the out-lap** (E6), then the gate. Not chosen: wider training ranges (would make the gate interpolation), stopping here.
+- **Speed bar on the gate protocol:** with an out-lap the timed lap has a flying start, so the bar is 1.2× the hand-coded driver's flying lap on the same tracks (23.9 s on validation, so 28.7 s), not 30.5 s.
+
 ## Gate check
 
 ## Handoff to next phase

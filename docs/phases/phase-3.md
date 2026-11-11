@@ -1,10 +1,14 @@
 # Phase 3 — Realistic dynamics and robustness
 
-- **Status:** in progress, gate failed (70% vs. 85%, 2026-11-10); started 2026-11-09
+- **Status:** gate passed (96%, second attempt, 2026-11-11); first attempt failed (70%, 2026-11-10); started 2026-11-09
 - **Goal / gate:** dynamic bicycle model with tire slip, throttle/brake, low-grip "dirt" patches, actuation latency, sensor noise, and **domain randomization** of friction, mass, and latency. **Gate:** on held-out tracks, with physics parameters drawn from a range *wider* than training, completion is ≥ 85% and the robustness curve is published. **Go/no-go:** after this phase, decide whether to go 3D (cost, interest, time).
 - **Learn:** vehicle dynamics, why perfect-traction policies fail, domain randomization as sim-to-real insurance, robustness evaluation; drifting may emerge on its own.
 - **Code:** `sdc/racer/dynamics.py` (dynamic car, dirt, delay, noise, physics ranges, hand-coded driver, Phase 1 policy adapter), `sdc/phase3/robust.py` (robustness sweeps, gate laps), `sdc/phase3/train.py` (SB3 PPO on the dynamic car), `tests/test_dynamics.py`
-- **How to reproduce the gate:** `python -m sdc.phase3.gate` (trains the owner's PPO, seed 0, 1M steps, then evaluates once on the test set; about 15 min)
+- **How to reproduce the gate:**
+  - Train the candidate: `python -m sdc.phase3.my_ppo --seed 0 --steps 1000000 --env realism=3 --env sensors='["accel","grip"]' --env lap_bonus=100 --set std_cap='[0.5,0.1]' --set select=true --set gamma=0.997 --out runs/p3-g2-s0` (about 11 min).
+  - Train its estimator: `python -m sdc.phase3.grip_estimator --policy runs/p3-g2-s0 --kind window --seed 0 --out runs/p3-g2est-s0` (about 15 min).
+  - Run the gate: `python -m sdc.phase3.gate2 --run runs/p3-g2est-s0 --official single` (about 3 min).
+  - First attempt: `python -m sdc.phase3.gate --run runs/p3-e9-s0`.
 - **Previous gate:** Phase 2 passed (2026-11-09).
 
 ## Phase-entry decisions (owner, 2026-11-09)
@@ -264,6 +268,17 @@ The threshold and physics ranges are unchanged.
   - By grip in the draw: 0.5–0.7×: 15% (26 laps); 0.7–0.9×: 73% (22); 0.9–1.1×: 97% (29); 1.1–1.3×: 96% (23). Light cars (mass < 0.8×): 55%. Test tracks at nominal: 20/20. The hand-coded driver (knows the grip) on the same 100 laps: 93%.
   - Robustness curves (test tracks, one knob at a time): delay, mass and noise stay at 90–100% across the gate range; grip falls from 90% at 0.7× to 35% at 0.6× and 5% at 0.5×. Published in the gate report.
 - **Verdict:** **FAIL.** Everything but low grip is handled; grip below the training range (0.5–0.7×) is not. The owner chose to continue on traction handling.
+
+### Gate, second attempt (2026-11-11)
+
+- **Run:** `python -m sdc.phase3.gate2 --run runs/p3-g2est-s0 --official single`, commit 19d9264. The candidate and protocol were fixed in advance (see "Gate candidate and protocol" below): the owner's PPO, seed 0, trained with the true grip as a sim-only input, lap bonus 100, noise schedule, γ 0.997, 1M steps, early stopping (chosen checkpoint: 250k steps). It drives on a learned 1 s window grip estimate, never the true grip. 1 torch thread, cloud container (4 CPU, no GPU). [Gate report](https://claude.ai/artifact/4JT8Md4XVfNXRnTkp1nzs2)
+- **Result vs. threshold:**
+  - Test set (tracks 20000–20019, never used by any experiment; gate-range physics, 5 draws per track, physics seed 54321), single lap from a standing start: **96/100 = 96%** vs. ≥ 85%: **pass**. With an out-lap (reported, not deciding): 95%.
+  - Same car on the validation set: 100% (single lap), 100% (out-lap). The test result is 4 points lower, as expected after choosing on validation.
+  - By grip in the draw: 0.5–0.7×: 96% (26 laps); 0.7–0.9×: 91% (22); 0.9–1.1×: 97% (29); 1.1–1.3×: 100% (23). Light cars: 100%. Test tracks at nominal: 20/20. The hand-coded driver (knows the grip) on the same 100 laps: 96%.
+  - Robustness curves (test tracks, one knob at a time): grip 90% at 0.4× (below the gate range), 95% at 0.5–0.6×, 100% at 0.7–1.2×, 85% at 1.3×; delay 95–100% up to 120 ms, 85% at 150 ms; mass 95–100%; noise 100%. Published in the gate report.
+  - Cost: speed. Mean lap at nominal 41.9 s vs. 25.4 s for the hand-coded driver. Seed 0's checkpoint is from early in training and cautious; seeds 1–2's checkpoints lap in about 34.5 s on validation. Lap time is not part of this gate.
+- **Verdict:** **PASS.**
 
 ## After the gate: traction handling (owner chose to continue, 2026-11-10)
 

@@ -30,8 +30,10 @@ def careful_outlap(policy, cap):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("runs", nargs="+")
-    p.add_argument("--caps", type=float, nargs="+", default=[0.4, 0.6, 0.8])
+    p.add_argument("--caps", type=float, nargs="+", default=[1.0, 0.4, 0.6, 0.8])   # 1.0 = no cap
     a = p.parse_args()
+    import torch
+    torch.set_num_threads(1)   # same as training/E13: a different thread count changes the results
     for d in a.runs:
         pol, m = grip_estimator.load(d)
         car = grip_estimator.car_options(m["kind"])

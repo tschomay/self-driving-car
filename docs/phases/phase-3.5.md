@@ -144,6 +144,10 @@ Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop t
 - **Takeaway:** the brake test reads the grip level well, but one test reads one surface. The gentle out-lap leaves the map blind to dirt.
 - **Decision (owner, 2026-11-11):** one more experiment (E7): probe the surface repeatedly on the out-lap, then the gate.
 
+### E7 — Probe the surface repeatedly on the out-lap
+
+- **Setup:** `sdc/phase35/probe.py`. On the out-lap the car keeps its own steering; every 6 m of odometer, when its steering is nearly straight (|command| < 0.35), it gives a 0.4 s full-brake pulse and reads the locked-wheel deceleration (readings from the third step, above 1.5 m/s) × K. Below 6 m/s when a probe is due, the throttle goes to full first (only while nearly straight). Readings fill the 5 m odometer map (median per bin, gaps interpolated). While mapping: grip input = latest reading, map input = median reading × 0.65. Timed lap: grip input and map input both from the map; no window estimator. K = 1.53 from training-range physics (rmse 0.046, about 30 probes per out-lap); gate-range check (not fitted): mean error 0.034, bias −0.018. Car: E5's low-noise car. Validation set, out-lap + timed lap.
+
 ## Gate check
 
 ## Handoff to next phase

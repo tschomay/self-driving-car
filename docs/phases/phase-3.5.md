@@ -93,7 +93,20 @@ Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop t
 - **Prediction (owner, before the run):** "I think it'll drift back (even though this was my idea)."
 - **Setup:**
   - **Behaviour cloning** (`python -m sdc.phase35.bc --seed S`): the owner's network copies the full-knowledge hand-coded driver (25.4 s) with E3's inputs. DAgger, 5 rounds × 50k states on training tracks and training-range physics; squared error on tanh(actor mean). The critic is then regressed on discounted returns (γ 0.997, lap bonus 100) of the clone's own noisy driving.
-  - **Then PPO** from the clone (`my_ppo --set init=runs/p35-e4-bc-sS/model.pt`, new plumbing option), E3's recipe otherwise. Two noise schedules: `std_cap=[0.5, 0.1]` (as E3) and `[0.15, 0.05]` (low noise). Seeds 0–1, 4 runs in parallel. Same scoring and pick as E1/E3.
+  - **Then PPO** from the clone (`my_ppo --set init=runs/p35-e4-bc-sS/model.pt`, new plumbing option), E3's recipe otherwise. Two noise schedules: `std_cap=[0.5, 0.1]` (as E3) and `[0.15, 0.05]` (low noise). Seeds 0–1, 4 runs in parallel. Same scoring and pick as E1/E3. Report: `python -m sdc.phase35.e4_report`.
+- **Result (validation set, true grip and true map):** [report](https://claude.ai/artifact/9k5s4t67unL6qe2WYsrDEc)
+
+  | Run | Clone only: gate range, lap | Pick (fastest ≥ 90%) | Last checkpoint (1M) |
+  |---|---|---|---|
+  | high noise, seed 0 | 62%, 25.0 s | 92%, **30.3 s** | 85%, 30.9 s |
+  | high noise, seed 1 | 33%, 24.9 s | none ≥ 90% (best 89%, 28.0 s) | 77%, 28.2 s |
+  | low noise, seed 0 | 62%, 25.0 s | 95%, **25.8 s** (51k) | 89%, 28.4 s |
+  | low noise, seed 1 | 33%, 24.9 s | none ≥ 90% (best 72%, 25.6 s) | 40%, 23.9 s |
+
+  - From scratch (E3) the same inputs and reward gave 33–34 s. Starting from fast driving, PPO keeps most of the speed: 28–31 s with high noise, 24–28 s with low noise.
+  - The clone is fast but fragile (33–62% gate range): copying never shows it how to recover. PPO buys robustness with some speed; with high exploration noise it gives up more.
+  - Seed spread is large: low-noise seed 1 stayed fast but never became reliable.
+- **Explanation (owner, after the run):** _pending_
 
 ## Gate check
 

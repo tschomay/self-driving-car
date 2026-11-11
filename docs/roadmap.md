@@ -11,7 +11,7 @@ Status: **confirmed 2026-11-04** ([Confirm learning style, budget, and phase pla
 - **Decisions deferred to phase exits:**
   - Phase 2 entry: how long runs survive ephemeral sessions (checkpoint-and-push vs. detached Modal jobs).
   - Phase 3 exit: whether to do Phase 4, and if so which 3D engine (MuJoCo/MJX, Isaac Lab, Genesis, ...). **Decided (2026-11-11):** go to Phase 4 after a Phase 3.5 speed detour; the engine choice and Modal setup move to Phase 4 entry.
-  - Phase 3.5 entry: the gate (reliability plus a lap-time target).
+  - Phase 3.5 entry: the gate (reliability plus a lap-time target). **Decided (2026-11-11):** ≥ 85% gate-range completion on fresh test tracks 30000–30019, and mean lap at nominal ≤ 1.2× the hand-coded driver on the same tracks.
 
 ## Purpose
 
@@ -75,7 +75,7 @@ Each phase has a goal, the concepts it teaches, and a **gate**: a measurable ben
 ### Phase 3.5 — Speed (CPU) — added at the Phase 3 exit
 - **Goal:** close the lap-time gap to the hand-coded driver (Phase 3's reliable car laps in about 34–42 s vs. 25.4 s) without losing robustness.
 - **Learn:** the speed vs. reliability trade-off, multi-objective model selection, reward design for speed, what knowing the track (dirt locations) is worth.
-- **Gate:** set at Phase 3.5 entry. Provisionally: ≥ 85% gate-range completion on a fresh test set, with mean lap ≤ about 1.15× the hand-coded driver.
+- **Gate (set 2026-11-11):** on fresh test tracks 30000–30019, ≥ 85% of single laps from a standing start finished with gate-range physics (5 draws per track), **and** mean lap at nominal physics ≤ 1.2× the hand-coded driver on the same tracks.
 
 ### Phase 4 — 3D terrain with jumps (Modal GPU)
 - **Goal:** a 3D rigid-body sim with heightfield terrain, ramps, and an IMU (accelerometer + gyro) in the observation. Candidate engines: MuJoCo/MJX, Isaac Lab, Genesis; to be decided at Phase 4 entry.

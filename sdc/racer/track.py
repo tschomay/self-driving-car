@@ -5,7 +5,7 @@ points at random radii (40-100% of R0) around a circle, joined by a closed
 Catmull-Rom spline, rounded off with a Gaussian blur (σ = 4 m) and resampled to
 N points evenly spaced along the centerline. Half the tracks run clockwise. Each seed gives one
 track, so a seed is a track's name. Training uses seeds < 10_000; held-out
-validation tracks use seeds from 10_000 (HELD_OUT_SEEDS); the gate's test tracks 20_000-20_019 (TEST_SEEDS).
+validation tracks use seeds from 10_000 (HELD_OUT_SEEDS); the gate's test tracks 20_000-20_019 (TEST_SEEDS, Phase 3) and 30_000-30_019 (TEST35_SEEDS, Phase 3.5).
 
 Rejected and redrawn (deterministically from the same seed):
   - corners tighter than MIN_RADIUS (sharper than the car's full-lock turning circle)
@@ -28,6 +28,8 @@ HELD_OUT_SEEDS = tuple(range(HELD_OUT_BASE, HELD_OUT_BASE + 20))
 # choice. HELD_OUT_SEEDS is the validation set that experiments report on; TEST_SEEDS are looked at
 # once, at a gate.
 TEST_SEEDS = tuple(range(20_000, 20_020))
+# Phase 3.5's fresh test set (owner's decision 2026-11-11): 20_000-20_019 were used by Phase 3's gate.
+TEST35_SEEDS = tuple(range(30_000, 30_020))
 
 
 @dataclass

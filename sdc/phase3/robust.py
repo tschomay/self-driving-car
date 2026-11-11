@@ -50,6 +50,7 @@ def sweep(policy, knobs=("grip", "delay", "mass", "noise"), dirt=True, seeds=trk
 
 
 TEST_PHYSICS_SEED = 54321   # physics draws for the gate's test laps (never used before the gate)
+TEST35_PHYSICS_SEED = 67890  # Phase 3.5's gate: physics draws for tracks trk.TEST35_SEEDS
 
 
 def gate_laps(policy, physics=dy.GATE_DR, draws=DRAWS, dirt=True, seed=12345, seeds=trk.HELD_OUT_SEEDS, outlap=False,

@@ -22,7 +22,7 @@ Full plan, feasibility research, and sources: [`docs/roadmap.md`](docs/roadmap.m
 | 1 | Our own 2D racer with distance sensors and perfect grip | Finishes at least 95% of laps on 20 new tracks, no slower than 1.1× a hand-coded driver | Gate passed |
 | 2 | Camera images fed through a CNN | Reaches at least 90% of Phase 1's lap completion, with a map showing it watches the track edges | Gate passed |
 | 3 | Tire slip, dirt patches, delays, sensor noise, randomized physics | Finishes at least 85% of laps with physics outside its training range; then decide whether to go 3D | Gate passed (96%, second attempt) |
-| 3.5 | Speed: close the lap-time gap without losing reliability | Set at entry (provisionally: still ≥ 85% on a fresh test set, laps within ~1.15× the hand-coded driver) | Not started |
+| 3.5 | Speed: close the lap-time gap without losing reliability | Still finishes at least 85% of laps (gate-range physics, fresh test tracks), with mean lap at nominal ≤ 1.2× the hand-coded driver | In progress |
 | 4 | 3D terrain with jumps and an accelerometer, on a Modal GPU | Lands at least 80% of jumps wheels-down, within $30 a month | Go (after Phase 3.5) |
 | 5 | The real car | Not planned yet | Future |
 

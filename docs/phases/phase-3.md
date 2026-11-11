@@ -387,6 +387,28 @@ Exploration-noise schedule (`std_cap=[start, end]`, SB3 and the owner's PPO): th
 - **Explanation (owner, after the run):** "The Oracle car must be getting more confident"
 - **Takeaway:** the best behavior appears mid-training, and how much of it survives to the end depends on how confident the car gets. The oracle car becomes confident fastest, so it has the most to lose by the end. Early stopping keeps the reliable version, at about 4–5 s per lap.
 
+### E13 — Estimating the grip
+
+- **Prediction (owner, before the run):** "Whole drive does better, out-lap helps, both below oracle"
+- **Setup:** `sdc/phase3/grip_estimator.py`. E12's best oracle checkpoints, frozen; the oracle grip input is replaced by a learned estimate:
+  - (q) 1 s window: an MLP on the last 10 steps of speed, commands, gyro and accelerometer
+  - (r) whole drive: a GRU reading the drive from the standing start
+  
+  Both are trained by regression on the true surface grip, with 4 rounds × 60k samples. Round 1 drives on the true grip; later rounds drive on the estimate (DAgger). Seeds 0–2, one per checkpoint. Each is evaluated without and with an out-lap (`evaluate.run_laps(outlap=True)`: an out-lap then the counted lap; finishing needs both).
+- **Result (validation set):** [report](https://claude.ai/artifact/BjVi1QDJP5bNhtnLsXaAUH)
+
+  | Grip input | Gate range per seed | Mean | With out-lap | Counted lap, out-lap survived | Estimate error |
+  |---|---|---|---|---|---|
+  | true grip (oracle) | 92 / 93 / 90% | 92% | – | – | 0 |
+  | (q) 1 s window | 91 / 92 / 86% | 90% | 85 / 87 / 76% | 92% | 0.06 |
+  | (r) whole drive | 91 / 92 / 82% | 88% | 91 / 83 / 75% | 95% | 0.06 |
+  | none (E12 o′, its own best checkpoints) | 80 / 72 / 86% | 79% | – | – | – |
+
+  - The estimators keep almost all of the oracle's benefit. Both settle within about 5 s (error 0.08–0.10 in the first 5 s, about 0.055 after); the whole-drive memory adds no accuracy.
+  - The out-lap lowers the gate range, because finishing means surviving two laps: 30–37 of about 50 failures happen in the out-lap. The counted lap after a survived out-lap does better (92–95% vs. 88–90%), most for the whole-drive estimator. The policy doesn't drive its out-lap more carefully. The counted lap is 1.5–3 s faster (flying start).
+- **Explanation (owner, after the run):** _pending_
+- **Takeaway:** _pending_
+
 Plan from here: E13 grip estimator (on E12's best oracle checkpoints); E14 reward options ("lose the lap" crash cost, lap-completion bonus); then decide on much wider training ranges and the gate rerun (with an out-lap).
 
 ## Handoff to next phase

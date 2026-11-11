@@ -1,0 +1,29 @@
+# Phase 3.5 — Speed
+
+- **Status:** in progress
+- **Goal:** close the lap-time gap to the hand-coded driver without losing robustness. Phase 3's gate car laps in 41.9 s at nominal (test tracks); the same recipe's other seeds in about 34.5 s (validation); the hand-coded driver, which knows the grip and the dirt, in 25.4 s.
+- **Learn:** the speed vs. reliability trade-off, multi-objective model selection, reward design for speed, what knowing the track (dirt locations) is worth.
+- **Gate (owner's decisions at entry, 2026-11-11):**
+  - **Reliability:** ≥ 85% of single laps from a standing start finished, with gate-range physics (grip 0.5–1.3×, mass ±35%, delay 0–120 ms, noise ≤ 4%), 5 draws per track = 100 laps. Same bar as Phase 3.
+  - **Speed:** mean lap at **nominal** physics on the same 20 test tracks ≤ **1.2×** the hand-coded driver's mean lap there (about 30.5 s if it stays near 25.4 s). The owner chose 1.2× over the provisional 1.15×. For scale: the hand-coded driver *without* dirt knowledge laps in 29.1 s (1.15×).
+  - **Test set:** fresh tracks 30000–30019 (`trk.TEST35_SEEDS`), physics seed 67890 (`robust.TEST35_PHYSICS_SEED`), looked at only by the gate. A retry reuses the same set, as in Phase 3. Experiments report on the validation set (tracks 10000–10019).
+  - **What the car may know while driving:** only what a real car could: its sensors, plus anything it learns on the track itself (for example a grip map from an out-lap). Sim-only inputs such as the true grip are allowed in training only. If track memory is tried, the out-lap rule is decided then.
+- **Scope:** about 4–6 experiments plus the gate. If progress stalls, go on to Phase 4 with what we have.
+- **Code:** `sdc/phase3/` (training, grip estimator, evaluation) and `sdc/racer/` (sim), reused from Phase 3; new Phase 3.5 code goes in `sdc/phase35/`.
+- **How to reproduce the gate:** to be written.
+
+## Plan
+
+Starting point: Phase 3's winning recipe (the owner's PPO, realism 3, true grip as a training-only input, lap bonus 100, `std_cap=[0.5, 0.1]`, γ 0.997, 1M steps, driving on the 1 s window grip estimate). Phase 3's checkpoints didn't survive the container, so E1 retrains it.
+
+1. **E1 — Pick for speed, not just safety.** Score every checkpoint for both reliability and lap time; choose the fastest with ≥ 90% validation gate range instead of the most reliable. How much speed did early stopping throw away?
+2. **E2 — Train longer.** 2–3M steps with the lap bonus: does it keep getting faster without the late reliability slide?
+3. **E3 — Reward speed directly.** A per-step time cost or a lap-time bonus: the speed vs. reliability trade-off as a reward.
+4. **E4 — Train with the grip estimate.** Fine-tune with the estimator in the loop, so the car learns to trust the estimate.
+5. **E5 — Track memory (only if still short).** A grip map built on an out-lap; the out-lap rule gets decided first.
+
+## Experiments
+
+## Gate check
+
+## Handoff to next phase

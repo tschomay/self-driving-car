@@ -132,6 +132,11 @@ Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop t
 - Fix grip estimation with a **brake test on the out-lap** (E6), then the gate. Not chosen: wider training ranges (would make the gate interpolation), stopping here.
 - **Speed bar on the gate protocol:** with an out-lap the timed lap has a flying start, so the bar is 1.2× the hand-coded driver's flying lap on the same tracks (23.9 s on validation, so 28.7 s), not 30.5 s.
 
+### E6 — A brake test on the out-lap
+
+- **Prediction (owner, before the run):** "Small improvements but it has to do multiple brake tests so it see the full range of surfaces."
+- **Setup:** `sdc/phase35/braketest.py`. At the start of the out-lap the car keeps its own steering while the throttle is overridden: accelerate to 8 m/s, then full brake for up to 1 s. Locked-wheel deceleration (accelerometer, readings after 0.3 s and above 1.5 m/s) × K gives the grip level. K = 1.61 from a least-squares fit on training-range physics only (the tire model predicts 1/(0.75 × 0.85) = 1.57). Check on gate-range physics (not used for fitting): mean error 0.03 at grip 0.5–0.7×, 0.04 at 0.7–0.9×, 0.08 at 0.9–1.1×, 0.14 at 1.1–1.3×. After the test, grip input = test level × (window estimate / median estimate so far on the lap, clipped to 0.6–1); the map records the same (as E5). Known weakness: a start on dirt reads dirt grip (validation track 10000 does). Car: E5's low-noise car and estimator. Validation set, out-lap + timed lap.
+
 ## Gate check
 
 ## Handoff to next phase

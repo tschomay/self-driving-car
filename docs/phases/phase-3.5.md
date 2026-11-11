@@ -106,7 +106,8 @@ Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop t
   - From scratch (E3) the same inputs and reward gave 33–34 s. Starting from fast driving, PPO keeps most of the speed: 28–31 s with high noise, 24–28 s with low noise.
   - The clone is fast but fragile (33–62% gate range): copying never shows it how to recover. PPO buys robustness with some speed; with high exploration noise it gives up more.
   - Seed spread is large: low-noise seed 1 stayed fast but never became reliable.
-- **Explanation (owner, after the run):** _pending_
+- **Explanation (owner, after the run):** "With highly varied exploration, it learns fear/caution because it knows how bad things can get. Less noise means it never hits the worst scenarios so it doesn't have to prepare for them."
+- **Takeaway:** the car never found fast driving on its own; started there, PPO keeps most of it, and less exploration noise keeps more. Next: the same car on its own map and grip estimate.
 
 ## Gate check
 

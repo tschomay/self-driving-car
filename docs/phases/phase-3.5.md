@@ -173,6 +173,11 @@ Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop t
   - First check (agent): 611 probes vs. 600, and the same share taken while turning, so corner probes seemed rare; the agent blamed the 6 m/s minimum. **Corrected after the owner asked:** the out-lap corners at 5–8 m/s (median 6.7), and E7's steering limit (|command| < 0.35) already allowed probes in most corners. Corner dirt was mapped about as well as straight dirt in both runs (E7: map flags 61% of corner-dirt positions and 53% of straight-dirt positions; E8: 63% and 55%; true dirt reads 0.78 of the grip level in the map against 0.65). The real limit is map sharpness: probes 6 m apart, 5 m bins, interpolation, and the shift between the out-lap and timed-lap lines blur the dirt edges.
 - **Explanation (owner, after the run):** "You already explained it. Corners are too slow to probe." (Given before the correction above.) The owner judged E8 and E7's corner handling to be the agent's implementation mistakes, not tests of probing.
 
+### E9 — Probe more often, err on the safe side
+
+- **Prediction (owner, before the run):** "82% at 27s."
+- **Setup:** E8 (corner probes, total force) plus: a probe every **3 m** (was 6), map stretches of **2.5 m** (was 5), and each stretch takes the **lowest** reading within ±1 stretch (±2.5 m), so blurred edges and position shifts err toward caution. Owner's question that led here: "Maybe it isn't probing often enough?" Same car, K = 1.53 (E8 calibration; the pulse is unchanged). Validation set, out-lap + timed lap. `python -m sdc.phase35.probe eval --dense`.
+
 ## Gate check
 
 ## Handoff to next phase

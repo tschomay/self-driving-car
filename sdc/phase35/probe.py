@@ -42,11 +42,15 @@ ACC_X = dy.OBS_DIM
 
 
 class ProbeDriver(sm.SelfMapDriver):
-    def __init__(self, net, base, k=None, record_truth=False, corners=False):
+    def __init__(self, net, base, k=None, record_truth=False, corners=False, every=PROBE_EVERY, bin=sm.BIN,
+                 erode=0):
+        """every: metres between probes; bin: map stretch length (m); erode (Phase 3.5 E9): each stretch takes
+        the lowest reading within ±erode stretches, so blurred edges and position shifts err on the safe side."""
         """corners (Phase 3.5 E8, owner's idea): probe in corners too, reading the total horizontal acceleration
         (braking and cornering): a locked, sliding tire gives SLIDE_FRAC × μ·g in whatever direction it slides."""
         super().__init__(net, base, est=None)
         self.corners = corners
+        self.every, self.bin, self.erode = every, bin, erode
         self.k = k if k is not None else json.loads((CAL_CORNERS if corners else CAL).read_text())["k"]
         self.record_truth = record_truth
 
@@ -64,17 +68,20 @@ class ProbeDriver(sm.SelfMapDriver):
         self._tab = {}
 
     def table(self, i):
-        L = max(self.out_len[i], sm.BIN)
-        nb = int(np.ceil(L / sm.BIN))
+        L = max(self.out_len[i], self.bin)
+        nb = int(np.ceil(L / self.bin))
         bins = [[] for _ in range(nb)]
         for odo, g in self.readings[i]:
-            bins[int(odo // sm.BIN) % nb].append(g)
+            bins[int(odo // self.bin) % nb].append(g)
         tab = np.array([np.median(v) if v else np.nan for v in bins])
         if np.isnan(tab).all():
             tab[:] = START_GRIP
         idx = np.arange(nb)
         good = ~np.isnan(tab)
-        return np.interp(idx, idx[good], tab[good], period=nb), L, nb
+        tab = np.interp(idx, idx[good], tab[good], period=nb)
+        if self.erode:
+            tab = np.min([np.roll(tab, k) for k in range(-self.erode, self.erode + 1)], axis=0)
+        return tab, L, nb
 
     def __call__(self, b):
         if self.n != b.n or (b.steps == 0).all():
@@ -97,7 +104,7 @@ class ProbeDriver(sm.SelfMapDriver):
                 x[i, sm.MAP_COLS] = med * dy.DIRT_GRIP
             else:
                 tab, L, nb = self._tab[i]
-                q = ((self.odo[i] + np.array((0.0,) + dy.GRIPMAP_AHEAD)) % L) // sm.BIN
+                q = ((self.odo[i] + np.array((0.0,) + dy.GRIPMAP_AHEAD)) % L) // self.bin
                 v = tab[q.astype(int) % nb]
                 x[i, dy.OBS_DIM + 2] = v[0]
                 x[i, sm.MAP_COLS] = v[1:]
@@ -124,7 +131,7 @@ class ProbeDriver(sm.SelfMapDriver):
                 self.pulse_t[i] += 1
                 if self.pulse_t[i] > PULSE:
                     self.pulse_t[i] = 0
-                    self.next_probe[i] = self.odo[i] + PROBE_EVERY
+                    self.next_probe[i] = self.odo[i] + self.every
                     if self.reads[i]:
                         g = self.k * float(np.mean(self.reads[i]))
                         self.latest[i] = g
@@ -157,12 +164,12 @@ def calibrate(run="runs/p35-e5-lo-s0", corners=False):
     print(res)
 
 
-def evaluate(run, out_name="eval_probe.json", seeds=None, phys_seed=None, corners=False):
+def evaluate(run, out_name="eval_probe.json", seeds=None, phys_seed=None, corners=False, **opts):
     torch.set_num_threads(1)
     t0 = time.perf_counter()
     net, base = sm.load_net(run)
     kw = {} if seeds is None else dict(seeds=seeds)
-    drv = ProbeDriver(net, base, corners=corners)
+    drv = ProbeDriver(net, base, corners=corners, **opts)
     nom = robust.laps(drv, outlap=True, **kw, **sm.CAR)
     diag = dict(map_err=float(np.mean(drv.map_err)) if drv.map_err else None,
                 probes_per_lap=float(np.mean(drv.n_probes)))
@@ -180,11 +187,15 @@ def main():
     ap.add_argument("cmd", choices=["calibrate", "eval"])
     ap.add_argument("--run", default="runs/p35-e5-lo-s0")
     ap.add_argument("--corners", action="store_true", help="probe in corners too (E8)")
+    ap.add_argument("--dense", action="store_true", help="E9: probe every 3 m, 2.5 m stretches, lowest within ±1")
     a = ap.parse_args()
     if a.cmd == "calibrate":
         calibrate(a.run, corners=a.corners)
     else:
-        evaluate(a.run, out_name="eval_probe_corners.json" if a.corners else "eval_probe.json", corners=a.corners)
+        if a.dense:
+            evaluate(a.run, out_name="eval_probe_dense.json", corners=True, every=3.0, bin=2.5, erode=1)
+        else:
+            evaluate(a.run, out_name="eval_probe_corners.json" if a.corners else "eval_probe.json", corners=a.corners)
 
 
 if __name__ == "__main__":

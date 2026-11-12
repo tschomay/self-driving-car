@@ -58,7 +58,7 @@ def page(title: str, eyebrow: str, h1: str, question: str, sections: list[str], 
          footer: str = "") -> Path:
     body = "".join(f"<section>{s}</section>" for s in sections)
     doc = f"""<title>{html.escape(title)}</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="claude:viewport-fit-sides" content="cover">
 {FONTS}
 <style>{CSS}{EXTRA_CSS}</style>
 <main>

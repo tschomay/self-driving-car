@@ -64,7 +64,7 @@ class JumpCar:
         self.ray_sites = np.array([self.m.site(n).id for n in cr.RAY_SITES])
 
     # ---- episode ---------------------------------------------------------------------
-    def reset(self, course_seed=None):
+    def reset(self, course_seed=None, x0=0.0):
         if course_seed is None:
             if self.courses == "random":
                 course_seed = int(self.rng.integers(0, 2**31 - 1))
@@ -74,8 +74,8 @@ class JumpCar:
         self.course = crs.make(course_seed, kinds=self.kinds, size=self.size)
         self.m.hfield_data[:] = self.course.hfield().ravel()
         mujoco.mj_resetData(self.m, self.d)
-        self.d.qpos[0] = crs.START_X
-        self.d.qpos[2] = self.course.height(crs.START_X) + 0.17
+        self.d.qpos[0] = crs.START_X + x0      # x0: start offset (evaluation repeats a course from a few starts)
+        self.d.qpos[2] = self.course.height(crs.START_X + x0) + 0.17
         mujoco.mj_forward(self.m, self.d)
         mujoco.mj_step(self.m, self.d, int(0.2 / cr.TIMESTEP))     # settle on the suspension (0.2 s)
         self.t = 0

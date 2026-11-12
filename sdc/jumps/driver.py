@@ -63,16 +63,24 @@ class ExpertDriver:
         return np.stack([self.act(c) for c in batch.cars])
 
 
-def run(policy, courses, n_envs=None, **batch_kw):
-    """Drive each course once with `policy(batch) -> actions`; return the episode summaries."""
-    n_envs = n_envs or min(len(courses), 10)
+STARTS = (0.0, -0.3, 0.3)   # start offsets (m) for steadier evaluation: each course driven from 3 starts
+
+
+def run(policy, courses, n_envs=None, starts=(0.0,), **batch_kw):
+    """Drive each course once per start offset with `policy(batch) -> actions`; return the episode summaries.
+
+    The car's outcome on a jump is chaotic (tiny differences, even float rounding in a batched
+    network, can flip a landing), so experiments score from several starts (STARTS: 3 x 60 jumps).
+    """
+    jobs = [(c, x0) for x0 in starts for c in courses]
+    n_envs = n_envs or min(len(jobs), 10)
     out = []
-    for s in range(0, len(courses), n_envs):
-        chunk = list(courses[s:s + n_envs])
-        b = je.JumpBatch(len(chunk), courses=chunk, **batch_kw)
-        b.reset()
+    for s in range(0, len(jobs), n_envs):
+        chunk = jobs[s:s + n_envs]
+        b = je.JumpBatch(len(chunk), courses=[c for c, _ in chunk], **batch_kw)
+        b._obs = np.zeros((len(chunk), je.OBS_DIM), np.float32)
         for i, c in enumerate(b.cars):
-            b._obs[i] = c.reset(chunk[i])
+            b._obs[i] = c.reset(chunk[i][0], x0=chunk[i][1])
         done = np.zeros(len(chunk), bool)
         ep = [None] * len(chunk)
         reset_fn = policy.reset if hasattr(policy, "reset") else None

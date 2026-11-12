@@ -51,6 +51,23 @@
 
 - **Prediction (owner, before the run):** "75% and only kind of" (it will only partly learn to use throttle in the air).
 - **Setup:** the owner's PPO (textbook clip, GAE, squared-error critic) with the Phase 1 network (two 64-unit layers, no memory), real sensors only (20 inputs), tanh-squashed actions, γ 0.99, λ 0.95, linear LR decay from 3e-4, 8 cars × 256 steps per update, 1M steps, seeds 0–2, 1 torch thread. Early stopping: best validation landing rate among checkpoints every 50k steps. `python -m sdc.phase4.train --seed S --steps 1000000 --out runs/p4-e1-sS`.
+- **Result (validation, 180 jumps = 20 courses × 3 starts):** [report](https://claude.ai/artifact/FgEYg5zyvbByT7YJpStNWW). Kept models land **36%, 35%, 55%** (mean 42%).
+
+  | Driver | Landed | Air throttle ↔ pitch error | Pitch − slope at touchdown |
+  |---|---|---|---|
+  | Hand-coded expert | 99% | 0.83 | −2° |
+  | Expert, throttle held in the air | 61% | 0 | +18° |
+  | Straight ahead, throttle 0.5 | 43% | 0 | −15° |
+  | Your PPO (3 seeds) | 35–55% | 0.01–0.13 | +6 to +13° (nose high) |
+
+  - It barely uses the throttle in the air, and lands nose high.
+  - About a quarter of runs end off the lane after a landing, and as many in a rollover.
+  - Re-scored curves peak at 48–55% around 550k–750k steps, then slide (as in Phase 3).
+  - Surprises:
+    - Holding half throttle and driving straight does about as well as the trained policies.
+    - Landings are chaotic: one network scored 55% evaluated as a batch and 40% one car at a time, from float rounding alone. Experiments now score from 3 start points (180 jumps), and checkpoints are re-scored that way (`python -m sdc.phase4.rescore`).
+  - Prediction vs. result: 75% predicted, 42% measured. "Only kind of" using the air throttle: correct, it barely does.
+- **Explanation (owner, after the run):** pending.
 
 ## Gate check
 

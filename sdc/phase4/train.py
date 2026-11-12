@@ -60,8 +60,8 @@ class Greedy:
             return np.tanh(self.net.actor(_t(b.obs())).numpy())
 
 
-def evaluate(policy, courses=crs.VAL_SEEDS, **env_kw) -> dict:
-    eps = dr.run(policy, list(courses), **{k: v for k, v in env_kw.items() if k in ("size", "max_steps")})
+def evaluate(policy, courses=crs.VAL_SEEDS, starts=(0.0,), **env_kw) -> dict:
+    eps = dr.run(policy, list(courses), starts=starts, **{k: v for k, v in env_kw.items() if k in ("size", "max_steps")})
     return dict(**dr.score(eps), episodes=eps)
 
 
@@ -162,7 +162,7 @@ def train(seed=0, total_timesteps=1_000_000, out="runs/p4", eval_every=50_000, l
         net.load_state_dict(torch.load(out / "ckpt" / f"{best['timesteps']}.pt"))
         selection = dict(chosen=best["timesteps"], rate=best["rate"], final_rate=evals[-1]["rate"])
     torch.save(net.state_dict(), out / "model.pt")
-    final = evaluate(greedy, size=env_cfg["size"])
+    final = evaluate(greedy, starts=dr.STARTS, size=env_cfg["size"])
     m = dict(label=label, seed=seed, threads=threads, ppo=cfg, env=env_cfg, total_timesteps=total_timesteps,
              trained_timesteps=steps, train_wall_s=round(train_s, 1), episodes=episodes, evals=evals,
              selection=selection, final={k: v for k, v in final.items() if k != "episodes"},

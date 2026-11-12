@@ -206,7 +206,7 @@ def train(seed=0, total_timesteps=1_000_000, out="runs/p4-rnn", eval_every=50_00
         selection = dict(chosen=best["timesteps"], rate=best["rate"], final_rate=evals[-1]["rate"])
     torch.save(net.state_dict(), out / "model.pt")
     greedy.h = None
-    final = tr.evaluate(greedy, size=env_cfg["size"])
+    final = tr.evaluate(greedy, starts=tr.dr.STARTS, size=env_cfg["size"])
     m = dict(label=label, seed=seed, threads=threads, ppo=cfg, gru=my_gru.CONFIG, env=env_cfg,
              total_timesteps=total_timesteps, trained_timesteps=steps, train_wall_s=round(train_s, 1),
              episodes=episodes, evals=evals, selection=selection,

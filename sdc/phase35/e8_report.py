@@ -51,7 +51,7 @@ img.gif {{ width:100%; max-width:480px; border-radius:6px; border:1px solid var(
 
 <section class="note"><h2>Result</h2>
 <p><b>No change: {e8['gate']['completion']:.0%}</b> of gate-range attempts finished (E7: {e7['gate']['completion']:.0%}), {e8['nominal']['mean_lap_time']:.1f} s at nominal. Of {len(fails)} failures, {n_out} are on the out-lap and {len(fails) - n_out} on the timed lap.</p>
-<p>Checked why: corner probes barely happened. On the 20 nominal tracks the car made 611 probes against 600 in E7, and the share taken while turning (gyro above 0.1) went from 49% to 50%. A probe needs at least 6 m/s for a clean reading, and on its cautious out-lap the car corners slower than that. The throttle override that brings it up to speed only works when it's going straight, so it doesn't help in corners. The steering rule wasn't what blocked corner probes; speed was.</p></section>
+<p><b>Corrected:</b> my first check blamed speed, which was wrong. The car corners at 5–8 m/s on the out-lap, and E7's steering rule already allowed probes in most corners. Corner dirt was mapped about as well as straight dirt in both runs: the map flags 55–63% of dirt positions and rates dirt at about 0.78 of the grip level, where the truth is 0.65. The limit is map sharpness. Probes 6 m apart, 5 m bins and the shift between the out-lap and timed-lap lines blur the dirt edges.</p></section>
 
 <section><h2>Five ways to know the grip</h2>
 <div class="wide"><table><tr><th>inputs</th><th>gate range</th><th>nominal</th><th>timed lap</th></tr>{trs}</table></div>

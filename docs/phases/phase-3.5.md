@@ -1,16 +1,21 @@
 # Phase 3.5 — Speed
 
-- **Status:** in progress
+- **Status:** gate passed (90%, 1.07×; first attempt)
 - **Goal:** close the lap-time gap to the hand-coded driver without losing robustness. Phase 3's gate car laps in 41.9 s at nominal (test tracks); the same recipe's other seeds in about 34.5 s (validation); the hand-coded driver, which knows the grip and the dirt, in 25.4 s.
 - **Learn:** the speed vs. reliability trade-off, multi-objective model selection, reward design for speed, what knowing the track (dirt locations) is worth.
 - **Gate (owner's decisions at entry, 2026-11-11):**
-  - **Reliability:** ≥ 85% of single laps from a standing start finished, with gate-range physics (grip 0.5–1.3×, mass ±35%, delay 0–120 ms, noise ≤ 4%), 5 draws per track = 100 laps. Same bar as Phase 3.
+  - **Reliability** (protocol changed to out-lap + timed lap after E2, see Track memory decisions): ≥ 85% of single laps from a standing start finished, with gate-range physics (grip 0.5–1.3×, mass ±35%, delay 0–120 ms, noise ≤ 4%), 5 draws per track = 100 laps. Same bar as Phase 3.
   - **Speed:** mean lap at **nominal** physics on the same 20 test tracks ≤ **1.2×** the hand-coded driver's mean lap there (about 30.5 s if it stays near 25.4 s). The owner chose 1.2× over the provisional 1.15×. For scale: the hand-coded driver *without* dirt knowledge laps in 29.1 s (1.15×).
   - **Test set:** fresh tracks 30000–30019 (`trk.TEST35_SEEDS`), physics seed 67890 (`robust.TEST35_PHYSICS_SEED`), looked at only by the gate. A retry reuses the same set, as in Phase 3. Experiments report on the validation set (tracks 10000–10019).
   - **What the car may know while driving:** only what a real car could: its sensors, plus anything it learns on the track itself (for example a grip map from an out-lap). Sim-only inputs such as the true grip are allowed in training only. If track memory is tried, the out-lap rule is decided then.
 - **Scope:** about 4–6 experiments plus the gate. If progress stalls, go on to Phase 4 with what we have.
 - **Code:** `sdc/phase3/` (training, grip estimator, evaluation) and `sdc/racer/` (sim), reused from Phase 3; new Phase 3.5 code goes in `sdc/phase35/`.
-- **How to reproduce the gate:** to be written.
+- **How to reproduce the gate:**
+  1. Behaviour clone: `python -m sdc.phase35.bc --out runs/p35-e4-bc-s0 --seed 0` (about 3 min).
+  2. PPO from the clone: `python -m sdc.phase3.my_ppo --seed 0 --steps 1000000 --env realism=3 --env sensors='["accel","grip","gripmap"]' --env lap_bonus=100 --set std_cap='[0.15,0.05]' --set select=true --set gamma=0.997 --set init='"runs/p35-e4-bc-s0/model.pt"' --out runs/p35-e4-lo-s0 --no-sweep` (about 11 min).
+  3. Pick: `python -m sdc.phase35.e1 score --run runs/p35-e4-lo-s0 && python -m sdc.phase35.e1 pick --run runs/p35-e4-lo-s0`. Copy `runs/p35-e4-lo-s0-fast/model.pt` (and its metrics.json) into `runs/p35-e5-lo-s0/` (E5's `selfmap fit` does this; its window estimator isn't used by the gate car).
+  4. Probe calibration: `python -m sdc.phase35.probe calibrate --corners` (about 5 min).
+  5. Gate: `python -m sdc.phase35.gate --run runs/p35-e5-lo-s0` (about 10 min).
 
 ## Plan
 
@@ -187,5 +192,50 @@ Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop t
 
 - **Candidate and protocol (fixed before any result; owner's go, 2026-11-12):** E9 exactly (E4's low-noise seed-0 network; dense probes every 3 m, corners allowed, total force; 2.5 m map, lowest within ±2.5 m; odometer reset at the line). Test tracks 30000–30019, physics seed 67890, gate-range physics, 5 draws per track. Out-lap then timed lap, both must be finished. Pass: ≥ 85% finished at gate range **and** nominal timed lap ≤ 1.2× the hand-coded driver's timed lap on the same tracks and protocol. Command: `python -m sdc.phase35.gate --run runs/p35-e5-lo-s0`.
 - **Before the run:** a background code review (owner's request). No oracle leakage: a full validation run gave identical per-track results with the driver as is, with any read of sim-only truth made to raise, and with the oracle obs columns scrambled each step (89%, 25.185 s, reproducing E9). No blockers. One fix adopted before the run: the speed ratio is **paired** (mean over tracks both drivers finished, `evaluate.compare`), as "on the same tracks" says; the unpaired means are recorded too. Other notes: thin margin (89% vs 85% on 100 attempts, with design choices made on validation), K fitted on validation tracks with training-range physics (a single sensor gain), test tracks and seed unused before the gate.
+- **Run:** 2026-11-12, `python -m sdc.phase35.gate --run runs/p35-e5-lo-s0`, commit c4c5b91, 1 torch thread, cloud container (4 CPU). [Gate report](https://claude.ai/artifact/Na7SAuiQ5mywjevg87Ut7Y)
+- **Result vs. threshold:**
+  - Reliability: **90/100 = 90%** finished at gate range (≥ 85%): **pass**. By grip: below 0.7×: 21/26; 0.7–0.9×: 20/20; 0.9–1.1×: 30/34; above 1.1×: 19/20. Failures: 4 on the out-lap, 6 on the timed lap.
+  - Speed: nominal timed lap **27.0 s** vs. the hand-coded driver's 25.2 s on the same tracks and protocol: **1.07×** (≤ 1.2×; paired = unpaired, both finished all 20): **pass**. Nominal: 20/20 finished.
+  - The hand-coded driver (knows grip, mass and dirt) on the same 100 gate-range attempts: 100%.
+  - Validation for comparison: 89%, 25.2 s. The test result is 1 point higher on reliability and 1.8 s slower, both within noise.
+- **Verdict: PASS** (first attempt).
 
 ## Handoff to next phase
+
+**Result:** the gate passed on the first attempt. The car finishes 90% of test attempts with physics outside its training range, at 1.07× the hand-coded driver, with no sim-only information while driving. Phase 3's gate car: 96%, but 1.65× and a standing start.
+
+**What got it there (in order of what mattered)**
+1. **Starting from fast driving** (E4): behaviour cloning of the hand-coded driver, then the owner's PPO. From scratch, PPO never found fast driving (33–34 s whatever it knew, E3). Owner: "it just never tried going faster so it doesn't know that would be ok."
+2. **Low exploration noise** in that fine-tune (std 0.15 → 0.05): big noise teaches caution. Owner: "Less noise means it never hits the worst scenarios so it doesn't have to prepare for them."
+3. **Knowing the track's grip:** a map built on an out-lap by **probing the surface** with short brake pulses (locked-wheel deceleration × K is grip), dense enough to resolve dirt (every 3 m), erring toward caution (lowest reading within ±2.5 m). Odometer position, reset at a start-line signal.
+
+**What the owner learned (in their words, condensed)**
+- E1: picking a faster checkpoint helps a little, but it isn't learning racing technique; "it's just getting by."
+- E2/E3: better information didn't make the RL car faster; the limit was what it learned, not what it knew (the agent's E2 reading was corrected after E3).
+- E4: "it never tried going faster"; big exploration noise teaches fear.
+- E5: grip is hard to judge from a short window, so the estimate averages over everything it has seen.
+- E6–E9: one brake test reads one surface; "it has to do multiple brake tests so it sees the full range of surfaces"; "maybe it isn't probing often enough?" (both the owner's ideas, and the fix).
+
+**Surprises worth remembering**
+- A learned grip estimator only reads grip from the driving style it was trained on (E2), and its estimates shrink toward the middle of its training range (E5: +0.16 at 0.55×, −0.20 at 1.0×).
+- You only feel grip near the limit: a gentle out-lap leaves a map blind to dirt (E6). Probing is how a car learns its track.
+- A perfect map was worth 1 s to the from-scratch RL car and 4.5 s to the hand-coded driver (E3): the RL car used it only to slow down.
+- The bar moves with the protocol: an out-lap gives a flying timed lap (hand-coded 23.9–25.2 s vs. 25.4 s standing).
+- Agent mistakes the owner caught: E8 (corner probes) was diagnosed wrongly at first (it blamed speed; the real limit was map sharpness). Owner: "we still haven't tested actual probes."
+
+**Built and reusable** (`sdc/phase35/`)
+- `bc.py`: DAgger behaviour cloning into the owner's network, with critic pre-training; `my_ppo --set init=...` warm start.
+- `probe.py`: the probing out-lap driver (`ProbeDriver`: probe spacing, map stretch, erosion, corner probes with total force) and its calibration.
+- `selfmap.py`: odometer, out-lap map recording and lookup, estimator-driven variant (E5).
+- `e1.py` (checkpoint scoring and picks), `e2.py` (handicapped hand-coded driver), `gate.py`, report scripts.
+- Sim: the oracle `gripmap` sensor (true grip 5–40 m ahead), `trk.TEST35_SEEDS`, `robust.TEST35_PHYSICS_SEED`.
+
+**Open questions and deferred ideas**
+- Seed spread is large (E4 seed 1 never got reliable); only seed 0 was taken to the gate.
+- Odometry assumes the timed-lap line is close to the out-lap line; a fallback is a provided track drawing (owner: acceptable but not preferred).
+- Probing needs a dedicated out-lap with braking pulses: fine on a test track, odd in a race.
+- Sim gaps kept from Phase 3: servo position not observed, ideal speed sensor apart from noise, 10 Hz control.
+
+**For Phase 4 (3D terrain with jumps)**
+- Choose the engine (MuJoCo/MJX, Isaac Lab, Genesis) and set up Modal (account and API token) at entry.
+- Carry over: behaviour cloning from an expert as a starting point, low exploration noise when fine-tuning, probing to learn the surface, the test-set discipline, and a code review for oracle leakage before every gate.

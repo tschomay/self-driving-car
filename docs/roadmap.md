@@ -75,7 +75,7 @@ Each phase has a goal, the concepts it teaches, and a **gate**: a measurable ben
 ### Phase 3.5 — Speed (CPU) — added at the Phase 3 exit
 - **Goal:** close the lap-time gap to the hand-coded driver (Phase 3's reliable car laps in about 34–42 s vs. 25.4 s) without losing robustness.
 - **Learn:** the speed vs. reliability trade-off, multi-objective model selection, reward design for speed, what knowing the track (dirt locations) is worth.
-- **Gate (set 2026-11-11):** on fresh test tracks 30000–30019, ≥ 85% of single laps from a standing start finished with gate-range physics (5 draws per track), **and** mean lap at nominal physics ≤ 1.2× the hand-coded driver on the same tracks.
+- **Gate (set 2026-11-11):** on fresh test tracks 30000–30019, ≥ 85% of single laps from a standing start finished with gate-range physics (5 draws per track), **and** mean lap at nominal physics ≤ 1.2× the hand-coded driver on the same tracks. Refined during the phase (owner): an out-lap then a timed lap, both finished (track memory, after E2); the speed bar is 1.2× the hand-coded driver's flying timed lap on the same protocol (after E5). **Passed 2026-11-12:** 90%, 1.07×.
 
 ### Phase 4 — 3D terrain with jumps (Modal GPU)
 - **Goal:** a 3D rigid-body sim with heightfield terrain, ramps, and an IMU (accelerometer + gyro) in the observation. Candidate engines: MuJoCo/MJX, Isaac Lab, Genesis; to be decided at Phase 4 entry.

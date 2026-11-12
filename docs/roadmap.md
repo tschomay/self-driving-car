@@ -12,6 +12,7 @@ Status: **confirmed 2026-11-04** ([Confirm learning style, budget, and phase pla
   - Phase 2 entry: how long runs survive ephemeral sessions (checkpoint-and-push vs. detached Modal jobs).
   - Phase 3 exit: whether to do Phase 4, and if so which 3D engine (MuJoCo/MJX, Isaac Lab, Genesis, ...). **Decided (2026-11-11):** go to Phase 4 after a Phase 3.5 speed detour; the engine choice and Modal setup move to Phase 4 entry.
   - Phase 3.5 entry: the gate (reliability plus a lap-time target). **Decided (2026-11-11):** ≥ 85% gate-range completion on fresh test tracks 30000–30019, and mean lap at nominal ≤ 1.2× the hand-coded driver on the same tracks.
+  - Phase 4 entry: engine, compute, gate details. **Decided (2026-11-12):** MuJoCo on the CPU (Modal only if a run exceeds about an hour); ≥ 80% of jumps landed (airborne ≥ 0.3 s, four wheels down, no rollover, still driving 1 s later) on fresh procedural jump courses at nominal physics; IMU + wheel speed + terrain rays; the owner writes the GRU memory.
 
 ## Purpose
 
@@ -77,7 +78,7 @@ Each phase has a goal, the concepts it teaches, and a **gate**: a measurable ben
 - **Learn:** the speed vs. reliability trade-off, multi-objective model selection, reward design for speed, what knowing the track (dirt locations) is worth.
 - **Gate (set 2026-11-11):** on fresh test tracks 30000–30019, ≥ 85% of single laps from a standing start finished with gate-range physics (5 draws per track), **and** mean lap at nominal physics ≤ 1.2× the hand-coded driver on the same tracks. Refined during the phase (owner): an out-lap then a timed lap, both finished (track memory, after E2); the speed bar is 1.2× the hand-coded driver's flying timed lap on the same protocol (after E5). **Passed 2026-11-12:** 90%, 1.07×.
 
-### Phase 4 — 3D terrain with jumps (Modal GPU)
+### Phase 4 — 3D terrain with jumps (MuJoCo on CPU; Modal GPU if needed)
 - **Goal:** a 3D rigid-body sim with heightfield terrain, ramps, and an IMU (accelerometer + gyro) in the observation. Candidate engines: MuJoCo/MJX, Isaac Lab, Genesis; to be decided at Phase 4 entry.
 - **Learn:** 3D dynamics, partial observability (the car is airborne, so it uses memory/recurrence), using throttle to control pitch mid-air, massively parallel GPU simulation.
 - **Gate (provisional):** ≥ 80% of jumps landed wheels-down on a held-out jump track, within the $30/month Modal budget.

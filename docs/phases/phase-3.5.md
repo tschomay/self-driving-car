@@ -167,6 +167,7 @@ Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop t
 
 ### E8 — Probes in corners too
 
+- **Prediction (owner, before the run):** "Better, failures now when all traction is used to turn or the map doesn't align."
 - **Setup:** E7 with `--corners`: probes no longer wait for straight steering, and a probe reads the total horizontal acceleration √(ax² + ay²) instead of the braking part alone (a locked, sliding tire gives 0.75 × μ·g in whatever direction it slides). The throttle override still happens only when nearly straight. K = 1.53 from training-range physics (rmse 0.041); gate-range check: mean error 0.034, bias −0.020. Same car, validation set, out-lap + timed lap. `python -m sdc.phase35.probe calibrate|eval --corners`.
 
 ## Gate check

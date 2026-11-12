@@ -37,13 +37,17 @@ V_MIN = 1.5
 STEER_OK = 0.35     # |steering command| below which a probe or a throttle override is allowed
 START_GRIP = 0.7
 CAL = Path("runs/p35-e7-calibration.json")
+CAL_CORNERS = Path("runs/p35-e8-calibration.json")
 ACC_X = dy.OBS_DIM
 
 
 class ProbeDriver(sm.SelfMapDriver):
-    def __init__(self, net, base, k=None, record_truth=False):
+    def __init__(self, net, base, k=None, record_truth=False, corners=False):
+        """corners (Phase 3.5 E8, owner's idea): probe in corners too, reading the total horizontal acceleration
+        (braking and cornering): a locked, sliding tire gives SLIDE_FRAC × μ·g in whatever direction it slides."""
         super().__init__(net, base, est=None)
-        self.k = k if k is not None else json.loads(CAL.read_text())["k"]
+        self.corners = corners
+        self.k = k if k is not None else json.loads((CAL_CORNERS if corners else CAL).read_text())["k"]
         self.record_truth = record_truth
 
     def reset_state(self, n):
@@ -105,7 +109,7 @@ class ProbeDriver(sm.SelfMapDriver):
                 continue
             straight = abs(a[i, 0]) < STEER_OK
             if self.pulse_t[i] == 0 and self.odo[i] >= self.next_probe[i]:
-                if speed[i] >= V_PROBE and straight:
+                if speed[i] >= V_PROBE and (straight or self.corners):
                     self.pulse_t[i] = 1
                     self.reads[i] = []
                     self.pulse_odo[i] = self.odo[i]
@@ -115,7 +119,8 @@ class ProbeDriver(sm.SelfMapDriver):
             if self.pulse_t[i] > 0:
                 a[i, 1] = -1.0
                 if self.pulse_t[i] > SETTLE and speed[i] > V_MIN:
-                    self.reads[i].append(-o[i, ACC_X])
+                    ax, ay = o[i, ACC_X], o[i, ACC_X + 1]
+                    self.reads[i].append(float(np.hypot(ax, ay)) if self.corners else -ax)
                 self.pulse_t[i] += 1
                 if self.pulse_t[i] > PULSE:
                     self.pulse_t[i] = 0
@@ -130,14 +135,14 @@ class ProbeDriver(sm.SelfMapDriver):
         return a
 
 
-def calibrate(run="runs/p35-e5-lo-s0"):
+def calibrate(run="runs/p35-e5-lo-s0", corners=False):
     """K: least squares (through 0) of true surface grip on the K=1 pulse reading, training-range physics only;
     then a check on gate-range physics (not used for fitting)."""
     torch.set_num_threads(1)
     net, base = sm.load_net(run)
 
     def pairs(physics, seed):
-        drv = ProbeDriver(net, base, k=1.0)
+        drv = ProbeDriver(net, base, k=1.0, corners=corners)
         robust.gate_laps(drv, physics=physics, seed=seed, draws=1, outlap=True, **sm.CAR)
         return np.array(drv.truth_pairs)
 
@@ -148,16 +153,16 @@ def calibrate(run="runs/p35-e5-lo-s0"):
     err = k * Q[:, 0] - Q[:, 1]
     res["gate_check"] = dict(n=len(Q), mean_abs=float(np.abs(err).mean()), bias=float(err.mean()),
                              dirt_mean=float((k * Q[Q[:, 1] < 0.9 * np.median(Q[:, 1]), 0]).mean()))
-    CAL.write_text(json.dumps(res, indent=1))
+    (CAL_CORNERS if corners else CAL).write_text(json.dumps(res, indent=1))
     print(res)
 
 
-def evaluate(run, out_name="eval_probe.json", seeds=None, phys_seed=None):
+def evaluate(run, out_name="eval_probe.json", seeds=None, phys_seed=None, corners=False):
     torch.set_num_threads(1)
     t0 = time.perf_counter()
     net, base = sm.load_net(run)
     kw = {} if seeds is None else dict(seeds=seeds)
-    drv = ProbeDriver(net, base)
+    drv = ProbeDriver(net, base, corners=corners)
     nom = robust.laps(drv, outlap=True, **kw, **sm.CAR)
     diag = dict(map_err=float(np.mean(drv.map_err)) if drv.map_err else None,
                 probes_per_lap=float(np.mean(drv.n_probes)))
@@ -174,11 +179,12 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("cmd", choices=["calibrate", "eval"])
     ap.add_argument("--run", default="runs/p35-e5-lo-s0")
+    ap.add_argument("--corners", action="store_true", help="probe in corners too (E8)")
     a = ap.parse_args()
     if a.cmd == "calibrate":
-        calibrate(a.run)
+        calibrate(a.run, corners=a.corners)
     else:
-        evaluate(a.run)
+        evaluate(a.run, out_name="eval_probe_corners.json" if a.corners else "eval_probe.json", corners=a.corners)
 
 
 if __name__ == "__main__":

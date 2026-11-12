@@ -163,6 +163,12 @@ Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop t
 - **Explanation (owner, after the run):** "Great, it's learning the track! I think we could probe corners it just need to account for total force that includes turning. Save that phase 4 if needed."
 - **Takeaway:** probing the surface (feeling the grip near the limit) builds a map good enough for the speed bar and most of the reliability; what's left is unprobed corners and line-to-line position shifts.
 
+**Decision after E7 (owner, 2026-11-12):** one more tweak before the gate: probe in corners too (owner's idea: account for the total force, including turning).
+
+### E8 — Probes in corners too
+
+- **Setup:** E7 with `--corners`: probes no longer wait for straight steering, and a probe reads the total horizontal acceleration √(ax² + ay²) instead of the braking part alone (a locked, sliding tire gives 0.75 × μ·g in whatever direction it slides). The throttle override still happens only when nearly straight. K = 1.53 from training-range physics (rmse 0.041); gate-range check: mean error 0.034, bias −0.020. Same car, validation set, out-lap + timed lap. `python -m sdc.phase35.probe calibrate|eval --corners`.
+
 ## Gate check
 
 ## Handoff to next phase

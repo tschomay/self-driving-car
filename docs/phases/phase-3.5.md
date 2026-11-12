@@ -186,6 +186,6 @@ Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop t
 ## Gate check
 
 - **Candidate and protocol (fixed before any result; owner's go, 2026-11-12):** E9 exactly (E4's low-noise seed-0 network; dense probes every 3 m, corners allowed, total force; 2.5 m map, lowest within ±2.5 m; odometer reset at the line). Test tracks 30000–30019, physics seed 67890, gate-range physics, 5 draws per track. Out-lap then timed lap, both must be finished. Pass: ≥ 85% finished at gate range **and** nominal timed lap ≤ 1.2× the hand-coded driver's timed lap on the same tracks and protocol. Command: `python -m sdc.phase35.gate --run runs/p35-e5-lo-s0`.
-- **Before the run:** a background code review for oracle leakage and evaluation bugs (owner's request).
+- **Before the run:** a background code review (owner's request). No oracle leakage: a full validation run gave identical per-track results with the driver as is, with any read of sim-only truth made to raise, and with the oracle obs columns scrambled each step (89%, 25.185 s, reproducing E9). No blockers. One fix adopted before the run: the speed ratio is **paired** (mean over tracks both drivers finished, `evaluate.compare`), as "on the same tracks" says; the unpaired means are recorded too. Other notes: thin margin (89% vs 85% on 100 attempts, with design choices made on validation), K fitted on validation tracks with training-range physics (a single sensor gain), test tracks and seed unused before the gate.
 
 ## Handoff to next phase

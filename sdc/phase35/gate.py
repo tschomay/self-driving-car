@@ -12,7 +12,7 @@ Test set (never used before): tracks 30000-30019 (trk.TEST35_SEEDS), physics see
 (robust.TEST35_PHYSICS_SEED), gate-range physics, 5 draws per track = 100 attempts. Protocol: an out-lap, then
 the timed lap; both must be finished.
 Pass: >= 85% finished at gate range AND nominal timed lap <= 1.2x the hand-coded driver's timed lap on the same
-test tracks and protocol.
+test tracks and protocol (paired: mean over tracks both finished, evaluate.compare).
 """
 
 from __future__ import annotations
@@ -28,6 +28,7 @@ from sdc.phase3 import robust
 from sdc.phase35 import probe
 from sdc.phase35 import selfmap as sm
 from sdc.racer import dynamics as dy
+from sdc.racer import evaluate
 from sdc.racer import track as trk
 
 GATE, RATIO = 0.85, 1.2
@@ -50,18 +51,23 @@ def main():
     nominal = robust.laps(candidate(a.run), seeds=seeds, outlap=True, **sm.CAR)
     hand_nom = robust.laps(dy.DynamicPursuit(), seeds=seeds, outlap=True, **sm.CAR)
     hand_gate = robust.gate_laps(dy.DynamicPursuit(), seeds=seeds, seed=ps, outlap=True, **sm.CAR)
+    # deciding speed number: paired ratio over tracks both drivers finished (the gate says "on the same tracks";
+    # code review 2026-11-12); the unpaired means are recorded too
+    paired = evaluate.compare(nominal, hand_nom)["lap_time_ratio"]
     bar = RATIO * hand_nom["mean_lap_time"]
     lap = nominal["mean_lap_time"]
     ok_rel = gate["completion"] >= GATE
-    ok_speed = lap is not None and lap <= bar
+    ok_speed = paired is not None and paired <= RATIO
     res = dict(run=a.run, passed=bool(ok_rel and ok_speed), gate=gate, nominal=nominal, hand_nominal=hand_nom,
-               hand_gate_completion=hand_gate["completion"], bar=bar, ratio=(lap / hand_nom["mean_lap_time"]) if lap else None,
+               hand_gate_completion=hand_gate["completion"], bar=bar, paired_ratio=paired,
+               unpaired_ratio=(lap / hand_nom["mean_lap_time"]) if lap else None,
                reliability_pass=ok_rel, speed_pass=ok_speed, wall_s=round(time.perf_counter() - t0))
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     (out / "gate.json").write_text(json.dumps(res, indent=1, default=float))
     print(f"GATE {'PASS' if res['passed'] else 'FAIL'}: gate range {gate['completion']:.0%} (>= 85%: {ok_rel}); "
-          f"nominal {nominal['completion']:.0%}, lap {lap} vs bar {bar:.2f} ({res['ratio']}); "
+          f"nominal {nominal['completion']:.0%}, lap {lap}, paired ratio {paired} (<= 1.2: {ok_speed}; unpaired "
+          f"{res['unpaired_ratio']}); "
           f"hand-coded {hand_nom['mean_lap_time']:.2f} s, gate range {hand_gate['completion']:.0%}")
 
 

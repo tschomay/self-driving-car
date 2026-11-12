@@ -168,7 +168,10 @@ Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop t
 ### E8 — Probes in corners too
 
 - **Prediction (owner, before the run):** "Better, failures now when all traction is used to turn or the map doesn't align."
-- **Setup:** E7 with `--corners`: probes no longer wait for straight steering, and a probe reads the total horizontal acceleration √(ax² + ay²) instead of the braking part alone (a locked, sliding tire gives 0.75 × μ·g in whatever direction it slides). The throttle override still happens only when nearly straight. K = 1.53 from training-range physics (rmse 0.041); gate-range check: mean error 0.034, bias −0.020. Same car, validation set, out-lap + timed lap. `python -m sdc.phase35.probe calibrate|eval --corners`.
+- **Setup:** E7 with `--corners`: probes no longer wait for straight steering, and a probe reads the total horizontal acceleration √(ax² + ay²) instead of the braking part alone (a locked, sliding tire gives 0.75 × μ·g in whatever direction it slides). The throttle override still happens only when nearly straight. K = 1.53 from training-range physics (rmse 0.041); gate-range check: mean error 0.034, bias −0.020. Same car, validation set, out-lap + timed lap. `python -m sdc.phase35.probe calibrate|eval --corners`; report `python -m sdc.phase35.e8_report`.
+- **Result (validation set):** [report](https://claude.ai/artifact/3Rh4vw9Z6TCWCj4FFHNmDe). Gate range **78%** (E7: 78%), nominal 100%, 24.6 s. By grip: below 0.7×: 16/27; 0.7–0.9×: 23/26; 0.9–1.1×: 26/28; above 1.1×: 13/19. Failures: 4 on the out-lap, 18 on the timed lap.
+  - Checked: corner probes barely happened. On the 20 nominal tracks: 611 probes (E7: 600); share taken while turning (gyro reading above 0.1): 50% (E7: 49%). A probe needs 6 m/s, the cautious out-lap corners slower than that, and the throttle override only acts when nearly straight. Speed, not the steering rule, kept probes out of corners.
+- **Explanation (owner, after the run):** _pending_
 
 ## Gate check
 

@@ -160,7 +160,8 @@ Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop t
   - By grip: below 0.7×: 18/27 (E5: 1/27); 0.7–0.9×: 19/26; 0.9–1.1×: 26/28; above 1.1×: 15/19.
   - Map error on the timed lap 0.05 (E5: 0.24); about 30 probes per out-lap. Of 22 failures, 3 on the out-lap and 19 on the timed lap: unprobed dirt in corners and the position shift between the out-lap and timed-lap lines.
   - Speed bar met (24.5 s vs. 28.7 s); reliability 7 points short on validation.
-- **Explanation (owner, after the run):** _pending_
+- **Explanation (owner, after the run):** "Great, it's learning the track! I think we could probe corners it just need to account for total force that includes turning. Save that phase 4 if needed."
+- **Takeaway:** probing the surface (feeling the grip near the limit) builds a map good enough for the speed bar and most of the reliability; what's left is unprobed corners and line-to-line position shifts.
 
 ## Gate check
 

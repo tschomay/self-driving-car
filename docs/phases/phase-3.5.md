@@ -180,8 +180,12 @@ Dropped after E2 (owner, 2026-11-11): a speed reward and estimator-in-the-loop t
 - **Result (validation set):** [report](https://claude.ai/artifact/ATEPp25KRvii1dbYC4Gea3). Gate range **89%** (E7/E8: 78%; true grip and map: 86%), nominal 100%, timed lap **25.2 s** (bar 28.7 s). By grip: below 0.7×: 24/27; 0.7–0.9×: 23/26; 0.9–1.1×: 27/28; above 1.1×: 15/19. Failures: 2 on the out-lap, 9 on the timed lap; about 51 probes per out-lap; map error 0.06.
   - It edges past the true-map car mostly on the out-lap (that car: 9 out-lap crashes at full knowledge; this one: 2, on slow probing laps); the cautious map adds margin on the timed lap.
   - Both validation targets met. Validation ran 4 points above test in Phase 3, so the gate is not a sure pass.
-- **Explanation (owner, after the run):** _pending_
+- **Explanation (owner, after the run):** none given; the owner went straight to the gate ("Go"). Their question before the run ("Maybe it isn't probing often enough?") was the mechanism.
+- **Takeaway:** probing densely enough to resolve the dirt, with a map that errs toward caution, gives a self-built map as good as the true one for this car.
 
 ## Gate check
+
+- **Candidate and protocol (fixed before any result; owner's go, 2026-11-12):** E9 exactly (E4's low-noise seed-0 network; dense probes every 3 m, corners allowed, total force; 2.5 m map, lowest within ±2.5 m; odometer reset at the line). Test tracks 30000–30019, physics seed 67890, gate-range physics, 5 draws per track. Out-lap then timed lap, both must be finished. Pass: ≥ 85% finished at gate range **and** nominal timed lap ≤ 1.2× the hand-coded driver's timed lap on the same tracks and protocol. Command: `python -m sdc.phase35.gate --run runs/p35-e5-lo-s0`.
+- **Before the run:** a background code review for oracle leakage and evaluation bugs (owner's request).
 
 ## Handoff to next phase

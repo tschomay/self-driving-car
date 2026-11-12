@@ -47,6 +47,11 @@
 
 ## Experiments
 
+### E1 — Can PPO learn to jump from scratch?
+
+- **Prediction (owner, before the run):** "75% and only kind of" (it will only partly learn to use throttle in the air).
+- **Setup:** the owner's PPO (textbook clip, GAE, squared-error critic) with the Phase 1 network (two 64-unit layers, no memory), real sensors only (20 inputs), tanh-squashed actions, γ 0.99, λ 0.95, linear LR decay from 3e-4, 8 cars × 256 steps per update, 1M steps, seeds 0–2, 1 torch thread. Early stopping: best validation landing rate among checkpoints every 50k steps. `python -m sdc.phase4.train --seed S --steps 1000000 --out runs/p4-e1-sS`.
+
 ## Gate check
 
 ## Handoff to next phase

@@ -1,0 +1,133 @@
+"""The 3D RC car in MuJoCo: a 1/10-scale 4WD off-road buggy on a heightfield jump course.
+
+Car (body frame: x forward, y left, z up):
+  - chassis 0.46 x 0.18 x 0.07 m (8 cm bumper overhang front and rear), 1.8 kg; four wheels (spheres, r = 5.5 cm, 0.12 kg) on sprung
+    suspension (8 cm travel), front wheels steer up to ±0.4 rad through a position servo.
+  - 4WD electric motor per wheel: torque = 0.25 N·m × throttle − back-EMF drag, top speed
+    about 14 m/s. throttle < 0 brakes, then reverses.
+  - The motor pushes against the chassis, so in the air spinning the wheels up tips the nose
+    UP and braking them tips the nose DOWN: that's how a real RC car steers its pitch mid-air.
+
+Physics: 2 ms steps (implicitfast); the policy acts at 50 Hz (10 physics steps per action).
+The rays are cast once per action (mj_multiRay against the ground only), not as MuJoCo
+rangefinder sensors, which would be recomputed every physics step at 10x the cost.
+
+Sensors the policy may use (real sensors on a real car):
+  accelerometer (3, body frame, includes gravity), gyro (3), wheel speeds (front, rear, m/s),
+  8 range-finder rays from the front bumper (3° above to 50° below the chassis' forward axis,
+  like a small lidar), 2 sideways rays (to the banks), and its own last action (2).
+Oracle quantities (training/expert only, never the gate car): pose, velocity, terrain ahead.
+"""
+
+from __future__ import annotations
+
+import numpy as np
+
+import mujoco
+
+from sdc.jumps import course as crs
+
+TIMESTEP = 0.002
+SUBSTEPS = 10                   # 50 Hz control
+DT = TIMESTEP * SUBSTEPS
+WHEEL_R = 0.055
+TAU_MAX = 0.25                  # N·m per wheel
+TOP_SPEED = 14.0                # m/s, back-EMF limit
+STEER_MAX = 0.4                 # rad
+RAY_ANGLES = (-3, 0, 2, 4, 7, 12, 25, 50)   # deg below the chassis' forward axis (-3 = slightly up)
+RAY_CUTOFF = 6.0
+WHEELS = ("fl", "fr", "rl", "rr")
+CORNER = dict(fl=(0.15, 0.14), fr=(0.15, -0.14), rl=(-0.15, 0.14), rr=(-0.15, -0.14))
+MOUNT_Z = -0.05
+
+
+RAY_SITES = [f"ray{i}" for i in range(len(RAY_ANGLES))] + ["rayL", "rayR"]
+
+
+def cast_rays(m, d, site_ids):
+    """Distance along each ray site's z axis to the ground (geom group 0); RAY_CUTOFF if nothing within it."""
+    origins = d.site_xpos[site_ids]
+    vec = d.site_xmat[site_ids].reshape(len(site_ids), 3, 3)[:, :, 2]
+    dist = np.empty(len(site_ids))
+    for o in np.unique(origins, axis=0):   # mj_multiRay casts a fan from one point: one call per origin
+        sel = np.flatnonzero((origins == o).all(1))
+        sub, gid = np.empty(len(sel)), np.empty(len(sel), np.int32)
+        mujoco.mj_multiRay(m, d, o.astype(np.float64), np.ascontiguousarray(vec[sel]).ravel(),
+                           np.array([1, 0, 0, 0, 0, 0], np.uint8), True, -1, gid, sub, None, len(sel), RAY_CUTOFF)
+        dist[sel] = sub
+    dist[(dist < 0) | (dist > RAY_CUTOFF)] = RAY_CUTOFF
+    return dist
+
+
+def _site_zaxis(direction):
+    d = np.asarray(direction, float)
+    return " ".join(f"{v:.5f}" for v in d / np.linalg.norm(d))
+
+
+def model_xml() -> str:
+    L, W = crs.LENGTH, crs.WIDTH
+    rays = []
+    for i, a in enumerate(RAY_ANGLES):
+        r = np.deg2rad(a)
+        rays.append(f'<site name="ray{i}" pos="0.235 0 0.02" zaxis="{_site_zaxis((np.cos(r), 0, -np.sin(r)))}" size=".005"/>')
+    rays.append('<site name="rayL" pos="0 0.095 0.02" zaxis="0 1 0" size=".005"/>')
+    rays.append('<site name="rayR" pos="0 -0.095 0.02" zaxis="0 -1 0" size=".005"/>')
+    corners = []
+    for w in WHEELS:
+        cx, cy = CORNER[w]
+        steer = (f'<joint name="{w}_steer" type="hinge" axis="0 0 1" range="-{STEER_MAX} {STEER_MAX}" '
+                 f'damping="0.05" armature="0.0005"/>') if w[0] == "f" else ""
+        corners.append(f'''
+      <body name="{w}" pos="{cx} {cy} {MOUNT_Z}">
+        <inertial pos="0 0 0" mass="0.05" diaginertia="2e-5 2e-5 2e-5"/>
+        <joint name="{w}_susp" type="slide" axis="0 0 1" range="-0.03 0.05" stiffness="1500" damping="30"
+               limited="true" solreflimit="0.005 1" armature="0.01"/>
+        {steer}
+        <body name="{w}_wheel">
+          <joint name="{w}_spin" type="hinge" axis="0 1 0" damping="{TAU_MAX / (TOP_SPEED / WHEEL_R):.6f}"/>
+          <geom name="{w}_tire" type="sphere" group="1" contype="1" conaffinity="0" margin="0.01" gap="0.01" size="{WHEEL_R}" mass="0.12" friction="1.0 0.005 0.0001"
+                rgba=".15 .15 .15 1"/>
+        </body>
+      </body>''')
+    sensors = ['<accelerometer name="accel" site="imu"/>', '<gyro name="gyro" site="imu"/>']
+    sensors += [f'<jointvel name="{w}_w" joint="{w}_spin"/>' for w in WHEELS]
+    motors = "\n    ".join(f'<motor name="{w}_motor" joint="{w}_spin" gear="{TAU_MAX}" ctrlrange="-1 1"/>'
+                           for w in WHEELS)
+    return f'''<mujoco model="rc-buggy">
+  <compiler angle="radian"/>
+  <option timestep="{TIMESTEP}" integrator="implicitfast"/>
+  <visual><global offwidth="640" offheight="360"/></visual>
+  <asset>
+    <hfield name="terrain" nrow="{crs.NROW}" ncol="{crs.NCOL}" size="{L / 2} {W / 2} {crs.ZMAX} 0.3"/>
+  </asset>
+  <worldbody>
+    <geom name="ground" type="hfield" contype="0" conaffinity="1" hfield="terrain" pos="{L / 2} 0 0" friction="1.0 0.005 0.0001"
+          rgba=".6 .5 .35 1"/>
+    <body name="car" pos="{crs.START_X} 0 0.25">
+      <freejoint name="root"/>
+      <geom name="chassis" type="box" group="1" contype="1" conaffinity="0" size="0.23 0.09 0.035" mass="1.8" rgba=".12 .44 .92 1"/>
+      <site name="imu" pos="0 0 0" size=".01"/>
+      {"".join(rays)}
+      {"".join(corners)}
+    </body>
+  </worldbody>
+  <actuator>
+    {motors}
+    <position name="fl_servo" joint="fl_steer" kp="3" ctrlrange="-{STEER_MAX} {STEER_MAX}"/>
+    <position name="fr_servo" joint="fr_steer" kp="3" ctrlrange="-{STEER_MAX} {STEER_MAX}"/>
+  </actuator>
+  <sensor>
+    {chr(10).join(sensors)}
+  </sensor>
+</mujoco>'''
+
+
+_BASE = None
+
+
+def build_model() -> mujoco.MjModel:
+    """A fresh model (each env owns one so each can hold its own course in the heightfield)."""
+    global _BASE
+    if _BASE is None:
+        _BASE = model_xml()
+    return mujoco.MjModel.from_xml_string(_BASE)

@@ -130,3 +130,31 @@ def steering_stats(policy, courses=None):
                 break
     return dict(steer_abs=round(float(np.mean(st)), 2), steer_change=round(float(np.mean(dst)), 2),
                 sign_flips=round(flips / max(len(dst), 1), 2))
+
+
+def speed_stats(policy, courses=None):
+    """Approach speed (last metre before each kicker), throttle on the ground, and time to finish (finished runs)."""
+    courses = courses or crs.VAL_SEEDS
+    v_app, thr, times = [], [], []
+    for seed in courses:
+        b = je.JumpBatch(1, courses=[seed], **getattr(policy, "env_kw", {}))
+        c = b.cars[0]
+        b._obs = c.reset(seed)[None]
+        if hasattr(policy, "reset"):
+            policy.reset(1)
+        while True:
+            a = np.asarray(policy(b))[0]
+            s = c.state()
+            nxt = [j for j in c.course.jumps if j.start > s["x"]]
+            if nxt and nxt[0].start - s["x"] < 1.0:
+                v_app.append(s["v_fwd"])
+            if not c.airborne:
+                thr.append(a[1])
+            _, term, trunc, reason = c.step(a)
+            b._obs = c.obs()[None]
+            if term or trunc:
+                if reason == "finished":
+                    times.append(c.t * 0.02)
+                break
+    return dict(approach_speed=round(float(np.mean(v_app)), 2), ground_throttle=round(float(np.mean(thr)), 2),
+                finish_time=round(float(np.mean(times)), 2) if times else None, n_finished=len(times))

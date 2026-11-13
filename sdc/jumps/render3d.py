@@ -32,7 +32,7 @@ def _overlay(img, who, lines, act, end=None, good=True):
         d.text((10, 30 + i * 18), line, font=_font(13), fill=INK if i == 0 else MUTED)
     gy = 26 + 40 + H + 8
     for label, val, gx, pc, nc in (("brake ◀ throttle ▶ gas", act[1], 10, GAS, BRAKE),
-                                   ("right ◀ steer ▶ left", act[0], W // 2 + 10, CAR, CAR)):
+                                   ("left ◀ steer ▶ right", -float(act[0]), W // 2 + 10, CAR, CAR)):
         gw = W // 2 - 30
         d.rectangle([gx, gy, gx + gw, gy + 8], fill=(232, 236, 241))
         mid = gx + gw / 2

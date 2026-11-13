@@ -159,6 +159,26 @@
   - What PPO changed, seed 1, copy → 1M steps: approach speed 6.9 → 7.5 m/s, ground throttle 0.74 → 0.88, off-the-lane runs on 10 courses 2 → 8. It trades landings for speed, as in Phase 3.
   - Validation is about 4 points above the 80% bar. Phase 3's validation ran about 4 points above its test.
   - Prediction vs. result: 80% predicted for the copy, about 90% measured. "Fine-tuning raises it slightly": only for the first 150k steps, then it lowers it.
+- **Explanation (owner, after the run):** "In 3.5 we had to add a lap bonus that locked in good driving before PPO could give reliable speed. Is there something similar here?" There isn't: the reward is +1 per metre and 10 per landed jump, with no bonus for finishing a course, so nothing locks in reliability once PPO starts chasing speed. This led to E5.
+- **Also (owner):** the GIFs' steering gauge read backwards. The wiring was checked (steer +1 turns the car left: 50° of yaw to the left) and only the display was mirrored. Fixed in both GIF types: a left turn puts the bar on the left.
+
+### E5 — A finish bonus to lock in reliability
+
+- **Prediction (owner, before the run):** "Slide a little but speed improves. Maybe 85-88%."
+- **Setup:** E4's fine-tune exactly (same three copies, the owner's PPO, std 0.15 → 0.05, γ 0.997, 1M steps, seeds 0–2) plus `--env finish_bonus=100` (the size of Phase 3.5's lap bonus). The copies' critic was pre-trained without the bonus. `sdc/phase4/e5_runs.sh`.
+- **Result (validation, 180 jumps per seed, one car at a time):** [report](https://claude.ai/artifact/Dbn14aWZLTR8Asc8vXzAoc).
+
+  | Run | Kept checkpoint | End of training | Finish time (kept) |
+  |---|---|---|---|
+  | Copy (E4) | 92 / 88 / 87% | | 11.6–11.7 s |
+  | Copy + PPO (E4) | 92 / 94 / 91% | 59 / 58 / 47% | 11.5–11.7 s |
+  | Copy + PPO + finish bonus (E5) | 92 / 94 / 96% | 89 / 72 / 75% | 11.6–11.7 s |
+  | Expert | 95% | | 11.7 s |
+
+  - The bonus about halves the slide. Kept checkpoints: seed 0 at 150k, seed 1 at 100k, seed 2 at 400k steps (seed 2 kept improving until then).
+  - Speed didn't change: about 11.6–12.2 s to finish for every car, and approach speed 6.7–7.2 m/s. The jumps are built for 6–7.5 m/s, so there's little time to gain.
+  - What's left: losing the lane after landings, and one seed stopping after casing gaps.
+  - Prediction vs. result: "slide a little but speed improves, 85–88%". The slide was smaller than without the bonus but still large for 2 of 3 seeds (end 72–89%). Kept checkpoints 92–96%. Speed: no change.
 - **Explanation (owner, after the run):** pending.
 
 ## Gate check

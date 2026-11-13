@@ -69,6 +69,36 @@
   - Prediction vs. result: 75% predicted, 42% measured. "Only kind of" using the air throttle: correct, it barely does.
 - **Explanation (owner, after the run):** "I don't think what it does with the throttle matters too much while it's still spazzing out. It probably never learned because it's barely driving in the first place." From the GIFs: the car seems to jump even on flat ground, and the steering saws back and forth again ("no fast/reliable car drives like it's having a seizure"). Their guess: it aims for an exact centre line and overshoots; being content with "close enough", a PID-like approach, or knowing where the throttle and steering currently are might help. Asked for a background review of the sim first, then debugging, and to come back with guidance.
 
+### After E1: sim review and steering debug (owner's request, 2026-11-13)
+
+[Report](https://claude.ai/artifact/Y3T1ZzdKaVt9nC2pQnYgj1). A background code review of the sim, then four debug runs (1M steps each, before the sim fixes).
+
+- **"Jumping on the flats" was mostly the renderer.**
+  - The GIF drew the ground from the smooth course plan, 2–8 cm below the real surface, and stretched heights 1.75×.
+  - In the sim, wheels never leave flat ground at any speed, even with full-lock sawing. Real flat-ground air is only bounces after landings and hits on the banks.
+- **Sim fixes from the review:**
+  - The GIF draws the true surface at one scale for both axes.
+  - The tires no longer float 1 cm above the ground (a contact margin; its gap setting has no effect in MuJoCo 4).
+  - "On the ground" now means within 1 cm, measured by distance.
+  - The accelerometer is averaged over each 20 ms step.
+  - "Off the lane" ends the run when the car's centre crosses the lane edge (|y| > 1.5 m).
+  - The expert's landing guess uses the true ground.
+  - After the fixes: expert 96%, expert without air control 54% (180 jumps).
+- **The car couldn't see its heading.** Its rays pointed straight ahead and straight sideways, which read the same for ±9° of heading. Even the expert's steering law, given only the sensors, weaves off the lane.
+  - Added an optional fan of 6 level rays (20°, 35°, 60° left and right): `--env fan=true`.
+- **The sawing comes from the exploration noise.** The noise is about 1 (the whole steering range), 50 times a second. The servo can't follow it, so sawing costs nothing (as in Phase 3).
+
+| Run | Steering change per step | Sign flips | Landed (180 jumps) |
+|---|---|---|---|
+| E1 seed 0 | 1.37 | 98% | 36% |
+| Fan rays only | 1.88 | 98% | 55% |
+| Noise schedule 0.5 → 0.1 only | 0.32 | 54% | 46% |
+| Fan + noise schedule, seed 0 | 0.25 | 42% | 57% |
+| Fan + noise schedule, seed 1 | 0.10 | 27% | 48% |
+
+- **Owner's centre-line guess:** there is no centre-line target in the reward. The weaving came from missing heading information, and the sawing from the noise. The policy already sees its last command, though not the servo's actual angle.
+- **Next:** fan rays + noise schedule on the fixed sim, 3 seeds (`runs/p4-e1b-s*`), as the new baseline for E2/E3.
+
 ## Gate check
 
 ## Handoff to next phase

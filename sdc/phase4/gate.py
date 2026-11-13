@@ -35,9 +35,10 @@ def main():
     eps = dr.run(pol, crs.TEST_SEEDS, n_envs=1, starts=dr.STARTS)
     sc = dr.score(eps)
     ex = dr.score(dr.run(dr.ExpertDriver(**EXPERT), crs.TEST_SEEDS, n_envs=1, starts=dr.STARTS))
+    val = dr.score(dr.run(pol, crs.VAL_SEEDS, n_envs=1, starts=dr.STARTS))   # same scoring, for comparison
     commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
     res = dict(run=str(d), commit=commit, courses=crs.TEST_SEEDS, starts=list(dr.STARTS), bar=BAR,
-               verdict="PASS" if sc["rate"] >= BAR else "FAIL", score=sc, expert=ex, episodes=eps)
+               verdict="PASS" if sc["rate"] >= BAR else "FAIL", score=sc, expert=ex, validation=val, episodes=eps)
     (d / "gate.json").write_text(json.dumps(res, indent=1, default=float))
     print(f"GATE {res['verdict']}: landed {sc['landed']}/{sc['jumps']} = {sc['rate']:.1%} (bar {BAR:.0%}); "
           f"expert {ex['rate']:.1%}; by kind {sc['by_kind']}; endings {sc['reasons']}")
@@ -51,7 +52,7 @@ def main():
 &nbsp;{sc['landed']} of {sc['jumps']} test jumps landed: <b>{sc['rate']:.1%}</b> (bar {BAR:.0%}).</p>
 <p>Test courses 40000–40019, never used before, each from 3 start points; nominal physics; one car at a time.
 The hand-coded expert, which reads the true state, lands {ex['rate']:.1%} of the same jumps.
-Validation for this car: {m['final']['rate']:.0%}.</p></div>""",
+Validation for this car, scored the same way: {val['rate']:.1%}.</p></div>""",
         "<h2>By jump and ending</h2>" + rp.table(["", "gap", "table", "drop", "finished runs"],
                                                  [["gate car", sc["by_kind"]["gap"], sc["by_kind"]["table"], sc["by_kind"]["drop"], f"{sc['finished']:.0%}"],
                                                   ["expert", ex["by_kind"]["gap"], ex["by_kind"]["table"], ex["by_kind"]["drop"], f"{ex['finished']:.0%}"]])

@@ -190,5 +190,10 @@
   - Pass: ≥ 80% of the 180 jumps landed under the entry definition (≥ 0.3 s airborne; within 1 s all four wheels down, no chassis contact, upright and still driving; a ramp not jumped counts as missed).
   - Command: `python -m sdc.phase4.gate --run runs/p4-e5-fb-s2`.
   - Before the run: a background code review for oracle leakage (sim-only state reaching the gate car).
+- **Pre-gate review (2026-11-13):**
+  - No oracle leakage: the car's actions were identical with every sim-only read made to raise.
+  - The gate script is correct, `model.pt` is the 400k checkpoint, and the test set is unused.
+  - One fix adopted before the run: the "no chassis contact" check looked once per 20 ms control step and missed brief bumper taps inside a step. It now looks after every 2 ms physics step from takeoff through the landing window.
+  - Under the strict check, validation (one car at a time) is: gate car 164/180 = 91.1% (was 93.3%), expert 92.8%. Earlier experiments' numbers carry the same small optimism, about 2 points.
 
 ## Handoff to next phase

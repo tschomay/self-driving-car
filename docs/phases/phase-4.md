@@ -138,6 +138,12 @@
 - **Takeaway:** memory alone didn't help; credit reaching back to the approach (γ) and a starting point that already jumps (E4) are the next levers.
 - **Resume:** training saves its state at every evaluation and resumes after a container restart. The first E3 baseline runs were lost to a restart at 650k–750k steps.
 
+### E4 — Start from the expert, then fine-tune
+
+- **Setup:**
+  1. **Behaviour clone** (`python -m sdc.phase4.bc --out runs/p4-e4-bc-sS --seed S`): DAgger, 6 rounds × 50k steps, the owner's network on E3's real sensors, critic pre-trained on γ 0.997 returns. The expert to copy is the version at a steady 7.1 m/s: 95% on validation, as good as the per-jump design-speed version (96%), and its speed choice is something the student can see (wheel speed).
+  2. **Fine-tune** with the owner's PPO from the clone: `--set init=.../model.pt std_cap=[0.15,0.05] gamma=0.997`, E3's environment options, 1M steps, seeds 0–2.
+
 ## Gate check
 
 ## Handoff to next phase

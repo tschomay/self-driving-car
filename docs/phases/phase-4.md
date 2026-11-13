@@ -111,6 +111,10 @@
   - the actual steering angle in the observation;
   - a steering-change cost of 0.03 × |Δsteer| per step;
   - the noise schedule (0.5 → 0.1).
+- **Prediction (owner, before the run):** "70% and yes" (the GRU car lands about 70% and uses the throttle in the air).
+- **Setup:** 1M steps, seeds 0–2 for each car, everything above on, 1 torch thread.
+  - No memory: `python -m sdc.phase4.train --seed S --out runs/p4-e3-mlp-sS --env fan=true --env servo=true --env steer_cost=0.03 --set 'std_cap=[0.5,0.1]'`
+  - GRU: the same with `sdc.phase4.train_rnn` and `--out runs/p4-e3-gru-sS`.
 - **Resume:** training saves its state at every evaluation and resumes after a container restart. The first E3 baseline runs were lost to a restart at 650k–750k steps.
 
 ## Gate check

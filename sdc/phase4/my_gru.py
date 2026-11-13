@@ -50,8 +50,11 @@ def reset_memory(h, episode_started):
 
     h: (batch, n_hidden); episode_started: (batch,) float, 1.0 where that car just began a new course.
     Return the memory to use for this step.
+
+    Owner's choice (2026-11-13): (a) zero it, "so each course starts fresh. An old course
+    [shouldn't] impact how you drive now aside from the training you've done."
     """
-    return None
+    return h * (1.0 - episode_started[:, None])      # blank memory for cars that just started a course
 
 
 CONFIG = dict(

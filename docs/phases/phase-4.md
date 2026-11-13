@@ -145,6 +145,21 @@
 - **Setup:**
   1. **Behaviour clone** (`python -m sdc.phase4.bc --out runs/p4-e4-bc-sS --seed S`): DAgger, 6 rounds × 50k steps, the owner's network on E3's real sensors, critic pre-trained on γ 0.997 returns. The expert to copy is the version at a steady 7.1 m/s: 95% on validation, as good as the per-jump design-speed version (96%), and its speed choice is something the student can see (wheel speed).
   2. **Fine-tune** with the owner's PPO from the clone: `--set init=.../model.pt std_cap=[0.15,0.05] gamma=0.997`, E3's environment options, 1M steps, seeds 0–2.
+- **Result (validation, 180 jumps per seed, one car at a time):** [report](https://claude.ai/artifact/EjtwPrUYbNqPLY9HkXV9iq).
+
+  | Driver | Landed | Air throttle ↔ pitch error | Pitch − slope at touchdown |
+  |---|---|---|---|
+  | Expert (steady 7.1 m/s) | 95% | 0.78 | −0.3° |
+  | Copy, seeds 0–2 | 89 / 90 / 91% | 0.66–0.69 | −6 to −9° |
+  | Copy + PPO (kept checkpoint), seeds 0–2 | 89 / 92 / 89% | 0.66–0.69 | −7 to −9° |
+  | E3, no memory (mean) | 50% | about 0 | |
+
+  - The copy uses the throttle in the air: it learned the expert's pitch control from its sensors alone. What's left is mostly "off the lane" after landings, and gaps.
+  - Fine-tuning gains 2–6 points in the first 150k steps, then slides to 47–63% by 1M (re-scored curves). Kept checkpoints: seed 0 at step 0 (the copy itself), seeds 1–2 at 150k.
+  - What PPO changed, seed 1, copy → 1M steps: approach speed 6.9 → 7.5 m/s, ground throttle 0.74 → 0.88, off-the-lane runs on 10 courses 2 → 8. It trades landings for speed, as in Phase 3.
+  - Validation is about 4 points above the 80% bar. Phase 3's validation ran about 4 points above its test.
+  - Prediction vs. result: 80% predicted for the copy, about 90% measured. "Fine-tuning raises it slightly": only for the first 150k steps, then it lowers it.
+- **Explanation (owner, after the run):** pending.
 
 ## Gate check
 

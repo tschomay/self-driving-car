@@ -79,7 +79,14 @@ def main():
 <p>With the finish bonus, the kept checkpoints land <span class="big2">{mean['fb']:.0%}</span> and the end of training
 <b>{mfin['fb']:.0%}</b> (E4 without the bonus: kept {mean['ft']:.0%}, end {mfin['ft']:.0%}; the copy {mean['bc']:.0%}).
 Your prediction: slides a little but speed improves, 85–88%.</p>
-<p>{{FINDING}}</p></div>""",
+<p><b>The bonus cuts the slide.</b> By the end of training the fine-tunes land 89/72/75% (E4: 59/58/47%), and the
+best kept checkpoints 92/94/96%, against the copy's 87–92%. Seed 2 kept improving until 400k steps. It still slides
+after its peak, but by about half as much.</p>
+<p><b>Speed didn't change.</b> The time to finish a course is about 11.6–12.2 s for every car, the expert included (11.7 s),
+and approach speeds stay at 6.7–7.2 m/s. The jumps are built for 6–7.5 m/s, so there's little time to gain, and E4's extra
+throttle (0.85–0.89 at the end) bought nothing: it ran off the lane instead.</p>
+<p><b>What still goes wrong:</b> losing the lane after landings (off the lane), and, for one seed, stopping after casing
+a gap (stuck). Steering is still smooth (0.03–0.08 change per step).</p></div>""",
         "<h2>Fine-tune learning curves</h2>" + rp.curve(curves)
         + rp.legend([(0, "E4: no finish bonus", f"end {mfin['ft']:.0%}"), (1, "E5: finish bonus 100", f"end {mfin['fb']:.0%}")])
         + "<p class='caption'>Validation landing rate of every 50k-step checkpoint (180 jumps); step 0 is the copy.</p>",

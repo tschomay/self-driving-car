@@ -162,6 +162,11 @@
 - **Explanation (owner, after the run):** "In 3.5 we had to add a lap bonus that locked in good driving before PPO could give reliable speed. Is there something similar here?" There isn't: the reward is +1 per metre and 10 per landed jump, with no bonus for finishing a course, so nothing locks in reliability once PPO starts chasing speed. This led to E5.
 - **Also (owner):** the GIFs' steering gauge read backwards. The wiring was checked (steer +1 turns the car left: 50° of yaw to the left) and only the display was mirrored. Fixed in both GIF types: a left turn puts the bar on the left.
 
+### E5 — A finish bonus to lock in reliability
+
+- **Prediction (owner, before the run):** "Slide a little but speed improves. Maybe 85-88%."
+- **Setup:** E4's fine-tune exactly (same three copies, the owner's PPO, std 0.15 → 0.05, γ 0.997, 1M steps, seeds 0–2) plus `--env finish_bonus=100` (the size of Phase 3.5's lap bonus). The copies' critic was pre-trained without the bonus. `sdc/phase4/e5_runs.sh`.
+
 ## Gate check
 
 ## Handoff to next phase

@@ -90,6 +90,18 @@ def train(seed=0, total_timesteps=1_000_000, out="runs/p4", eval_every=50_000, l
     obs = _t(batch.reset())
     episodes, evals, steps, next_eval = [], [], 0, 0
     t0 = time.perf_counter()
+    resumed = []
+    if (out / "resume.pt").exists():   # pick up after a container restart (state saved at every evaluation)
+        r = torch.load(out / "resume.pt", weights_only=False)
+        net.load_state_dict(r["net"])
+        opt.load_state_dict(r["opt"])
+        steps, next_eval, evals, episodes = r["steps"], r["next_eval"], r["evals"], r["episodes"]
+        resumed = r.get("resumed", []) + [steps]
+        t0 -= r["wall"]
+        torch.manual_seed(seed + steps)
+        batch = je.JumpBatch(cfg["n_envs"], seed=seed + steps, **env_cfg)   # fresh courses; env state isn't saved
+        obs = _t(batch.reset())
+        print(f"resumed at {steps} steps", flush=True)
     while steps < total_timesteps:
         if steps >= next_eval:
             if cfg["select"]:
@@ -99,6 +111,8 @@ def train(seed=0, total_timesteps=1_000_000, out="runs/p4", eval_every=50_000, l
             print(f"[{steps:>8}] val landed {evals[-1]['rate']:.0%} finished {evals[-1]['finished']:.0%} "
                   f"({evals[-1]['wall_s']:.0f}s)", flush=True)
             next_eval += eval_every
+            torch.save(dict(net=net.state_dict(), opt=opt.state_dict(), steps=steps, next_eval=next_eval, evals=evals,
+                            episodes=episodes, wall=time.perf_counter() - t0, resumed=resumed), out / "resume.pt")
         frac = min(steps / total_timesteps, 1.0)
         if cfg["std_cap"]:
             cap = cfg["std_cap"][0] + (cfg["std_cap"][1] - cfg["std_cap"][0]) * frac
@@ -165,7 +179,7 @@ def train(seed=0, total_timesteps=1_000_000, out="runs/p4", eval_every=50_000, l
     torch.save(net.state_dict(), out / "model.pt")
     final = evaluate(greedy, starts=dr.STARTS, size=env_cfg["size"], fan=env_cfg["fan"], servo=env_cfg["servo"])
     m = dict(label=label, seed=seed, threads=threads, ppo=cfg, env=env_cfg, total_timesteps=total_timesteps,
-             trained_timesteps=steps, train_wall_s=round(train_s, 1), episodes=episodes, evals=evals,
+             trained_timesteps=steps, resumed_at=resumed, train_wall_s=round(train_s, 1), episodes=episodes, evals=evals,
              selection=selection, final={k: v for k, v in final.items() if k != "episodes"},
              final_episodes=final["episodes"])
     if gif:

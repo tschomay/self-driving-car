@@ -99,6 +99,20 @@
 - **Owner's centre-line guess:** there is no centre-line target in the reward. The weaving came from missing heading information, and the sawing from the noise. The policy already sees its last command, though not the servo's actual angle.
 - **Next:** fan rays + noise schedule on the fixed sim, 3 seeds (`runs/p4-e1b-s*`), as the new baseline for E2/E3.
 
+### E3 — Does your GRU memory help in the air?
+
+- **Owner's GRU (`sdc/phase4/my_gru.py`, 2026-11-13):**
+  1. **Update:** blend with an update gate plus a reset gate (a standard GRU). "B is the best blend where older memories are kept but down weighted. The gate allows a cutoff ... so the rest of the lap doesn't impact this jump."
+  2. **New course:** zero the memory, "so each course starts fresh".
+  3. **Shape:** 64 numbers, beside the sensors (the actor and critic layers see sensors and memory), a separate memory for actor and critic "so the critic doesn't distort memory".
+  4. **Training chunks:** 64 steps, which "covers a full flight plus the landing".
+- **Also adopted for E3 on (owner agreed, 2026-11-13):**
+  - heading fan rays;
+  - the actual steering angle in the observation;
+  - a steering-change cost of 0.03 × |Δsteer| per step;
+  - the noise schedule (0.5 → 0.1).
+- **Resume:** training saves its state at every evaluation and resumes after a container restart. The first E3 baseline runs were lost to a restart at 650k–750k steps.
+
 ## Gate check
 
 ## Handoff to next phase

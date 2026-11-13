@@ -179,8 +179,16 @@
   - Speed didn't change: about 11.6–12.2 s to finish for every car, and approach speed 6.7–7.2 m/s. The jumps are built for 6–7.5 m/s, so there's little time to gain.
   - What's left: losing the lane after landings, and one seed stopping after casing gaps.
   - Prediction vs. result: "slide a little but speed improves, 85–88%". The slide was smaller than without the bonus but still large for 2 of 3 seeds (end 72–89%). Kept checkpoints 92–96%. Speed: no change.
-- **Explanation (owner, after the run):** pending.
+- **Explanation (owner, after the run):** "The bonus locks in completion and then allows tuning past that point. It still slides because the weight isn't outsized compared with the rest."
+- **Takeaway:** start from a copy of the expert, then fine-tune with a finish bonus. Keep the best validation checkpoint: the slide is smaller but not gone.
 
 ## Gate check
+
+- **Candidate and protocol (owner, 2026-11-13, fixed before any test result):**
+  - Candidate: E5 seed 2's kept checkpoint (`runs/p4-e5-fb-s2`, step 400k), validation 96%. It is the best of 3 seeds on validation, which flatters it a little.
+  - Test set: courses 40000–40019, never used before, each driven from the 3 experiment start points (0, −0.3, +0.3 m) = 180 jumps. Nominal physics, one car at a time.
+  - Pass: ≥ 80% of the 180 jumps landed under the entry definition (≥ 0.3 s airborne; within 1 s all four wheels down, no chassis contact, upright and still driving; a ramp not jumped counts as missed).
+  - Command: `python -m sdc.phase4.gate --run runs/p4-e5-fb-s2`.
+  - Before the run: a background code review for oracle leakage (sim-only state reaching the gate car).
 
 ## Handoff to next phase

@@ -67,7 +67,7 @@
     - Holding half throttle and driving straight does about as well as the trained policies.
     - Landings are chaotic: one network scored 55% evaluated as a batch and 40% one car at a time, from float rounding alone. Experiments now score from 3 start points (180 jumps), and checkpoints are re-scored that way (`python -m sdc.phase4.rescore`).
   - Prediction vs. result: 75% predicted, 42% measured. "Only kind of" using the air throttle: correct, it barely does.
-- **Explanation (owner, after the run):** pending.
+- **Explanation (owner, after the run):** "I don't think what it does with the throttle matters too much while it's still spazzing out. It probably never learned because it's barely driving in the first place." From the GIFs: the car seems to jump even on flat ground, and the steering saws back and forth again ("no fast/reliable car drives like it's having a seizure"). Their guess: it aims for an exact centre line and overshoots; being content with "close enough", a PID-like approach, or knowing where the throttle and steering currently are might help. Asked for a background review of the sim first, then debugging, and to come back with guidance.
 
 ## Gate check
 

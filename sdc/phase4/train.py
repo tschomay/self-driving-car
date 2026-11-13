@@ -30,7 +30,7 @@ from sdc.phase1 import my_ppo as owner
 
 DEFAULTS = dict(n_envs=8, n_steps=256, batch_size=256, n_epochs=10, lr=3e-4, lr_decay=True, gamma=0.99, lam=0.95,
                 clip=0.2, vf_coef=0.5, max_grad_norm=0.5, std_cap=None, select=True, init=None, hidden=[64, 64])
-ENV = dict(jump_bonus=10.0, max_steps=1500, size=1.0, fan=False)
+ENV = dict(jump_bonus=10.0, max_steps=1500, size=1.0, fan=False, servo=False, steer_cost=0.0)
 OBS_CLIP = 5.0
 GIF_COURSES = (10000, 10004)
 
@@ -62,7 +62,7 @@ class Greedy:
 
 
 def evaluate(policy, courses=crs.VAL_SEEDS, starts=(0.0,), **env_kw) -> dict:
-    eps = dr.run(policy, list(courses), starts=starts, **{k: v for k, v in env_kw.items() if k in ("size", "max_steps", "fan")})
+    eps = dr.run(policy, list(courses), starts=starts, **{k: v for k, v in env_kw.items() if k in ("size", "max_steps", "fan", "servo")})
     return dict(**dr.score(eps), episodes=eps)
 
 
@@ -80,10 +80,10 @@ def train(seed=0, total_timesteps=1_000_000, out="runs/p4", eval_every=50_000, l
         net.load_state_dict(torch.load(cfg["init"]))
     opt = torch.optim.Adam(net.parameters(), lr=cfg["lr"], eps=1e-5)
     owner.POLICY_LOSS_VARIANT = "textbook"
-    greedy = Greedy(net, dict(fan=env_cfg["fan"]))
+    greedy = Greedy(net, dict(fan=env_cfg["fan"], servo=env_cfg["servo"]))
 
     def val():
-        r = evaluate(greedy, size=env_cfg["size"], fan=env_cfg["fan"])
+        r = evaluate(greedy, size=env_cfg["size"], fan=env_cfg["fan"], servo=env_cfg["servo"])
         return {k: v for k, v in r.items() if k != "episodes"}
 
     T, B = cfg["n_steps"], cfg["n_envs"]
@@ -163,7 +163,7 @@ def train(seed=0, total_timesteps=1_000_000, out="runs/p4", eval_every=50_000, l
         net.load_state_dict(torch.load(out / "ckpt" / f"{best['timesteps']}.pt"))
         selection = dict(chosen=best["timesteps"], rate=best["rate"], final_rate=evals[-1]["rate"])
     torch.save(net.state_dict(), out / "model.pt")
-    final = evaluate(greedy, starts=dr.STARTS, size=env_cfg["size"], fan=env_cfg["fan"])
+    final = evaluate(greedy, starts=dr.STARTS, size=env_cfg["size"], fan=env_cfg["fan"], servo=env_cfg["servo"])
     m = dict(label=label, seed=seed, threads=threads, ppo=cfg, env=env_cfg, total_timesteps=total_timesteps,
              trained_timesteps=steps, train_wall_s=round(train_s, 1), episodes=episodes, evals=evals,
              selection=selection, final={k: v for k, v in final.items() if k != "episodes"},
@@ -180,10 +180,15 @@ def train(seed=0, total_timesteps=1_000_000, out="runs/p4", eval_every=50_000, l
 
 def load(run_dir):
     m = json.loads((Path(run_dir) / "metrics.json").read_text())
-    fan = m["env"].get("fan", False)
-    net = ActorCritic(obs_dim=je.OBS_DIM + (6 if fan else 0), hidden=m["ppo"]["hidden"])
+    kw = env_kw(m)
+    net = ActorCritic(obs_dim=je.JumpBatch(1, **kw).obs_dim, hidden=m["ppo"]["hidden"])
     net.load_state_dict(torch.load(Path(run_dir) / "model.pt"))
-    return Greedy(net, dict(fan=fan)), m
+    return Greedy(net, kw), m
+
+
+def env_kw(m):
+    """The observation options a saved run was trained with."""
+    return dict(fan=m["env"].get("fan", False), servo=m["env"].get("servo", False))
 
 
 def main():

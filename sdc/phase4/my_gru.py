@@ -64,7 +64,7 @@ CONFIG = dict(
     where="beside",         # "before": obs -> GRU -> actor/critic MLP heads; "beside": MLP heads see obs AND memory
     shared=False,           # True: one memory for actor and critic; False: each has its own
     # OWNER TODO 4: training on sequences
-    seq_len=None,           # steps per training chunk (how far back gradients flow), e.g. 16, 32, 64
+    seq_len=64,             # owner: "64, covers a full flight plus the landing". Steps per training chunk (how far back gradients flow), e.g. 16, 32, 64
 )
 
 

@@ -140,6 +140,8 @@
 
 ### E4 — Start from the expert, then fine-tune
 
+- **Prediction (owner, before the run):** "80% and raises slightly. This approach worked well in the past."
+
 - **Setup:**
   1. **Behaviour clone** (`python -m sdc.phase4.bc --out runs/p4-e4-bc-sS --seed S`): DAgger, 6 rounds × 50k steps, the owner's network on E3's real sensors, critic pre-trained on γ 0.997 returns. The expert to copy is the version at a steady 7.1 m/s: 95% on validation, as good as the per-jump design-speed version (96%), and its speed choice is something the student can see (wheel speed).
   2. **Fine-tune** with the owner's PPO from the clone: `--set init=.../model.pt std_cap=[0.15,0.05] gamma=0.997`, E3's environment options, 1M steps, seeds 0–2.

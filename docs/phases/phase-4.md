@@ -1,11 +1,14 @@
 # Phase 4 — 3D terrain with jumps
 
-- **Status:** in progress
+- **Status:** gate passed (90.6%, first attempt)
 - **Goal:** a 3D rigid-body sim with heightfield terrain, ramps, and an IMU (accelerometer + gyro) in the observation; a policy that jumps and lands.
 - **Learn:** 3D dynamics, partial observability (airborne, the car must use memory), using throttle to control pitch mid-air, massively parallel simulation.
 - **Gate (owner's decisions at entry, 2026-11-12):** ≥ 80% of jumps landed on a fresh test set of procedurally generated jump courses (ramp size and approach randomized), nominal physics. A jump counts only if the car is airborne ≥ 0.3 s. It is **landed** when all four wheels touch down, the car doesn't roll over (no body contact with the ground), and it is still driving 1 s later.
 - **Code:** `sdc/jumps/` (the 3D sim), `sdc/phase4/` (training, evaluation, reports).
-- **How to reproduce the gate:** to be filled at the gate.
+- **How to reproduce the gate** (CPU, about 1.5 h; 3D GIFs need `apt-get install -y libosmesa6`):
+  1. Behaviour clone: `python -m sdc.phase4.bc --out runs/p4-e4-bc-s2 --seed 2` (about 10 min).
+  2. Fine-tune with the finish bonus: `python -m sdc.phase4.train --seed 2 --out runs/p4-e5-fb-s2 --env fan=true --env servo=true --env steer_cost=0.03 --env finish_bonus=100 --set init='"runs/p4-e4-bc-s2/model.pt"' --set std_cap='[0.15,0.05]' --set gamma=0.997` (about 30 min; keeps the best validation checkpoint).
+  3. Gate: `python -m sdc.phase4.gate --run runs/p4-e5-fb-s2` (about 10 min).
 
 ## Phase-entry decisions (owner, 2026-11-12)
 
@@ -196,4 +199,54 @@
   - One fix adopted before the run: the "no chassis contact" check looked once per 20 ms control step and missed brief bumper taps inside a step. It now looks after every 2 ms physics step from takeoff through the landing window.
   - Under the strict check, validation (one car at a time) is: gate car 164/180 = 91.1% (was 93.3%), expert 92.8%. Earlier experiments' numbers carry the same small optimism, about 2 points.
 
+- **Run:** 2026-11-13, `python -m sdc.phase4.gate --run runs/p4-e5-fb-s2`, commit 4839207, 1 torch thread, cloud container (4 CPU), $0. [Gate report](https://claude.ai/artifact/ELLhpFLRUgbFCRfX6irWp3)
+- **Result vs. threshold:** **163/180 = 90.6%** landed on test courses 40000–40019 (≥ 80%): **pass**.
+  - By kind: gap 67/72, table 61/63, drop 35/45. Drops (landing flat) are the weak spot.
+  - Runs: 52 of 60 finished; 5 off the lane, 2 stuck, 1 rolled over.
+  - Same 180 jumps: expert 92.2%. Validation, scored the same way: 91.1%. Test is 0.5 points below validation.
+- **Verdict: PASS** (first attempt).
+
 ## Handoff to next phase
+
+**Result:** the gate passed on the first attempt: 90.6% of 180 test jumps landed, 1.6 points below the expert, using real sensors only. Compute stayed on the container CPU ($0); Modal was never needed.
+
+**What got it there (in order of what mattered)**
+1. **Starting from a copy of the expert** (E4). From scratch, PPO landed about 50% and never learned to use the throttle in the air. The copy learned the expert's pitch control from its sensors alone (link to pitch error 0.66–0.69) and landed about 90%.
+2. **A finish bonus during fine-tuning** (E5). Without it, PPO traded landings for speed and slid to 47–59%; with it, the end of training held 72–89%. Owner: "The bonus locks in completion and then allows tuning past that point."
+3. **Early stopping on validation:** the best checkpoints come at 100k–400k steps.
+4. **Heading rays and a noise schedule** (after E1). Without heading, the car couldn't hold the lane. The full-range 50 Hz noise taught bang-bang sawing.
+
+**What the owner learned (in their words, condensed)**
+- E1: "It probably never learned because it's barely driving in the first place." They spotted the sawing and the "floating" car, which led to the sim review.
+- E3: "Your setup for a jump matters so much but it's far removed from the landing. And what you need to do driving is adapt in a lot of ways."
+- E4: "In 3.5 we had to add a lap bonus that locked in good driving before PPO could give reliable speed. Is there something similar here?" That question was E5.
+- E5: the bonus locks in completion; it still slides because its weight isn't outsized compared with the rest.
+
+**Surprises worth remembering**
+- Landings are chaotic: float rounding alone (a batch of 10 cars vs one at a time) moved one network from 55% to 40%. Score over 180 jumps, one car at a time.
+- The GIFs drew the car floating (the wrong ground height and a stretched scale). Two other sim bugs hid behind the same symptom: tires floating 1 cm (a MuJoCo margin), and the expert using the wrong ground. Check renders against the physics.
+- The rays see the ground in the air, so pitch is readable from the current sensors (R² about 0.9). Memory (the owner's GRU) added nothing.
+- Speed didn't matter here: every good car takes about 11.6 s, because the jumps are built for one speed.
+- The pre-gate review found the chassis-contact check could miss bumper taps within a control step; fixed before the gate (about 2 points).
+
+**Built and reusable**
+- `sdc/jumps/`:
+  - `car.py`: MuJoCo 1/10 buggy; fan rays; servo angle.
+  - `course.py`: jump courses with design speeds; VAL and TEST seeds.
+  - `env.py`: jump scoring; finish bonus, steering cost.
+  - `driver.py`: the expert, and 3-start scoring.
+  - `render.py` (side view) and `render3d.py` (3D chase camera).
+- `sdc/phase4/`:
+  - `train.py` and `train_rnn.py`: the owner's PPO, with resume after container restarts.
+  - `my_gru.py`: the owner's GRU.
+  - `bc.py`: DAgger cloning.
+  - `rescore.py`, `analysis.py` (air-throttle use, pitch probe, steering, speed), reports, `gate.py`, run launchers.
+
+**Open questions and deferred ideas**
+- Drops (flat landings) are the weakest kind: 35/45 on test.
+- Fine-tuning still slides after its peak; a larger finish bonus or a crash cost might hold it.
+- The sim is kinder than reality: sphere wheels, stiff suspension (3 mm of sag), nominal physics only, no sensor noise. Phase 3's randomization was not carried over.
+- The 3D renderer needs `libosmesa6`, installed on demand (shared environment).
+
+**For Phase 5 (the real car)**
+- Not planned yet (roadmap: "future"). Carry over: copy an expert first, then fine-tune with a reliability bonus and early stopping; real sensors only; a code review for oracle leakage before every gate; physics randomization (Phase 3) before trusting any sim result on hardware.

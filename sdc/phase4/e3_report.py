@@ -71,7 +71,19 @@ def main():
         f"""<h2>Result</h2><div class="note">
 <p><span class="big2">{mean['gru']:.0%}</span> landed with your GRU vs <b>{mean['mlp']:.0%}</b> without memory
 (3 seeds each, 180 validation jumps per seed). Your prediction: 70%, and it would use the throttle in the air.</p>
-<p>{{FINDING}}</p></div>""",
+<p>No clear gain from memory. One car at a time, the GRU seeds land 65/61/43% vs 57/51/42% without memory; scored in batches of ten
+(float rounding alone changes outcomes), it is 57/58/49% vs 69/61/41%. The seed-to-seed spread (about 20 points) is bigger than
+any difference between the two cars.</p>
+<p><b>What changed:</b> the steering is calm now. The change per step on the flats is 0.00–0.07, against 1.37 in E1.
+<b>What didn't:</b> neither car uses the throttle in the air. Its throttle barely moves after takeoff (0.02–0.19 vs the
+expert's 0.37), and the link to the pitch error is about zero (−0.36 to +0.14, expert +0.81). The memory does hold the
+pitch: a straight-line read-out of the GRU's memory recovers it with R² up to 0.84. But the sensors already give most of it
+(0.8–0.9, from the downward rays seeing the ground), and the policy doesn't act on either. The runs now end
+"off the lane" or "stuck" (casing a gap and stopping) more than rolled over. The learning curves swing wildly from one
+checkpoint to the next (0% to 60%), in both cars.</p>
+<p><b>Reading:</b> knowing the pitch wasn't the missing piece. PPO from scratch never finds out that throttle in the air
+pays off: it's a rare, precise skill, and random exploration almost never stumbles on it. That is Phase 3.5's lesson
+("it never tried going faster"), and the planned E4 (start from the expert, then fine-tune with low noise) is aimed at it.</p></div>""",
         f"<h2>Learning curves</h2>{rp.curve(curves)}"
         + rp.legend([(0, "no memory (3 seeds)", f"{mean['mlp']:.0%}"), (1, "your GRU (3 seeds)", f"{mean['gru']:.0%}")])
         + "<p class='caption'>Validation landing rate of every 50k-step checkpoint (3-start re-score, 180 jumps). "

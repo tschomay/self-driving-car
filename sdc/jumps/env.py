@@ -10,6 +10,8 @@ Observation (real sensors only, OBS_DIM = 20):
   accel / 9.81 (3, body frame), gyro / 5 (3), wheel speed front/rear / 10 m/s (2),
   8 forward rays (3° up to 50° down) + left/right rays, distance / 6 m (10, 1.0 = nothing within 6 m),
   last action (2).
+Optional fan=True adds 6 horizontal rays (20/35/60 deg left and right, level), so the car can see the lane
+edges ahead (its heading), before the last action: OBS_DIM + 6.
 
 A jump (the gate's definition, owner 2026-11-12): all four wheels off the ground for >= 0.3 s.
 It is credited to the course jump whose stretch contains the takeoff point (only the first jump
@@ -18,7 +20,8 @@ ground together at some moment, the chassis never touches the ground, and at the
 second the car is upright (up-axis z >= 0.7) and still driving (forward speed >= 0.5 m/s).
 A ramp the car didn't jump (too slow, or it crashed before reaching it) counts as not landed.
 
-Episode ends: finish line (terminated, success), rollover (up-axis z < 0.2), off the lane,
+Episode ends: finish line (terminated, success), rollover (up-axis z < 0.2), off the lane (centre past the
+lane edge, |y| > 1.5 m),
 stuck (< 0.3 m/s for 2 s), or the step cap (truncated).
 
 Reward: forward progress in metres + jump_bonus for each landed jump.
@@ -34,6 +37,7 @@ from sdc.jumps import car as cr
 from sdc.jumps import course as crs
 
 OBS_DIM = 20
+ON_GROUND = 0.01   # m: a tire this close to the terrain counts as on the ground
 MIN_AIR = 0.3
 LAND_WINDOW = 1.0
 
@@ -47,7 +51,7 @@ def _pitch_roll(R):
 class JumpCar:
     """One car on one course."""
 
-    def __init__(self, seed_rng, courses="random", size=1.0, kinds=crs.KINDS):
+    def __init__(self, seed_rng, courses="random", size=1.0, kinds=crs.KINDS, fan=False):
         self.m = cr.build_model()
         self.d = mujoco.MjData(self.m)
         self.rng = seed_rng
@@ -61,7 +65,9 @@ class JumpCar:
         self.spin_dof = np.array([self.m.jnt_dofadr[self.m.joint(f"{w}_spin").id] for w in cr.WHEELS])
         s = {self.m.sensor(i).name: (self.m.sensor_adr[i], self.m.sensor_dim[i]) for i in range(self.m.nsensor)}
         self.s_accel, self.s_gyro = s["accel"][0], s["gyro"][0]
-        self.ray_sites = np.array([self.m.site(n).id for n in cr.RAY_SITES])
+        self.fan = fan
+        self.ray_sites = np.array([self.m.site(n).id for n in cr.RAY_SITES + (cr.FAN_SITES if fan else [])])
+        self.obs_dim = OBS_DIM + (len(cr.FAN_SITES) if fan else 0)
 
     # ---- episode ---------------------------------------------------------------------
     def reset(self, course_seed=None, x0=0.0):
@@ -78,6 +84,7 @@ class JumpCar:
         self.d.qpos[2] = self.course.height(crs.START_X + x0) + 0.17
         mujoco.mj_forward(self.m, self.d)
         mujoco.mj_step(self.m, self.d, int(0.2 / cr.TIMESTEP))     # settle on the suspension (0.2 s)
+        self.v_prev = self.d.qvel[:3].copy()
         self.t = 0
         self.last_act = np.zeros(2, np.float32)
         self.ret = 0.0
@@ -92,16 +99,19 @@ class JumpCar:
         return self.obs()
 
     def contacts(self):
+        """(wheels on the ground (4,), chassis touching the ground).
+
+        A wheel counts as on the ground when its tire is within ON_GROUND (1 cm) of the terrain
+        (mj_geomDistance), so a car resting on its suspension doesn't flicker "airborne" from contact
+        chatter. (Until 2026-11-13 this used a contact margin on the tires, which in MuJoCo 4 also
+        made them float 1 cm above the ground: the review found it.)"""
+        wheels = np.array([mujoco.mj_geomDistance(self.m, self.d, int(g), self.ground, 0.05, None) < ON_GROUND
+                           for g in self.tires])
         c = self.d.contact
         n = self.d.ncon
-        if n == 0:
-            return np.zeros(4, bool), False
         g1, g2 = c.geom1[:n], c.geom2[:n]
-        # tires carry a 1 cm detection margin (no force until they touch): a wheel within 1 cm of the
-        # ground counts as on it, so a car resting on its suspension doesn't flicker "airborne".
-        other = np.where(g1 == self.ground, g2, np.where(g2 == self.ground, g1, -1))
-        wheels = np.isin(self.tires, other)
-        return wheels, bool(np.any(other == self.chassis))
+        body = bool(np.any(((g1 == self.chassis) & (g2 == self.ground)) | ((g2 == self.chassis) & (g1 == self.ground))))
+        return wheels, body
 
     def state(self):
         """Oracle state (experts, scoring, rendering; never in the policy's obs)."""
@@ -120,7 +130,11 @@ class JumpCar:
         self.rays = cr.cast_rays(self.m, self.d, self.ray_sites)
         rays = self.rays / cr.RAY_CUTOFF
         w = self.d.qvel[self.spin_dof] * cr.WHEEL_R / 10.0
-        return np.concatenate([sd[self.s_accel:self.s_accel + 3] / 9.81, sd[self.s_gyro:self.s_gyro + 3] / 5.0,
+        # accelerometer averaged over the 20 ms control step (a real IMU low-pass filters; a single
+        # 2 ms sample was dominated by contact chatter): (dv/dt + gravity) in the body frame
+        R = self.d.xmat[1].reshape(3, 3)
+        acc = R.T @ ((self.d.qvel[:3] - self.v_prev) / cr.DT + np.array([0.0, 0.0, 9.81]))
+        return np.concatenate([acc / 9.81, sd[self.s_gyro:self.s_gyro + 3] / 5.0,
                                [w[:2].mean(), w[2:].mean()], rays, self.last_act]).astype(np.float32)
 
     # ---- one control step ------------------------------------------------------------
@@ -128,7 +142,9 @@ class JumpCar:
         a = np.clip(np.asarray(action, np.float32), -1, 1)
         self.d.ctrl[:4] = a[1]
         self.d.ctrl[4:6] = a[0] * cr.STEER_MAX
+        v0 = self.d.qvel[:3].copy()
         mujoco.mj_step(self.m, self.d, cr.SUBSTEPS)
+        self.v_prev = v0
         self.t += 1
         self.last_act = a
         t = self.t * cr.DT
@@ -175,7 +191,7 @@ class JumpCar:
             reason = "finished"
         elif st["up_z"] < 0.2:
             reason = "rolled over"
-        elif abs(st["y"]) > crs.WIDTH / 2 - 0.2:
+        elif abs(st["y"]) > crs.DRIVE_W / 2:     # centre past the lane edge: its outer wheels are on the bank
             reason = "off the lane"
         elif self.slow >= 100 and self.t > 50:
             reason = "stuck"
@@ -201,14 +217,15 @@ class JumpCar:
 
 
 class JumpBatch:
-    def __init__(self, n, seed=0, courses="random", max_steps=1500, jump_bonus=10.0, size=1.0, kinds=crs.KINDS):
+    def __init__(self, n, seed=0, courses="random", max_steps=1500, jump_bonus=10.0, size=1.0, kinds=crs.KINDS,
+                 fan=False):
         rng = np.random.default_rng(seed)
-        self.cars = [JumpCar(np.random.default_rng(rng.integers(2**63)), courses, size, kinds) for _ in range(n)]
+        self.cars = [JumpCar(np.random.default_rng(rng.integers(2**63)), courses, size, kinds, fan) for _ in range(n)]
         if courses != "random":   # spread a fixed course list across the cars
             for i, c in enumerate(self.cars):
                 c.courses = list(courses)[i::n] or list(courses)
         self.n, self.max_steps, self.jump_bonus = n, max_steps, jump_bonus
-        self.obs_dim = OBS_DIM
+        self.obs_dim = self.cars[0].obs_dim
         self._obs = None
 
     def reset(self):
@@ -224,7 +241,7 @@ class JumpBatch:
         term = np.zeros(self.n, bool)
         trunc = np.zeros(self.n, bool)
         infos = [{} for _ in range(self.n)]
-        obs = np.empty((self.n, OBS_DIM), np.float32)
+        obs = np.empty((self.n, self.obs_dim), np.float32)
         for i, c in enumerate(self.cars):
             rew[i], term[i], trunc[i], reason = c.step(actions[i], self.jump_bonus, self.max_steps)
             if term[i] or trunc[i]:

@@ -14,7 +14,8 @@ Optional fan=True adds 6 horizontal rays (20/35/60 deg left and right, level), s
 edges ahead (its heading), before the last action: OBS_DIM + 6.
 Optional servo=True adds the steering's actual angle (front wheels, / 0.4 rad), not just the last command: + 1.
 Reward option steer_cost: minus steer_cost x |steering command change| each step (owner, 2026-11-13: a
-small cost on sawing rather than a hard limit).
+small cost on sawing rather than a hard limit). Reward option finish_bonus: added once at the finish line
+(Phase 4 E5, the analogue of Phase 3.5's lap bonus).
 
 A jump (the gate's definition, owner 2026-11-12): all four wheels off the ground for >= 0.3 s.
 It is credited to the course jump whose stretch contains the takeoff point (only the first jump
@@ -144,7 +145,7 @@ class JumpCar:
                                [w[:2].mean(), w[2:].mean()], rays, servo, self.last_act]).astype(np.float32)
 
     # ---- one control step ------------------------------------------------------------
-    def step(self, action, jump_bonus=10.0, max_steps=1500, steer_cost=0.0):
+    def step(self, action, jump_bonus=10.0, max_steps=1500, steer_cost=0.0, finish_bonus=0.0):
         a = np.clip(np.asarray(action, np.float32), -1, 1)
         d_steer = abs(float(a[0]) - float(self.last_act[0]))
         self.d.ctrl[:4] = a[1]
@@ -196,6 +197,7 @@ class JumpCar:
         reason = None
         if st["x"] >= crs.FINISH_X:
             reason = "finished"
+            reward += finish_bonus
         elif st["up_z"] < 0.2:
             reason = "rolled over"
         elif abs(st["y"]) > crs.DRIVE_W / 2:     # centre past the lane edge: its outer wheels are on the bank
@@ -225,11 +227,11 @@ class JumpCar:
 
 class JumpBatch:
     def __init__(self, n, seed=0, courses="random", max_steps=1500, jump_bonus=10.0, size=1.0, kinds=crs.KINDS,
-                 fan=False, servo=False, steer_cost=0.0):
+                 fan=False, servo=False, steer_cost=0.0, finish_bonus=0.0):
         rng = np.random.default_rng(seed)
         self.cars = [JumpCar(np.random.default_rng(rng.integers(2**63)), courses, size, kinds, fan, servo)
                      for _ in range(n)]
-        self.steer_cost = steer_cost
+        self.steer_cost, self.finish_bonus = steer_cost, finish_bonus
         if courses != "random":   # spread a fixed course list across the cars
             for i, c in enumerate(self.cars):
                 c.courses = list(courses)[i::n] or list(courses)
@@ -252,7 +254,7 @@ class JumpBatch:
         infos = [{} for _ in range(self.n)]
         obs = np.empty((self.n, self.obs_dim), np.float32)
         for i, c in enumerate(self.cars):
-            rew[i], term[i], trunc[i], reason = c.step(actions[i], self.jump_bonus, self.max_steps, self.steer_cost)
+            rew[i], term[i], trunc[i], reason = c.step(actions[i], self.jump_bonus, self.max_steps, self.steer_cost, self.finish_bonus)
             if term[i] or trunc[i]:
                 infos[i] = dict(terminal_observation=c.obs(), episode=c.summary(reason))
                 obs[i] = c.reset()

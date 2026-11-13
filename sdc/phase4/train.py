@@ -30,7 +30,7 @@ from sdc.phase1 import my_ppo as owner
 
 DEFAULTS = dict(n_envs=8, n_steps=256, batch_size=256, n_epochs=10, lr=3e-4, lr_decay=True, gamma=0.99, lam=0.95,
                 clip=0.2, vf_coef=0.5, max_grad_norm=0.5, std_cap=None, select=True, init=None, hidden=[64, 64])
-ENV = dict(jump_bonus=10.0, max_steps=1500, size=1.0, fan=False, servo=False, steer_cost=0.0)
+ENV = dict(jump_bonus=10.0, max_steps=1500, size=1.0, fan=False, servo=False, steer_cost=0.0, finish_bonus=0.0)
 OBS_CLIP = 5.0
 GIF_COURSES = (10000, 10004)
 

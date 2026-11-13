@@ -142,7 +142,7 @@ def _frame(s, course: crs.Course, title, lines, trail, end=None, end_good=True):
     # throttle gauge (centre = 0, right = gas, left = brake) and steering gauge
     gy = y0 + 50
     for label, val, gx, pos_col, neg_col in (("brake ◀ throttle ▶ gas", s["act"][1], 10, GAS, BRAKE),
-                                             ("right ◀ steer ▶ left", s["act"][0], W // 2 + 10, CAR, CAR)):
+                                             ("left ◀ steer ▶ right", -s["act"][0], W // 2 + 10, CAR, CAR)):
         gw = W // 2 - 30
         d.rectangle([gx, gy, gx + gw, gy + 8], fill=(232, 236, 241))
         mid = gx + gw / 2

@@ -159,7 +159,8 @@
   - What PPO changed, seed 1, copy → 1M steps: approach speed 6.9 → 7.5 m/s, ground throttle 0.74 → 0.88, off-the-lane runs on 10 courses 2 → 8. It trades landings for speed, as in Phase 3.
   - Validation is about 4 points above the 80% bar. Phase 3's validation ran about 4 points above its test.
   - Prediction vs. result: 80% predicted for the copy, about 90% measured. "Fine-tuning raises it slightly": only for the first 150k steps, then it lowers it.
-- **Explanation (owner, after the run):** pending.
+- **Explanation (owner, after the run):** "In 3.5 we had to add a lap bonus that locked in good driving before PPO could give reliable speed. Is there something similar here?" There isn't: the reward is +1 per metre and 10 per landed jump, with no bonus for finishing a course, so nothing locks in reliability once PPO starts chasing speed. This led to E5.
+- **Also (owner):** the GIFs' steering gauge read backwards. The wiring was checked (steer +1 turns the car left: 50° of yaw to the left) and only the display was mirrored. Fixed in both GIF types: a left turn puts the bar on the left.
 
 ## Gate check
 

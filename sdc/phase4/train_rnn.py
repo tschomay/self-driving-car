@@ -65,8 +65,9 @@ class RecurrentActorCritic(nn.Module):
 
 
 class GreedyRNN:
-    def __init__(self, net):
+    def __init__(self, net, env_kw=None):
         self.net = net
+        self.env_kw = env_kw or {}
         self.h = None
         self.started = None
 
@@ -94,17 +95,17 @@ def train(seed=0, total_timesteps=1_000_000, out="runs/p4-rnn", eval_every=50_00
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     batch = je.JumpBatch(cfg["n_envs"], seed=seed, **env_cfg)
-    net = RecurrentActorCritic(mlp_hidden=cfg["hidden"])
+    net = RecurrentActorCritic(obs_dim=batch.obs_dim, mlp_hidden=cfg["hidden"])
     if cfg["init"]:
         net.load_state_dict(torch.load(cfg["init"]), strict=False)
     opt = torch.optim.Adam(net.parameters(), lr=cfg["lr"], eps=1e-5)
     owner.POLICY_LOSS_VARIANT = "textbook"
-    greedy = GreedyRNN(net)
+    greedy = GreedyRNN(net, dict(fan=env_cfg["fan"], servo=env_cfg["servo"]))
     L = my_gru.CONFIG["seq_len"]
 
     def val():
         greedy.h = None
-        r = tr.evaluate(greedy, size=env_cfg["size"])
+        r = tr.evaluate(greedy, size=env_cfg["size"], **greedy.env_kw)
         return {k: v for k, v in r.items() if k != "episodes"}
 
     T, B = cfg["n_steps"], cfg["n_envs"]
@@ -114,6 +115,18 @@ def train(seed=0, total_timesteps=1_000_000, out="runs/p4-rnn", eval_every=50_00
     started = torch.ones(B)
     episodes, evals, steps, next_eval = [], [], 0, 0
     t0 = time.perf_counter()
+    resumed = []
+    if (out / "resume.pt").exists():   # pick up after a container restart (state saved at every evaluation)
+        r = torch.load(out / "resume.pt", weights_only=False)
+        net.load_state_dict(r["net"])
+        opt.load_state_dict(r["opt"])
+        steps, next_eval, evals, episodes = r["steps"], r["next_eval"], r["evals"], r["episodes"]
+        resumed = r.get("resumed", []) + [steps]
+        t0 -= r["wall"]
+        torch.manual_seed(seed + steps)
+        batch = je.JumpBatch(cfg["n_envs"], seed=seed + steps, **env_cfg)   # fresh courses; env state isn't saved
+        obs = tr._t(batch.reset())
+        print(f"resumed at {steps} steps", flush=True)
     while steps < total_timesteps:
         if steps >= next_eval:
             if cfg["select"]:
@@ -123,6 +136,8 @@ def train(seed=0, total_timesteps=1_000_000, out="runs/p4-rnn", eval_every=50_00
             print(f"[{steps:>8}] val landed {evals[-1]['rate']:.0%} finished {evals[-1]['finished']:.0%} "
                   f"({evals[-1]['wall_s']:.0f}s)", flush=True)
             next_eval += eval_every
+            torch.save(dict(net=net.state_dict(), opt=opt.state_dict(), steps=steps, next_eval=next_eval, evals=evals,
+                            episodes=episodes, wall=time.perf_counter() - t0, resumed=resumed), out / "resume.pt")
         frac = min(steps / total_timesteps, 1.0)
         if cfg["std_cap"]:
             cap = cfg["std_cap"][0] + (cfg["std_cap"][1] - cfg["std_cap"][0]) * frac
@@ -206,9 +221,9 @@ def train(seed=0, total_timesteps=1_000_000, out="runs/p4-rnn", eval_every=50_00
         selection = dict(chosen=best["timesteps"], rate=best["rate"], final_rate=evals[-1]["rate"])
     torch.save(net.state_dict(), out / "model.pt")
     greedy.h = None
-    final = tr.evaluate(greedy, starts=tr.dr.STARTS, size=env_cfg["size"])
+    final = tr.evaluate(greedy, starts=tr.dr.STARTS, size=env_cfg["size"], **greedy.env_kw)
     m = dict(label=label, seed=seed, threads=threads, ppo=cfg, gru=my_gru.CONFIG, env=env_cfg,
-             total_timesteps=total_timesteps, trained_timesteps=steps, train_wall_s=round(train_s, 1),
+             total_timesteps=total_timesteps, trained_timesteps=steps, resumed_at=resumed, train_wall_s=round(train_s, 1),
              episodes=episodes, evals=evals, selection=selection,
              final={k: v for k, v in final.items() if k != "episodes"}, final_episodes=final["episodes"])
     if gif:
@@ -224,9 +239,10 @@ def train(seed=0, total_timesteps=1_000_000, out="runs/p4-rnn", eval_every=50_00
 
 def load(run_dir):
     m = json.loads((Path(run_dir) / "metrics.json").read_text())
-    net = RecurrentActorCritic(cfg=m["gru"], mlp_hidden=m["ppo"]["hidden"])
+    kw = tr.env_kw(m)
+    net = RecurrentActorCritic(obs_dim=je.JumpBatch(1, **kw).obs_dim, cfg=m["gru"], mlp_hidden=m["ppo"]["hidden"])
     net.load_state_dict(torch.load(Path(run_dir) / "model.pt"))
-    return GreedyRNN(net), m
+    return GreedyRNN(net, kw), m
 
 
 def main():

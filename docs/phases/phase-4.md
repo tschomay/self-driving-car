@@ -99,6 +99,40 @@
 - **Owner's centre-line guess:** there is no centre-line target in the reward. The weaving came from missing heading information, and the sawing from the noise. The policy already sees its last command, though not the servo's actual angle.
 - **Next:** fan rays + noise schedule on the fixed sim, 3 seeds (`runs/p4-e1b-s*`), as the new baseline for E2/E3.
 
+### E3 — Does your GRU memory help in the air?
+
+- **Owner's GRU (`sdc/phase4/my_gru.py`, 2026-11-13):**
+  1. **Update:** blend with an update gate plus a reset gate (a standard GRU). "B is the best blend where older memories are kept but down weighted. The gate allows a cutoff ... so the rest of the lap doesn't impact this jump."
+  2. **New course:** zero the memory, "so each course starts fresh".
+  3. **Shape:** 64 numbers, beside the sensors (the actor and critic layers see sensors and memory), a separate memory for actor and critic "so the critic doesn't distort memory".
+  4. **Training chunks:** 64 steps, which "covers a full flight plus the landing".
+- **Also adopted for E3 on (owner agreed, 2026-11-13):**
+  - heading fan rays;
+  - the actual steering angle in the observation;
+  - a steering-change cost of 0.03 × |Δsteer| per step;
+  - the noise schedule (0.5 → 0.1).
+- **Prediction (owner, before the run):** "70% and yes" (the GRU car lands about 70% and uses the throttle in the air).
+- **Setup:** 1M steps, seeds 0–2 for each car, everything above on, 1 torch thread.
+  - No memory: `python -m sdc.phase4.train --seed S --out runs/p4-e3-mlp-sS --env fan=true --env servo=true --env steer_cost=0.03 --set 'std_cap=[0.5,0.1]'`
+  - GRU: the same with `sdc.phase4.train_rnn` and `--out runs/p4-e3-gru-sS`.
+- **Result (validation, 180 jumps per seed):** [report](https://claude.ai/artifact/K5RJAHMJpfaPYvP8K3k7qH). No clear gain from memory.
+
+  | Car | Landed (batched / one car at a time) | Air throttle ↔ pitch error | Steering change per step |
+  |---|---|---|---|
+  | No memory, seeds 0–2 | 69/61/41% · 57/51/42% | −0.36 to −0.08 | 0.02–0.07 |
+  | Your GRU, seeds 0–2 | 57/58/49% · 65/61/43% | −0.08 to +0.14 | 0.00–0.05 |
+  | Expert | 96% | +0.81 | 0.00 |
+
+  - Steering is calm now (E1: 1.37 per step).
+  - Neither car uses the throttle in the air: after takeoff it moves 0.02–0.19 (expert 0.37).
+  - The GRU's memory holds the pitch (straight-line read-out R² up to 0.84). The current sensors give most of it too (0.8–0.9: the downward rays see the ground). The policy acts on neither.
+  - Endings shifted to "off the lane" and "stuck" (casing a gap and stopping).
+  - Learning curves swing from 0% to 60% between checkpoints in both cars.
+  - The seed spread (about 20 points), and the batched vs one-at-a-time difference (up to 8 points per seed), are bigger than any memory effect.
+  - Prediction vs. result: 70% predicted, about 55% measured. "Uses the throttle in the air": no.
+- **Explanation (owner, after the run):** pending.
+- **Resume:** training saves its state at every evaluation and resumes after a container restart. The first E3 baseline runs were lost to a restart at 650k–750k steps.
+
 ## Gate check
 
 ## Handoff to next phase

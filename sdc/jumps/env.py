@@ -12,6 +12,9 @@ Observation (real sensors only, OBS_DIM = 20):
   last action (2).
 Optional fan=True adds 6 horizontal rays (20/35/60 deg left and right, level), so the car can see the lane
 edges ahead (its heading), before the last action: OBS_DIM + 6.
+Optional servo=True adds the steering's actual angle (front wheels, / 0.4 rad), not just the last command: + 1.
+Reward option steer_cost: minus steer_cost x |steering command change| each step (owner, 2026-11-13: a
+small cost on sawing rather than a hard limit).
 
 A jump (the gate's definition, owner 2026-11-12): all four wheels off the ground for >= 0.3 s.
 It is credited to the course jump whose stretch contains the takeoff point (only the first jump
@@ -51,7 +54,7 @@ def _pitch_roll(R):
 class JumpCar:
     """One car on one course."""
 
-    def __init__(self, seed_rng, courses="random", size=1.0, kinds=crs.KINDS, fan=False):
+    def __init__(self, seed_rng, courses="random", size=1.0, kinds=crs.KINDS, fan=False, servo=False):
         self.m = cr.build_model()
         self.d = mujoco.MjData(self.m)
         self.rng = seed_rng
@@ -67,7 +70,9 @@ class JumpCar:
         self.s_accel, self.s_gyro = s["accel"][0], s["gyro"][0]
         self.fan = fan
         self.ray_sites = np.array([self.m.site(n).id for n in cr.RAY_SITES + (cr.FAN_SITES if fan else [])])
-        self.obs_dim = OBS_DIM + (len(cr.FAN_SITES) if fan else 0)
+        self.servo = servo
+        self.steer_q = np.array([self.m.jnt_qposadr[self.m.joint(f"{w}_steer").id] for w in ("fl", "fr")])
+        self.obs_dim = OBS_DIM + (len(cr.FAN_SITES) if fan else 0) + (1 if servo else 0)
 
     # ---- episode ---------------------------------------------------------------------
     def reset(self, course_seed=None, x0=0.0):
@@ -134,12 +139,14 @@ class JumpCar:
         # 2 ms sample was dominated by contact chatter): (dv/dt + gravity) in the body frame
         R = self.d.xmat[1].reshape(3, 3)
         acc = R.T @ ((self.d.qvel[:3] - self.v_prev) / cr.DT + np.array([0.0, 0.0, 9.81]))
+        servo = [self.d.qpos[self.steer_q].mean() / cr.STEER_MAX] if self.servo else []   # actual wheel angle
         return np.concatenate([acc / 9.81, sd[self.s_gyro:self.s_gyro + 3] / 5.0,
-                               [w[:2].mean(), w[2:].mean()], rays, self.last_act]).astype(np.float32)
+                               [w[:2].mean(), w[2:].mean()], rays, servo, self.last_act]).astype(np.float32)
 
     # ---- one control step ------------------------------------------------------------
-    def step(self, action, jump_bonus=10.0, max_steps=1500):
+    def step(self, action, jump_bonus=10.0, max_steps=1500, steer_cost=0.0):
         a = np.clip(np.asarray(action, np.float32), -1, 1)
+        d_steer = abs(float(a[0]) - float(self.last_act[0]))
         self.d.ctrl[:4] = a[1]
         self.d.ctrl[4:6] = a[0] * cr.STEER_MAX
         v0 = self.d.qvel[:3].copy()
@@ -150,7 +157,7 @@ class JumpCar:
         t = self.t * cr.DT
         wheels, body = self.contacts()
         st = self.state()
-        reward = st["x"] - self.x_prev
+        reward = st["x"] - self.x_prev - steer_cost * d_steer
         self.x_prev = st["x"]
 
         # airborne bookkeeping
@@ -218,9 +225,11 @@ class JumpCar:
 
 class JumpBatch:
     def __init__(self, n, seed=0, courses="random", max_steps=1500, jump_bonus=10.0, size=1.0, kinds=crs.KINDS,
-                 fan=False):
+                 fan=False, servo=False, steer_cost=0.0):
         rng = np.random.default_rng(seed)
-        self.cars = [JumpCar(np.random.default_rng(rng.integers(2**63)), courses, size, kinds, fan) for _ in range(n)]
+        self.cars = [JumpCar(np.random.default_rng(rng.integers(2**63)), courses, size, kinds, fan, servo)
+                     for _ in range(n)]
+        self.steer_cost = steer_cost
         if courses != "random":   # spread a fixed course list across the cars
             for i, c in enumerate(self.cars):
                 c.courses = list(courses)[i::n] or list(courses)
@@ -243,7 +252,7 @@ class JumpBatch:
         infos = [{} for _ in range(self.n)]
         obs = np.empty((self.n, self.obs_dim), np.float32)
         for i, c in enumerate(self.cars):
-            rew[i], term[i], trunc[i], reason = c.step(actions[i], self.jump_bonus, self.max_steps)
+            rew[i], term[i], trunc[i], reason = c.step(actions[i], self.jump_bonus, self.max_steps, self.steer_cost)
             if term[i] or trunc[i]:
                 infos[i] = dict(terminal_observation=c.obs(), episode=c.summary(reason))
                 obs[i] = c.reset()

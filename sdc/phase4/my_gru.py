@@ -33,8 +33,16 @@ def gru_step(x, h, p):
     p: a dict of parameters: p["Wz"], p["Wr"], p["Wh"] (n_in -> n_hidden), p["Uz"], p["Ur"], p["Uh"]
        (n_hidden -> n_hidden), each an nn.Linear (call it like p["Wz"](x)); the W's carry the biases.
     Return the new memory, (batch, n_hidden).
+
+    Owner's choice (2026-11-13): (b) blend with an update gate, plus a reset gate r. "B is the best
+    blend where older memories are kept but down weighted. The gate allows a cutoff so the down
+    weighted doesn't have to be too strong, but there can be a cut off so the rest of the lap
+    doesn't impact this jump for example."
     """
-    return None
+    z = torch.sigmoid(p["Wz"](x) + p["Uz"](h))          # update gate: how much of each number to overwrite
+    r = torch.sigmoid(p["Wr"](x) + p["Ur"](h))          # reset gate: how much old memory the candidate sees
+    cand = torch.tanh(p["Wh"](x) + p["Uh"](r * h))      # candidate memory from this step's input
+    return (1 - z) * h + z * cand                        # blend: keep (z~0) or overwrite (z~1)
 
 
 def reset_memory(h, episode_started):
@@ -42,17 +50,21 @@ def reset_memory(h, episode_started):
 
     h: (batch, n_hidden); episode_started: (batch,) float, 1.0 where that car just began a new course.
     Return the memory to use for this step.
+
+    Owner's choice (2026-11-13): (a) zero it, "so each course starts fresh. An old course
+    [shouldn't] impact how you drive now aside from the training you've done."
     """
-    return None
+    return h * (1.0 - episode_started[:, None])      # blank memory for cars that just started a course
 
 
 CONFIG = dict(
-    # OWNER TODO 3: shape of the memory network (None = not decided yet)
-    hidden=None,            # memory size, e.g. 32, 64, 128
-    where=None,             # "before": obs -> GRU -> actor/critic MLP heads; "beside": MLP heads see obs AND memory
-    shared=None,            # True: one memory for actor and critic; False: each has its own
+    # OWNER TODO 3: shape of the memory network. Owner (2026-11-13): "64, beside, separate so the
+    # critic doesn't distort memory".
+    hidden=64,              # memory size, e.g. 32, 64, 128
+    where="beside",         # "before": obs -> GRU -> actor/critic MLP heads; "beside": MLP heads see obs AND memory
+    shared=False,           # True: one memory for actor and critic; False: each has its own
     # OWNER TODO 4: training on sequences
-    seq_len=None,           # steps per training chunk (how far back gradients flow), e.g. 16, 32, 64
+    seq_len=64,             # owner: "64, covers a full flight plus the landing". Steps per training chunk (how far back gradients flow), e.g. 16, 32, 64
 )
 
 

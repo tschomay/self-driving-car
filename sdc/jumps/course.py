@@ -62,7 +62,14 @@ class Course:
     jumps: list[Jump] = field(default_factory=list)
 
     def height(self, xq):
-        return np.interp(xq, self.x, self.profile)
+        """True ground height along the lane centre: the heightfield's middle row (bumps and offset included)."""
+        return np.interp(xq, self.x, self.ground)
+
+    @property
+    def ground(self):
+        if getattr(self, "_ground", None) is None:
+            self._ground = self.hfield()[NROW // 2].astype(float) * ZMAX
+        return self._ground
 
     def slope(self, xq, h=0.1):
         return (self.height(xq + h) - self.height(xq - h)) / (2 * h)
@@ -75,9 +82,15 @@ class Course:
                 idx = i
         return idx
 
-    def hfield(self, rng=None) -> np.ndarray:
-        """(NROW, NCOL) elevations in [0, 1] (times ZMAX), rows along y, with banks and light roughness."""
-        rng = rng or np.random.default_rng(self.seed + 7)
+    def hfield(self) -> np.ndarray:
+        """(NROW, NCOL) elevations in [0, 1] (times ZMAX), rows along y, with banks and light roughness.
+
+        The whole surface is lifted so its lowest point sits 2 cm above the heightfield base; height()
+        reads this same surface (fixed 2026-11-13 after the sim review: it used to read the smooth
+        profile, 2-8 cm off, which made GIFs draw the car floating and the expert's landing guess wrong)."""
+        if getattr(self, "_hf", None) is not None:
+            return self._hf
+        rng = np.random.default_rng(self.seed + 7)
         y = np.linspace(-WIDTH / 2, WIDTH / 2, NROW)
         z = np.repeat(self.profile[None, :], NROW, axis=0)
         # banks: rise 0.35 m over 0.4 m outside the lane
@@ -93,7 +106,8 @@ class Course:
             bumps += rng.uniform(0.003, 0.008) * np.sin(2 * np.pi * self.x / wl + rng.uniform(0, 2 * np.pi))
         z = z + (bumps * flat)[None, :]
         z = np.clip(z - z.min() + 0.02, 0, None)  # keep everything above the base
-        return (z / ZMAX).astype(np.float32)
+        self._hf = (z / ZMAX).astype(np.float32)
+        return self._hf
 
     def to_dict(self):
         return dict(seed=self.seed, jumps=[j.to_dict() for j in self.jumps])

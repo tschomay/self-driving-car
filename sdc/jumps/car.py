@@ -42,6 +42,10 @@ MOUNT_Z = -0.05
 
 
 RAY_SITES = [f"ray{i}" for i in range(len(RAY_ANGLES))] + ["rayL", "rayR"]
+# Optional horizontal fan (env fan=True): rays from the bumper at these angles left (+) / right (-) of
+# straight ahead, level with the chassis, so the car sees the lane edges ahead and can tell its heading.
+FAN_ANGLES = (20, 35, 60, -20, -35, -60)
+FAN_SITES = [f"fan{i}" for i in range(len(FAN_ANGLES))]
 
 
 def cast_rays(m, d, site_ids):
@@ -70,6 +74,10 @@ def model_xml() -> str:
     for i, a in enumerate(RAY_ANGLES):
         r = np.deg2rad(a)
         rays.append(f'<site name="ray{i}" pos="0.235 0 0.02" zaxis="{_site_zaxis((np.cos(r), 0, -np.sin(r)))}" size=".005"/>')
+    for i, a in enumerate(FAN_ANGLES):
+        r, dn = np.deg2rad(a), 0.0
+        v = (np.cos(r) * np.cos(dn), np.sin(r) * np.cos(dn), -np.sin(dn))
+        rays.append(f'<site name="fan{i}" pos="0.235 {0.001 * (i + 1):.3f} 0.02" zaxis="{_site_zaxis(v)}" size=".005"/>')
     rays.append('<site name="rayL" pos="0 0.095 0.02" zaxis="0 1 0" size=".005"/>')
     rays.append('<site name="rayR" pos="0 -0.095 0.02" zaxis="0 -1 0" size=".005"/>')
     corners = []
@@ -85,7 +93,7 @@ def model_xml() -> str:
         {steer}
         <body name="{w}_wheel">
           <joint name="{w}_spin" type="hinge" axis="0 1 0" damping="{TAU_MAX / (TOP_SPEED / WHEEL_R):.6f}"/>
-          <geom name="{w}_tire" type="sphere" group="1" contype="1" conaffinity="0" margin="0.01" gap="0.01" size="{WHEEL_R}" mass="0.12" friction="1.0 0.005 0.0001"
+          <geom name="{w}_tire" type="sphere" group="1" contype="1" conaffinity="0" size="{WHEEL_R}" mass="0.12" friction="1.0 0.005 0.0001"
                 rgba=".15 .15 .15 1"/>
         </body>
       </body>''')

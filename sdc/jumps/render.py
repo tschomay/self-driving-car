@@ -22,7 +22,7 @@ from sdc.jumps import car as cr
 from sdc.jumps import course as crs
 from sdc.jumps import env as je
 
-W, VIEW_H = 480, 200
+W, VIEW_H = 480, 130     # one scale for both axes: 60 px per metre
 PAD_TOP = 74
 STRIP = 84
 SKY = (236, 242, 248)
@@ -38,7 +38,7 @@ BAD = (180, 70, 43)
 GAS = (15, 138, 106)
 BRAKE = (190, 50, 40)
 SPAN_BACK, SPAN_FWD = 2.5, 5.5    # metres shown behind / ahead of the car
-Z_LO, Z_HI = -0.15, 1.75
+Z_LO, Z_HI = -0.1, 2.07
 
 
 def _snap(c: je.JumpCar, a):
@@ -66,7 +66,7 @@ def _snap(c: je.JumpCar, a):
 
 def record(policy, course_seed, max_steps=1500):
     """Drive one course with `policy(batch)`; return the snapshots and the episode summary."""
-    b = je.JumpBatch(1, courses=[course_seed], max_steps=max_steps)
+    b = je.JumpBatch(1, courses=[course_seed], max_steps=max_steps, **getattr(policy, "env_kw", {}))
     c = b.cars[0]
     b._obs = c.reset(course_seed)[None]
     if hasattr(policy, "reset"):

@@ -18,7 +18,7 @@ from sdc.jumps import env as je
 def air_steps(policy, courses=crs.VAL_SEEDS, max_steps=1500, starts=dr.STARTS):
     rows, eps = [], []
     for seed, x0 in [(c, x0) for x0 in starts for c in courses]:
-        b = je.JumpBatch(1, courses=[seed], max_steps=max_steps)
+        b = je.JumpBatch(1, courses=[seed], max_steps=max_steps, **getattr(policy, "env_kw", {}))
         c = b.cars[0]
         b._obs = c.reset(seed, x0=x0)[None]
         if hasattr(policy, "reset"):

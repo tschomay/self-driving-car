@@ -72,13 +72,14 @@ def run(policy, courses, n_envs=None, starts=(0.0,), **batch_kw):
     The car's outcome on a jump is chaotic (tiny differences, even float rounding in a batched
     network, can flip a landing), so experiments score from several starts (STARTS: 3 x 60 jumps).
     """
+    batch_kw = {**getattr(policy, "env_kw", {}), **batch_kw}   # a trained policy carries its env options (e.g. fan)
     jobs = [(c, x0) for x0 in starts for c in courses]
     n_envs = n_envs or min(len(jobs), 10)
     out = []
     for s in range(0, len(jobs), n_envs):
         chunk = jobs[s:s + n_envs]
         b = je.JumpBatch(len(chunk), courses=[c for c, _ in chunk], **batch_kw)
-        b._obs = np.zeros((len(chunk), je.OBS_DIM), np.float32)
+        b._obs = np.zeros((len(chunk), b.obs_dim), np.float32)
         for i, c in enumerate(b.cars):
             b._obs[i] = c.reset(chunk[i][0], x0=chunk[i][1])
         done = np.zeros(len(chunk), bool)

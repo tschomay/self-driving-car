@@ -104,15 +104,21 @@ def model_xml() -> str:
     return f'''<mujoco model="rc-buggy">
   <compiler angle="radian"/>
   <option timestep="{TIMESTEP}" integrator="implicitfast"/>
-  <visual><global offwidth="640" offheight="360"/></visual>
+  <visual><global offwidth="640" offheight="360"/><quality shadowsize="2048"/>
+    <headlight ambient="0.35 0.35 0.35" diffuse="0.5 0.5 0.5" specular="0 0 0"/></visual>
   <asset>
+    <texture name="sky" type="skybox" builtin="gradient" rgb1="0.75 0.85 0.95" rgb2="0.95 0.97 1" width="64" height="64"/>
+    <texture name="dirt" type="2d" builtin="checker" rgb1="0.62 0.50 0.34" rgb2="0.56 0.45 0.30" width="64" height="64"/>
+    <material name="dirt" texture="dirt" texrepeat="60 4" reflectance="0"/>
     <hfield name="terrain" nrow="{crs.NROW}" ncol="{crs.NCOL}" size="{L / 2} {W / 2} {crs.ZMAX} 0.3"/>
   </asset>
   <worldbody>
     <geom name="ground" type="hfield" contype="0" conaffinity="1" hfield="terrain" pos="{L / 2} 0 0" friction="1.0 0.005 0.0001"
-          rgba=".6 .5 .35 1"/>
+          material="dirt"/>
+    <light name="sun" pos="30 -10 20" dir="-0.3 0.4 -1" directional="true" diffuse="0.7 0.7 0.7" castshadow="true"/>
     <body name="car" pos="{crs.START_X} 0 0.25">
       <freejoint name="root"/>
+      <camera name="chase" mode="trackcom" pos="-1.6 -1.6 0.9" xyaxes="0.707 -0.707 0 0.25 0.25 0.935" fovy="50"/>
       <geom name="chassis" type="box" group="1" contype="1" conaffinity="0" size="0.23 0.09 0.035" mass="1.8" rgba=".12 .44 .92 1"/>
       <site name="imu" pos="0 0 0" size=".01"/>
       {"".join(rays)}

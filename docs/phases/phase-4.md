@@ -130,7 +130,12 @@
   - Learning curves swing from 0% to 60% between checkpoints in both cars.
   - The seed spread (about 20 points), and the batched vs one-at-a-time difference (up to 8 points per seed), are bigger than any memory effect.
   - Prediction vs. result: 70% predicted, about 55% measured. "Uses the throttle in the air": no.
-- **Explanation (owner, after the run):** pending.
+- **Explanation (owner, after the run):** "The training curve looks like total noise. It isn't learning anything. Maybe the task is too hard or nuanced for our setup? Or the memory window is too long? Like your setup for a jump matters so much but it's far removed from the landing. And what you need to do driving is adapt in a lot of ways rather than one consistent thing."
+- **Agent's follow-up:**
+  - The validation curve (one pass per checkpoint) is noisy. The training episodes (about 2,500 per run) do show slow learning: E1 seed 2 lands 20% → 50% over training, GRU seed 1 9% → 52%, no-memory E3 seed 0 11% → 33%.
+  - The owner's "setup far from the landing" point holds. With γ 0.99 a reward 2 s away counts 0.37 and one 4 s away 0.17. The jump bonus comes 1 s after touchdown, so the approach speed is credited weakly.
+  - The 64-step chunk limits how far back the memory is trained, not how far back reward credit reaches. That is set by γ and λ.
+- **Takeaway:** memory alone didn't help; credit reaching back to the approach (γ) and a starting point that already jumps (E4) are the next levers.
 - **Resume:** training saves its state at every evaluation and resumes after a container restart. The first E3 baseline runs were lost to a restart at 650k–750k steps.
 
 ## Gate check

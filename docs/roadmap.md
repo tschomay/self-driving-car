@@ -81,7 +81,7 @@ Each phase has a goal, the concepts it teaches, and a **gate**: a measurable ben
 ### Phase 4 — 3D terrain with jumps (MuJoCo on CPU; Modal GPU if needed)
 - **Goal:** a 3D rigid-body sim with heightfield terrain, ramps, and an IMU (accelerometer + gyro) in the observation. Candidate engines: MuJoCo/MJX, Isaac Lab, Genesis; to be decided at Phase 4 entry.
 - **Learn:** 3D dynamics, partial observability (the car is airborne, so it uses memory/recurrence), using throttle to control pitch mid-air, massively parallel GPU simulation.
-- **Gate (provisional):** ≥ 80% of jumps landed wheels-down on a held-out jump track, within the $30/month Modal budget.
+- **Gate (provisional):** ≥ 80% of jumps landed wheels-down on a held-out jump track, within the $30/month Modal budget. **Set at entry (2026-11-12):** ≥ 80% of jumps landed (≥ 0.3 s airborne; four wheels down, no chassis contact, upright and driving 1 s later) on fresh test courses 40000–40019, nominal physics; 180 jumps (3 starts per course, owner 2026-11-13). **Passed 2026-11-13:** 90.6%, on the CPU ($0).
 
 ### Phase 5 — Real car (future, not planned in this map)
 Hardware bill of materials (1/10 off-road chassis, onboard compute like a Raspberry Pi 5 or Jetson, camera, IMU), deployment, and real-world fine-tuning. Sketched here so the earlier phases keep sim-to-real in mind, for example by keeping camera resolution and control rate realistic.

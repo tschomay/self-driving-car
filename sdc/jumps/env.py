@@ -98,6 +98,7 @@ class JumpCar:
         self.slow = 0
         self.airborne = False
         self.takeoff = None          # (t, x)
+        self.body_hit = False        # chassis touched the ground since takeoff (checked every physics step)
         self.pending = None          # landing under evaluation
         self.results = [None] * len(self.course.jumps)   # per course jump: dict or None
         self.air_log = []            # every airborne spell >= MIN_AIR
@@ -118,6 +119,11 @@ class JumpCar:
         g1, g2 = c.geom1[:n], c.geom2[:n]
         body = bool(np.any(((g1 == self.chassis) & (g2 == self.ground)) | ((g2 == self.chassis) & (g1 == self.ground))))
         return wheels, body
+
+    def _chassis_contact(self):
+        n = self.d.ncon
+        g1, g2 = self.d.contact.geom1[:n], self.d.contact.geom2[:n]
+        return bool(np.any(((g1 == self.chassis) & (g2 == self.ground)) | ((g2 == self.chassis) & (g1 == self.ground))))
 
     def state(self):
         """Oracle state (experts, scoring, rendering; never in the policy's obs)."""
@@ -151,7 +157,15 @@ class JumpCar:
         self.d.ctrl[:4] = a[1]
         self.d.ctrl[4:6] = a[0] * cr.STEER_MAX
         v0 = self.d.qvel[:3].copy()
-        mujoco.mj_step(self.m, self.d, cr.SUBSTEPS)
+        if self.airborne or self.pending is not None:
+            # In the air and in a landing window, check the chassis after every 2 ms physics step: a bumper tap
+            # can come and go inside one 20 ms control step (pre-gate review, 2026-11-13). Same physics as
+            # one mj_step of 10 substeps.
+            for _ in range(cr.SUBSTEPS):
+                mujoco.mj_step(self.m, self.d, 1)
+                self.body_hit |= self._chassis_contact()
+        else:
+            mujoco.mj_step(self.m, self.d, cr.SUBSTEPS)
         self.v_prev = v0
         self.t += 1
         self.last_act = a
@@ -165,6 +179,8 @@ class JumpCar:
         if not wheels.any():
             if not self.airborne:
                 self.airborne, self.takeoff = True, (t, st["x"])
+                if self.pending is None:
+                    self.body_hit = False
         elif self.airborne:
             self.airborne = False
             air = t - self.takeoff[0]
@@ -173,7 +189,7 @@ class JumpCar:
                 self.air_log.append(round(air, 3))
                 k = self.course.jump_at(self.takeoff[1])
                 if k is not None and self.results[k] is None and self.pending is None:
-                    self.pending = dict(jump=k, touch=t, air=round(air, 3), all4=False, body=False,
+                    self.pending = dict(jump=k, touch=t, air=round(air, 3), all4=False, body=self.body_hit,
                                         takeoff_x=round(self.takeoff[1], 2), touch_x=round(st["x"], 2),
                                         pitch=round(float(np.degrees(st["pitch"])), 1),
                                         slope=round(float(np.degrees(np.arctan(self.course.slope(st["x"])))), 1),
@@ -182,13 +198,14 @@ class JumpCar:
         if self.pending is not None:
             p = self.pending
             p["all4"] |= bool(wheels.all())
-            p["body"] |= body
+            p["body"] |= body or self.body_hit
             if t - p["touch"] >= LAND_WINDOW:
                 p["upright"] = st["up_z"] >= 0.7
                 p["driving"] = st["v_fwd"] >= 0.5
                 p["landed"] = bool(p["all4"] and not p["body"] and p["upright"] and p["driving"])
                 self.results[p["jump"]] = p
                 self.pending = None
+                self.body_hit = False
                 if p["landed"]:
                     reward += jump_bonus
 

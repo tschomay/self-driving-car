@@ -58,10 +58,11 @@ def reset_memory(h, episode_started):
 
 
 CONFIG = dict(
-    # OWNER TODO 3: shape of the memory network (None = not decided yet)
-    hidden=None,            # memory size, e.g. 32, 64, 128
-    where=None,             # "before": obs -> GRU -> actor/critic MLP heads; "beside": MLP heads see obs AND memory
-    shared=None,            # True: one memory for actor and critic; False: each has its own
+    # OWNER TODO 3: shape of the memory network. Owner (2026-11-13): "64, beside, separate so the
+    # critic doesn't distort memory".
+    hidden=64,              # memory size, e.g. 32, 64, 128
+    where="beside",         # "before": obs -> GRU -> actor/critic MLP heads; "beside": MLP heads see obs AND memory
+    shared=False,           # True: one memory for actor and critic; False: each has its own
     # OWNER TODO 4: training on sequences
     seq_len=None,           # steps per training chunk (how far back gradients flow), e.g. 16, 32, 64
 )

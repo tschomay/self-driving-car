@@ -33,8 +33,16 @@ def gru_step(x, h, p):
     p: a dict of parameters: p["Wz"], p["Wr"], p["Wh"] (n_in -> n_hidden), p["Uz"], p["Ur"], p["Uh"]
        (n_hidden -> n_hidden), each an nn.Linear (call it like p["Wz"](x)); the W's carry the biases.
     Return the new memory, (batch, n_hidden).
+
+    Owner's choice (2026-11-13): (b) blend with an update gate, plus a reset gate r. "B is the best
+    blend where older memories are kept but down weighted. The gate allows a cutoff so the down
+    weighted doesn't have to be too strong, but there can be a cut off so the rest of the lap
+    doesn't impact this jump for example."
     """
-    return None
+    z = torch.sigmoid(p["Wz"](x) + p["Uz"](h))          # update gate: how much of each number to overwrite
+    r = torch.sigmoid(p["Wr"](x) + p["Ur"](h))          # reset gate: how much old memory the candidate sees
+    cand = torch.tanh(p["Wh"](x) + p["Uh"](r * h))      # candidate memory from this step's input
+    return (1 - z) * h + z * cand                        # blend: keep (z~0) or overwrite (z~1)
 
 
 def reset_memory(h, episode_started):

@@ -150,6 +150,23 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
   - Errors against the true pitch and roll: on the ground, in the air, at touchdown, and the worst in a run.
   - `python -m sdc.phase45.e2`.
 - **Prediction (owner, before the run):** "10-15 deg. Accelerometer will be worst. It'll be lost on the air and give bass [bad] input on the ground." (Your filter about 10–15° off in the air and at touchdown; accelerometer-only the worst estimator.)
+- **Result (validation, 60 runs per physics range):** [report](https://claude.ai/artifact/4sxZPJsvuT1wMRMxNmDrRX). Errors in degrees (RMS), nominal / gate range:
+
+  | Estimator | Pitch, ground | Pitch, air | Pitch at touchdown | Roll, ground | Roll, air |
+  |---|---|---|---|---|---|
+  | Gyro only | 4.2 / 5.4 | 3.8 / 4.9 | 3.2 / 3.9 | 3.5 / 5.2 | 3.0 / 4.4 |
+  | Gyro, bias fixed | 4.8 / 5.9 | 4.3 / 5.3 | 3.1 / 3.9 | 3.5 / 5.2 | 3.0 / 4.4 |
+  | Accelerometer only | 13.9 / 13.9 | 37 / 38 | 37 / 34 | 9.4 / 10.8 | 121 / 120 |
+  | **Your filter** | **10.0 / 9.6** | **9.9 / 9.4** | **8.9 / 8.5** | **1.6 / 2.6** | **1.7 / 2.7** |
+  | … always blend (no choice 2) | 7.9 / 7.9 | 4.8 / 4.8 | 4.9 / 4.9 | 5.6 / 5.5 | 11.4 / 11.2 |
+  | … ±0.05 g window | 5.6 / 7.3 | 5.5 / 7.4 | 4.8 / 6.6 | 2.5 / 3.6 | 2.3 / 3.4 |
+
+  - Accelerometer only is the worst: lost in the air (free fall reads about nothing; roll is noise).
+  - Your filter has the best roll (under 3°). Its pitch error comes from acceleration along the car: launch (5–6 m/s²), braking and kicker climbs read as tilt (up to 30° at launch). The total stays within the ±0.15 g window, so the filter trusts it. A ±0.05 g window roughly halves the pitch error. (The tolerance was the agent's default.)
+  - Choice 2 (ignore the accelerometer away from 1 g) is what keeps roll in the air under 3° (11° without it).
+  - Surprise: gyro only is best for pitch on these 12 s courses, since drift has little time to grow. Its error is unbounded on longer drives (0.5°/s of bias is 30° per minute); the filter's isn't.
+  - **Sim bug found and fixed:** the still-car calibration ran while the soft springs were still bouncing, and while the car crept on bumpy starts: bias estimates were up to ±3°/s off. The car now settles 0.5 s and is held still for the 0.2 s, and estimates are within 0.06°/s.
+  - Prediction vs. result: 10–15° predicted; pitch measured about 10° (8.5° at touchdown), roll about 2°. "Accelerometer worst, lost in the air": yes.
 
 ## Gate check
 

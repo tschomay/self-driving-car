@@ -220,15 +220,20 @@ class JumpCar:
                         cr.TIMESTEP)
 
     def _calibrate(self):
-        """IMU readings while the car sits still before the start (0.2 s, 10 control-step reads), for a gyro-bias
+        """IMU readings while the car sits still before the start (0.2 s, 10 control-step reads, after 0.5 s more
+        settling, held still), for a gyro-bias
         calibration like a real car's on power-up. The physics state is restored afterwards, so the run itself
         starts exactly as before (the car was resting anyway)."""
         d = self.d
         saved = (d.qpos.copy(), d.qvel.copy(), d.act.copy(), d.qacc_warmstart.copy(), d.time, d.ctrl.copy())
         d.ctrl[:] = 0.0
+        # let the soft suspension stop bouncing first (0.5 s, unrecorded): a still car, as on a real power-up
+        mujoco.mj_step(self.m, d, int(0.5 / cr.TIMESTEP))
+        self.imu.clear()
         acc, gyro = [], []
         for _ in range(10):
             for _ in range(cr.SUBSTEPS):
+                d.qvel[:] = 0.0          # held still (on a bumpy start the car would otherwise creep)
                 mujoco.mj_step(self.m, d, 1)
                 self._sample_imu()
             a, g = self.imu.read()

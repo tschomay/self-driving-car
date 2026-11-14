@@ -10,6 +10,7 @@ true pitch and roll. Estimators, run on the same logs:
   accelerometer only the angle of the felt gravity, every step
   your filter        my_filter.AttitudeFilter (alpha 0.98, accelerometer ignored away from 1 g, bias fixed)
   ... always blend   your filter without choice 2 (the accelerometer is always blended in)
+  ... ±0.05 g        your filter with a tighter "close to 1 g" window (the ±0.15 g default was the agent's)
 Errors in degrees (RMS) on the ground, in the air, at touchdown (pitch), and the worst error in a run.
 Writes <out>/e2.json.
 """
@@ -71,7 +72,8 @@ class AccelOnly:
 
 def estimators():
     return {"gyro only": GyroOnly(False), "gyro, bias fixed": GyroOnly(True), "accelerometer only": AccelOnly(),
-            "your filter": mf.AttitudeFilter(), "... always blend": mf.AttitudeFilter(g_tol=np.inf)}
+            "your filter": mf.AttitudeFilter(), "... always blend": mf.AttitudeFilter(g_tol=np.inf),
+            "... tolerance ±0.05 g": mf.AttitudeFilter(g_tol=0.05)}
 
 
 def score(run):

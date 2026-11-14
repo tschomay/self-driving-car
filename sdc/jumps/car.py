@@ -68,7 +68,20 @@ def _site_zaxis(direction):
     return " ".join(f"{v:.5f}" for v in d / np.linalg.norm(d))
 
 
-def model_xml() -> str:
+# Phase 4.5 physics switches (model structure). Empty = Phase 4's car exactly.
+#   tires: wide tires (a 3 cm tread with rounded shoulders: a capsule along the axle) instead of spheres
+#   susp:  soft suspension (about 30% sag, about critically damped) and a higher centre of mass (battery on top)
+#   drive: one motor through open differentials (equal torque to the wheels; back-EMF on the mean wheel speed)
+MODEL_SWITCHES = ("tires", "susp", "drive")
+TIRE_W = 0.03         # m, flat part of the tread (capsule segment)
+SOFT_K = 185.0          # N/m per corner: 4.4 N static load per corner / 2.4 cm sag (30% of 8 cm travel)
+SOFT_C = 18.0           # N·s/m per corner: about critically damped with the 0.45 kg corner load. At 0.4 the springs
+                        # rebounded off the kicker lips (a pogo kick) and the expert landed 51%.
+BATTERY_M, BATTERY_Z = 0.4, 0.05   # moved from the chassis box to a pack on top (centre of mass about 1 cm higher)
+
+
+def model_xml(real=()) -> str:
+    real = set(real)
     L, W = crs.LENGTH, crs.WIDTH
     rays = []
     for i, a in enumerate(RAY_ANGLES):
@@ -81,6 +94,21 @@ def model_xml() -> str:
     rays.append('<site name="rayL" pos="0 0.095 0.02" zaxis="0 1 0" size=".005"/>')
     rays.append('<site name="rayR" pos="0 -0.095 0.02" zaxis="0 -1 0" size=".005"/>')
     corners = []
+    if "susp" in real:   # spring at rest at full droop (no preload): sags 2.4 cm under the static load
+        susp = (f'<joint name="{{w}}_susp" type="slide" axis="0 0 1" range="-0.03 0.05" stiffness="{SOFT_K}" '
+                f'springref="-0.03" damping="{SOFT_C}" limited="true" solreflimit="0.005 1" armature="0.01"/>')
+    else:
+        susp = ('<joint name="{w}_susp" type="slide" axis="0 0 1" range="-0.03 0.05" stiffness="1500" damping="30"\n'
+                '               limited="true" solreflimit="0.005 1" armature="0.01"/>')
+    if "tires" in real:  # a capsule along the axle: a 3 cm flat tread with fully rounded shoulders
+        # (A true cylinder snags on the heightfield's grid in MuJoCo: up to 2.8 m/s lost in one landing step.)
+        tire = (f'<geom name="{{w}}_tire" type="capsule" euler="1.5708 0 0" group="1" contype="1" conaffinity="0" '
+                f'size="{WHEEL_R} {TIRE_W / 2}" mass="0.12" friction="1.0 0.005 0.0001" rgba=".15 .15 .15 1"/>')
+    else:
+        tire = (f'<geom name="{{w}}_tire" type="sphere" group="1" contype="1" conaffinity="0" size="{WHEEL_R}" mass="0.12" '
+                f'friction="1.0 0.005 0.0001"\n                rgba=".15 .15 .15 1"/>')
+    # back-EMF drag: per wheel (one motor each), or on the single motor's speed (the mean wheel speed, via a tendon)
+    spin_damp = 1e-5 if "drive" in real else TAU_MAX / (TOP_SPEED / WHEEL_R)
     for w in WHEELS:
         cx, cy = CORNER[w]
         steer = (f'<joint name="{w}_steer" type="hinge" axis="0 0 1" range="-{STEER_MAX} {STEER_MAX}" '
@@ -88,19 +116,27 @@ def model_xml() -> str:
         corners.append(f'''
       <body name="{w}" pos="{cx} {cy} {MOUNT_Z}">
         <inertial pos="0 0 0" mass="0.05" diaginertia="2e-5 2e-5 2e-5"/>
-        <joint name="{w}_susp" type="slide" axis="0 0 1" range="-0.03 0.05" stiffness="1500" damping="30"
-               limited="true" solreflimit="0.005 1" armature="0.01"/>
+        {susp.format(w=w)}
         {steer}
         <body name="{w}_wheel">
-          <joint name="{w}_spin" type="hinge" axis="0 1 0" damping="{TAU_MAX / (TOP_SPEED / WHEEL_R):.6f}"/>
-          <geom name="{w}_tire" type="sphere" group="1" contype="1" conaffinity="0" size="{WHEEL_R}" mass="0.12" friction="1.0 0.005 0.0001"
-                rgba=".15 .15 .15 1"/>
+          <joint name="{w}_spin" type="hinge" axis="0 1 0" damping="{spin_damp:.6f}"/>
+          {tire.format(w=w)}
         </body>
       </body>''')
     sensors = ['<accelerometer name="accel" site="imu"/>', '<gyro name="gyro" site="imu"/>']
     sensors += [f'<jointvel name="{w}_w" joint="{w}_spin"/>' for w in WHEELS]
     motors = "\n    ".join(f'<motor name="{w}_motor" joint="{w}_spin" gear="{TAU_MAX}" ctrlrange="-1 1"/>'
                            for w in WHEELS)
+    tendon = ""
+    if "drive" in real:   # one motor: equal torque to every wheel (open diffs), drag on the mean wheel speed
+        motors = f'<motor name="motor" tendon="drive" gear="{4 * TAU_MAX}" ctrlrange="-1 1"/>'
+        tendon = ('\n  <tendon><fixed name="drive" damping="' + f"{4 * TAU_MAX / (TOP_SPEED / WHEEL_R):.6f}" + '">'
+                  + "".join(f'<joint joint="{w}_spin" coef="0.25"/>' for w in WHEELS) + '</fixed></tendon>')
+    if "susp" in real:
+        chassis_m, battery = 1.8 - BATTERY_M, (f'\n      <geom name="battery" type="box" group="1" contype="0" conaffinity="0" '
+                                               f'pos="0 0 {BATTERY_Z}" size="0.07 0.035 0.015" mass="{BATTERY_M}" rgba=".2 .2 .2 1"/>')
+    else:
+        chassis_m, battery = 1.8, ""
     return f'''<mujoco model="rc-buggy">
   <compiler angle="radian"/>
   <option timestep="{TIMESTEP}" integrator="implicitfast"/>
@@ -119,7 +155,7 @@ def model_xml() -> str:
     <body name="car" pos="{crs.START_X} 0 0.25">
       <freejoint name="root"/>
       <camera name="chase" mode="trackcom" pos="-1.6 -1.6 0.9" xyaxes="0.707 -0.707 0 0.25 0.25 0.935" fovy="50"/>
-      <geom name="chassis" type="box" group="1" contype="1" conaffinity="0" size="0.23 0.09 0.035" mass="1.8" rgba=".12 .44 .92 1"/>
+      <geom name="chassis" type="box" group="1" contype="1" conaffinity="0" size="0.23 0.09 0.035" mass="{chassis_m}" rgba=".12 .44 .92 1"/>{battery}
       <site name="imu" pos="0 0 0" size=".01"/>
       {"".join(rays)}
       {"".join(corners)}
@@ -129,19 +165,19 @@ def model_xml() -> str:
     {motors}
     <position name="fl_servo" joint="fl_steer" kp="3" ctrlrange="-{STEER_MAX} {STEER_MAX}"/>
     <position name="fr_servo" joint="fr_steer" kp="3" ctrlrange="-{STEER_MAX} {STEER_MAX}"/>
-  </actuator>
+  </actuator>{tendon}
   <sensor>
     {chr(10).join(sensors)}
   </sensor>
 </mujoco>'''
 
 
-_BASE = None
+_BASE = {}
 
 
-def build_model() -> mujoco.MjModel:
+def build_model(real=()) -> mujoco.MjModel:
     """A fresh model (each env owns one so each can hold its own course in the heightfield)."""
-    global _BASE
-    if _BASE is None:
-        _BASE = model_xml()
-    return mujoco.MjModel.from_xml_string(_BASE)
+    key = tuple(sorted(set(real) & set(MODEL_SWITCHES)))
+    if key not in _BASE:
+        _BASE[key] = model_xml(key)
+    return mujoco.MjModel.from_xml_string(_BASE[key])

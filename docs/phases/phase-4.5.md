@@ -36,6 +36,59 @@ Measured first (agent, before the decisions):
 5. **E5 — How much delay can it take?** Add sensor and compute delay until landings collapse. This tells Phase 5 how fast the Pi's loop must be.
 6. **Gate** on test courses 45000–45019.
 
+## The realistic car (built 2026-11-14)
+
+All switches are off by default, and then the car is Phase 4's exactly: the same model file, and the Phase 4 expert's validation score reproduces (92.8%). Code: `sdc/jumps/real.py`, plus options on `car.py`, `env.py` and `driver.py`. Tests: `tests/test_real.py`.
+
+**Physics** (`real=`; `"all"` turns on all six):
+
+| Switch | What changes |
+|---|---|
+| `tires` | Wide tires: a 3 cm tread with rounded shoulders (a capsule along the axle) instead of a sphere. A true cylinder was rejected: in MuJoCo it snags on the heightfield's grid and loses up to 2.8 m/s in a single landing step. |
+| `susp` | Soft suspension: 2.4 cm of sag (30% of the 8 cm travel), damped to about critical. A 0.4 damping ratio was tried first; the springs rebounded off the kicker lips and threw the car (a pogo kick). A 0.4 kg battery pack sits on top, raising the centre of mass. |
+| `drive` | One motor through open differentials: equal torque to every wheel, back-EMF drag on the mean wheel speed. A wheel in the air spins up and steals speed. |
+| `servo` | The steering servo moves at a limited speed (0.12 s per 60° nominal), with a 0.01 rad deadband. |
+| `battery` | Motor power scales with the pack's charge (95% nominal) and sags 7% at full throttle. |
+| `delay` | Commands reach the servo and ESC 15 ms after the sensors are read (nominal): Pi compute plus the PWM frame. It is applied at 2 ms resolution with ±1 ms jitter. |
+
+**Sensors** (`sensors=`):
+- `ideal`: Phase 4's perfect sensors.
+- `noisy`: Phase 4's layout, so its gate car can drive unchanged, with realistic signals:
+  - The IMU is sampled every 2 ms. Each sample clips at ±16 g and ±2000°/s, and the samples are averaged per step. On top: sensor noise, motor vibration that grows with speed, a per-run bias, bias drift, and a randomly tilted mount.
+  - One motor-speed signal, from hall-sensor counts every 20 ms (about 0.15 m/s steps), goes in both wheel-speed slots. It reads wrong when wheels spin in the air.
+  - Every ray gets range noise and 2% dropouts.
+  - The servo slot reports the command, since a hobby servo has no position feedback.
+- `parts`: the parts list's layout, 76 numbers:
+  - IMU (6) and motor speed (1);
+  - TFmini-S, one beam 3° down, 8 m outdoors (1);
+  - VL53L5CX, 8×8 zones over 45°, looking 25° down, updated at 15 Hz, about 3 m range outdoors, 4% of zones invalid per frame (64);
+  - two side VL53L1X, 3 m (2);
+  - last action (2).
+
+  The two side sensors (about $10) were added to the parts list: without them, nothing sees the lane edges, and Phase 4 showed that heading matters.
+
+**Randomized physics** (`dr=`; drawn per run from the course, the start and a physics seed, so scores don't depend on batching):
+
+| | Training range | Gate range |
+|---|---|---|
+| Mass | ×0.85–1.15 | ×0.75–1.3 |
+| Tire grip | 0.7–1.1 | 0.55–1.25 |
+| Spring, damping | ×0.8–1.25, ×0.7–1.4 | ×0.7–1.4, ×0.6–1.7 |
+| Motor torque, battery charge | ×0.85–1.1, 85–100% | ×0.8–1.15, 80–100% |
+| Servo speed (s per 60°) | 0.08–0.16 | 0.06–0.2 |
+| Control delay | 5–30 ms | 0–45 ms |
+| IMU mount tilt | ±1° | ±2° |
+| Sensor noise | ×0.5–1.5 | ×0.5–2 |
+| ToF range (sunlight) | 2–4 m | 1.5–4 m |
+
+**Expert (the teacher), retuned:** each jump's design speed + 0.3 m/s (the damper soaks up some of the kicker), and twice the in-air pitch damping (with up to 45 ms of delay, Phase 4's gains overshoot to 20–33° nose down). Settings: `sdc/phase45/common.py`. Two other ideas didn't help and were dropped: an integral term on speed, and in-air gains scaled by power-to-weight.
+
+**Speed:** about 400–700 sim steps/s per core, against about 1,500 in Phase 4: physics now runs 2 ms at a time in Python, with the IMU sampled at each step. A 1M-step run takes about 30–40 min.
+
+**Phase 4's gate car was rebuilt.** Its weights were lost with the old container (`runs/` is not committed), so it is being retrained from the logged commands with the same seeds.
+
+**Test set:** courses 45000–45019 with physics seed 45, never used by experiments.
+
 ## Experiments
 
 ## Gate check

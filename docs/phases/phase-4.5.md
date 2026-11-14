@@ -231,6 +231,16 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
 - **Owner's question:** "We've added a lot of complexity but kept the same model. Do we need a bigger one or different architecture?"
 - **Agent's check:** the copy's imitation error on its own training data is twice Phase 4's (0.032 vs 0.017 for E3; 0.020 for E3b), and it rises as DAgger adds data. That points to underfitting (the network can't reproduce the expert from these inputs: too small, or missing information such as memory), not to overfitting.
 
+### E4 — What does the student need?
+
+- **Owner (2026-11-14):** "Do a, c, d now and build the GRU." Also: change the course for a realistic out-lap. "Roll at a slow pace to learn the track. No jumps, just measuring... instead of gap jumps we use rollers that can be doubled."
+- **Setup:** copies of the steady expert, E3b's recipe (parts-list sensors, training-range physics, scored at gate range), no fine-tuning. Seeds 0–1. Baseline: E3b's copies (64-unit layers, 61% / 69%).
+  - (a) bigger: 256-unit layers;
+  - (c) plus the owner's filter (pitch and roll, with telemetry) as two inputs;
+  - (d) both.
+  - `bash sdc/phase45/e4_runs.sh`.
+  - Next: (b) the owner's GRU memory (the copying code needs a sequence version).
+
 ## Gate check
 
 ## Handoff to next phase

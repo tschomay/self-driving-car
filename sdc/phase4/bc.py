@@ -97,6 +97,7 @@ def main():
     ap.add_argument("--env", action="append", default=[], metavar="KEY=VALUE",
                     help="extra env options as JSON values (Phase 4.5: real, sensors, dr, val_dr)")
     ap.add_argument("--expert", default=None, help="ExpertDriver options as JSON (default: Phase 4's)")
+    ap.add_argument("--hidden", default="[64, 64]", help="layer sizes as JSON (Phase 4.5 E4)")
     a = ap.parse_args()
     for kv in a.env:
         k, v = kv.split("=", 1)
@@ -110,10 +111,13 @@ def main():
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     expert = dr.ExpertDriver(**EXPERT)
-    net = tr.ActorCritic(obs_dim=batch(0, 1).obs_dim)
+    hidden = json.loads(a.hidden)
+    net = tr.ActorCritic(obs_dim=batch(0, 1).obs_dim, hidden=hidden)
     env_kw = dict(fan=ENV["fan"], servo=ENV["servo"])
     if "real" in ENV or "sensors" in ENV:   # Phase 4.5: score (and later select) at the validation physics range
         env_kw.update(real=ENV.get("real", ()), sensors=ENV.get("sensors", "ideal"), dr=ENV.get("val_dr"))
+        if ENV.get("attitude"):
+            env_kw["attitude"] = True
     Xs, Ys, log = [], [], []
     for r in range(a.rounds):
         O, A, _, _ = collect(net, expert, a.steps, a.seed * 1000 + r, use_expert=(r == 0))
@@ -131,7 +135,7 @@ def main():
     torch.save(net.state_dict(), out / "model.pt")
     final = tr.evaluate(tr.Greedy(net, env_kw), starts=dr.STARTS, **env_kw)
     m = dict(label="behaviour clone of the expert", seed=a.seed, rounds=log, critic_mse=vmse, expert=EXPERT,
-             env={**tr.ENV, **ENV}, ppo=dict(tr.DEFAULTS), selection=dict(chosen=0, rate=final["rate"], final_rate=final["rate"]),
+             env={**tr.ENV, **ENV}, ppo={**tr.DEFAULTS, "hidden": hidden}, selection=dict(chosen=0, rate=final["rate"], final_rate=final["rate"]),
              final={k: v for k, v in final.items() if k != "episodes"}, final_episodes=final["episodes"],
              evals=[dict(timesteps=0, rate=final["rate"], finished=final["finished"])],
              wall_s=round(time.perf_counter() - t0, 1))

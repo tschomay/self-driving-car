@@ -208,7 +208,11 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
   - Best single cues on gaps and tables: touchdown jolt (−0.45 correlation), airtime (−0.37), speed lost after touchdown (+0.32).
   - What really sets the design speed is where the landing ramp starts (correlation 0.81). These measurements don't capture it.
 - **What a perfect map is worth** (expert, validation, 180 jumps): per-jump speeds vs a steady 7.4 m/s, 98% vs 95% at nominal, 87% vs 79% at gate range.
-- **Decision pending** (owner): build a landing-ramp measurement for the out-lap, or fall back to (a).
+- **Decision (owner, 2026-11-14):** fall back to (a) first ("Sure"). Its result shows whether the half day of landing-ramp measurement is worth it.
+
+### E3b — Copy the steady-speed expert
+
+- **Setup:** E3 arm B exactly (parts-list sensors, training-range physics, scored and kept at gate range, finish bonus 100), but the teacher drives a steady 7.4 m/s into every jump, a speed choice the student can copy. Seeds 0–1. `bash sdc/phase45/e3b_runs.sh`. Reference: the steady expert itself lands 95% at nominal and 79% at gate range.
 
 ## Gate check
 

@@ -132,3 +132,13 @@ def test_filter_telemetry_removes_launch_tilt():
             v += 4 * mf.DT
             f.update(level + [4.0, 0, 0], np.zeros(3), speed=v)
         assert (abs(np.degrees(f.pitch)) < 2) == ok
+
+
+def test_roller_courses_keep_tables_and_drops_in_place():
+    from sdc.jumps import course as crs
+    for seed in crs.VAL_SEEDS:
+        a, b = crs.make(seed), crs.make(seed, kinds=crs.KINDS45)
+        assert [j.kind.replace("gap", "double") for j in a.jumps] == [j.kind for j in b.jumps]
+        for ja, jb in zip(a.jumps, b.jumps):
+            assert ja.lip == jb.lip and ja.design_speed == jb.design_speed
+        assert b.jumps[-1].end < crs.FINISH_X - 8

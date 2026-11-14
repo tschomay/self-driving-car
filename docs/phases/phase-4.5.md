@@ -167,6 +167,8 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
   - Surprise: gyro only is best for pitch on these 12 s courses, since drift has little time to grow. Its error is unbounded on longer drives (0.5°/s of bias is 30° per minute); the filter's isn't.
   - **Sim bug found and fixed:** the still-car calibration ran while the soft springs were still bouncing, and while the car crept on bumpy starts: bias estimates were up to ±3°/s off. The car now settles 0.5 s and is held still for the 0.2 s, and estimates are within 0.06°/s.
   - Prediction vs. result: 10–15° predicted; pitch measured about 10° (8.5° at touchdown), roll about 2°. "Accelerometer worst, lost in the air": yes.
+- **Explanation (owner, after the run):** "In actual racing, close to 1g effectively never happens. Here it seems the cars acceleration is much less than the forces around jumps. We could add telemetry - throttle and steering along with the grip estimate and maybe travel direction."
+- **Takeaway:** checking the size of the acceleration catches free fall and impacts, but not a push along the car (5 m/s² changes the total by only 11%). The fix is to know the car's own acceleration from other sensors (motor speed, commands) and subtract it, the owner's telemetry idea.
 
 ## Gate check
 

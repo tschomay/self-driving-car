@@ -35,7 +35,7 @@ EXPERT = dict(plan=False, v_target=7.1)
 
 
 def batch(seed, n=16):
-    return je.JumpBatch(n, seed=seed, **ENV)
+    return je.JumpBatch(n, seed=seed, **{k: v for k, v in ENV.items() if k != "val_dr"})
 
 
 def collect(net, expert, n_steps, seed, use_expert, noise=0.1):
@@ -94,7 +94,16 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--rounds", type=int, default=6)
     ap.add_argument("--steps", type=int, default=50_000)
+    ap.add_argument("--env", action="append", default=[], metavar="KEY=VALUE",
+                    help="extra env options as JSON values (Phase 4.5: real, sensors, dr, val_dr)")
+    ap.add_argument("--expert", default=None, help="ExpertDriver options as JSON (default: Phase 4's)")
     a = ap.parse_args()
+    for kv in a.env:
+        k, v = kv.split("=", 1)
+        ENV[k] = json.loads(v)
+    if a.expert:
+        EXPERT.clear()
+        EXPERT.update(json.loads(a.expert))
     torch.set_num_threads(1)
     torch.manual_seed(a.seed)
     t0 = time.perf_counter()
@@ -103,6 +112,8 @@ def main():
     expert = dr.ExpertDriver(**EXPERT)
     net = tr.ActorCritic(obs_dim=batch(0, 1).obs_dim)
     env_kw = dict(fan=ENV["fan"], servo=ENV["servo"])
+    if "real" in ENV or "sensors" in ENV:   # Phase 4.5: score (and later select) at the validation physics range
+        env_kw.update(real=ENV.get("real", ()), sensors=ENV.get("sensors", "ideal"), dr=ENV.get("val_dr"))
     Xs, Ys, log = [], [], []
     for r in range(a.rounds):
         O, A, _, _ = collect(net, expert, a.steps, a.seed * 1000 + r, use_expert=(r == 0))

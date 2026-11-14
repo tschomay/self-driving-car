@@ -119,3 +119,16 @@ def test_still_calibration_is_recorded():
     c.reset(10000)
     assert c.still_gyro.shape == (10, 3)
     assert np.abs(np.linalg.norm(c.still_acc, axis=1) / 9.81 - 1).max() < 0.2
+
+
+def test_filter_telemetry_removes_launch_tilt():
+    from sdc.phase45 import my_filter as mf
+    level = np.array([0.0, 0.0, 9.81])
+    for telem, ok in ((False, False), (True, True)):
+        f = mf.AttitudeFilter(telemetry=telem)
+        f.reset(np.zeros((10, 3)), np.tile(level, (10, 1)))
+        v = 0.0
+        for _ in range(100):   # level car accelerating at 4 m/s²: the accelerometer feels it as tilt
+            v += 4 * mf.DT
+            f.update(level + [4.0, 0, 0], np.zeros(3), speed=v)
+        assert (abs(np.degrees(f.pitch)) < 2) == ok

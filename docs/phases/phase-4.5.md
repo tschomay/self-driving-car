@@ -170,6 +170,32 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
 - **Explanation (owner, after the run):** "In actual racing, close to 1g effectively never happens. Here it seems the cars acceleration is much less than the forces around jumps. We could add telemetry - throttle and steering along with the grip estimate and maybe travel direction."
 - **Takeaway:** checking the size of the acceleration catches free fall and impacts, but not a push along the car (5 m/s² changes the total by only 11%). The fix is to know the car's own acceleration from other sensors (motor speed, commands) and subtract it, the owner's telemetry idea.
 
+### E3 — Retrain for the real car
+
+- **Setup:**
+  - Phase 4's recipe on the realistic car. DAgger-copy the 4.5 expert into the owner's network (two 64-unit layers) on the **parts-list sensors** (76 inputs). Then fine-tune with the owner's PPO: finish bonus 100 (owner: "make sure you include a completion bonus so the PPO doesn't just regress"), std 0.15 → 0.05, γ 0.997, steering cost 0.03, 1M steps.
+  - Arm A trains at nominal physics, arm B on the training range; seeds 0–1 each.
+  - Both are scored at gate-range physics on the validation courses. Checkpoints are kept by that score too (early stopping on validation, as in Phases 3–4).
+  - `bash sdc/phase45/e3_runs.sh`. `sdc/phase4/train.py` and `bc.py` gained Phase 4.5 env options; Phase 4 defaults are unchanged.
+- **Prediction (owner, before the run):** "A. 65% B. 75% this has been a winning recipe but the task is hard so I expect less improvement."
+- **Result (validation, gate-range physics, 180 jumps per run):** [report](https://claude.ai/artifact/PvZ1ofJoKSJa8Ad14zDihv).
+
+  | Run | Copy | Copy + PPO (kept) | End of training |
+  |---|---|---|---|
+  | A (nominal), seeds 0/1 | 63% / 62% | 57% / 62% | 58% / 48% |
+  | B (training range), seeds 0/1 | 66% / 68% | 62% / 59% | 50% / 50% |
+  | Phase 4's gate car, unchanged (E1) | | 61% | |
+  | Expert (4.5) | | 87% | |
+
+  - Randomized training helps the copy by about 4 points.
+  - Fine-tuning didn't help: it drifted down even with the finish bonus. Kept checkpoints were picked on a noisy 60-jump score.
+  - The copy trails the expert by 15–20 points at every physics range: nominal 81–83% vs 98%, training range 74–76% vs 90%. The most common ending is "stuck" (casing a gap).
+  - **Cause, checked:** the expert approaches each jump at its design speed + 0.3 m/s, read from the course plan (approach speed vs design speed: correlation 0.94). The copy can't sense that, so it drives one average speed into every jump (correlation −0.21). The student can't copy what it can't sense. Phase 4 copied a steady-speed expert for this reason; this phase's retuned expert reintroduced the per-jump plan.
+  - Prediction vs. result: A 65% / B 75% predicted; measured A 57–63%, B 59–68%. "B better": yes, by about 4 points, not 10.
+- **Explanation (owner, after the run):** "The expert knows the track. We could add a steady speed out lap or provide a rough track map."
+- **Takeaway:** a teacher that uses information the student can't sense can't be copied. Either the teacher drives only on what the student could know, or the student gets that knowledge (a map, an out-lap).
+- **Owner's decision for E4:** upgrade the filter with telemetry: subtract the forward acceleration measured from motor speed before taking the accelerometer's angle (yes).
+
 ## Gate check
 
 ## Handoff to next phase

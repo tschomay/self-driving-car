@@ -192,6 +192,8 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
   - The copy trails the expert by 15–20 points at every physics range: nominal 81–83% vs 98%, training range 74–76% vs 90%. The most common ending is "stuck" (casing a gap).
   - **Cause, checked:** the expert approaches each jump at its design speed + 0.3 m/s, read from the course plan (approach speed vs design speed: correlation 0.94). The copy can't sense that, so it drives one average speed into every jump (correlation −0.21). The student can't copy what it can't sense. Phase 4 copied a steady-speed expert for this reason; this phase's retuned expert reintroduced the per-jump plan.
   - Prediction vs. result: A 65% / B 75% predicted; measured A 57–63%, B 59–68%. "B better": yes, by about 4 points, not 10.
+- **Explanation (owner, after the run):** "The expert knows the track. We could add a steady speed out lap or provide a rough track map."
+- **Takeaway:** a teacher that uses information the student can't sense can't be copied. Either the teacher drives only on what the student could know, or the student gets that knowledge (a map, an out-lap).
 - **Owner's decision for E4:** upgrade the filter with telemetry: subtract the forward acceleration measured from motor speed before taking the accelerometer's angle (yes).
 
 ## Gate check

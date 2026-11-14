@@ -136,6 +136,40 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
 - **Explanation (owner, after the run):** "Acceleration and angle are very important, and soft springs change both. Maybe moreover, the car can tip while the wheels stay flat, so the rays point different directions compared with the linear motion of the car."
 - **Takeaway:** sensors bolted to a sprung body measure the body, not the car's path. Body roll and pitch must be estimated (the IMU, your filter in E2) or designed out (sensor placement), and a policy trained on a stiff car never learned to tell the two apart.
 
+### E2 — Your pitch and roll filter
+
+- **Owner's filter (`sdc/phase45/my_filter.py`, 2026-11-14):** a complementary filter.
+  1. Blend α = 0.98 at 50 Hz: the gyro carries the angle, and the accelerometer pulls out drift within about 1 s.
+  2. The accelerometer is ignored whenever the total isn't close to 1 g (in the air, landings, hard braking). Tolerance ±0.15 g (agent's default).
+  3. Gyro bias: the average while the car sits still for 0.2 s before the start, subtracted.
+  4. Both pitch and roll.
+- **Sim support:** the car now records 0.2 s of IMU readings while sitting still before each run (like a power-up calibration). The physics is restored afterwards, so runs start exactly as before. The noise stream shifts, so E1 reruns would differ slightly.
+- **Setup:**
+  - The 4.5 expert drives the realistic car (all physics, noisy IMU) on the validation courses, 3 starts, at nominal, training-range and gate-range physics.
+  - Estimators on the same logs: gyro only (with and without the bias fix), accelerometer only, your filter, and your filter without choice 2.
+  - Errors against the true pitch and roll: on the ground, in the air, at touchdown, and the worst in a run.
+  - `python -m sdc.phase45.e2`.
+- **Prediction (owner, before the run):** "10-15 deg. Accelerometer will be worst. It'll be lost on the air and give bass [bad] input on the ground." (Your filter about 10–15° off in the air and at touchdown; accelerometer-only the worst estimator.)
+- **Result (validation, 60 runs per physics range):** [report](https://claude.ai/artifact/4sxZPJsvuT1wMRMxNmDrRX). Errors in degrees (RMS), nominal / gate range:
+
+  | Estimator | Pitch, ground | Pitch, air | Pitch at touchdown | Roll, ground | Roll, air |
+  |---|---|---|---|---|---|
+  | Gyro only | 4.2 / 5.4 | 3.8 / 4.9 | 3.2 / 3.9 | 3.5 / 5.2 | 3.0 / 4.4 |
+  | Gyro, bias fixed | 4.8 / 5.9 | 4.3 / 5.3 | 3.1 / 3.9 | 3.5 / 5.2 | 3.0 / 4.4 |
+  | Accelerometer only | 13.9 / 13.9 | 37 / 38 | 37 / 34 | 9.4 / 10.8 | 121 / 120 |
+  | **Your filter** | **10.0 / 9.6** | **9.9 / 9.4** | **8.9 / 8.5** | **1.6 / 2.6** | **1.7 / 2.7** |
+  | … always blend (no choice 2) | 7.9 / 7.9 | 4.8 / 4.8 | 4.9 / 4.9 | 5.6 / 5.5 | 11.4 / 11.2 |
+  | … ±0.05 g window | 5.6 / 7.3 | 5.5 / 7.4 | 4.8 / 6.6 | 2.5 / 3.6 | 2.3 / 3.4 |
+
+  - Accelerometer only is the worst: lost in the air (free fall reads about nothing; roll is noise).
+  - Your filter has the best roll (under 3°). Its pitch error comes from acceleration along the car: launch (5–6 m/s²), braking and kicker climbs read as tilt (up to 30° at launch). The total stays within the ±0.15 g window, so the filter trusts it. A ±0.05 g window roughly halves the pitch error. (The tolerance was the agent's default.)
+  - Choice 2 (ignore the accelerometer away from 1 g) is what keeps roll in the air under 3° (11° without it).
+  - Surprise: gyro only is best for pitch on these 12 s courses, since drift has little time to grow. Its error is unbounded on longer drives (0.5°/s of bias is 30° per minute); the filter's isn't.
+  - **Sim bug found and fixed:** the still-car calibration ran while the soft springs were still bouncing, and while the car crept on bumpy starts: bias estimates were up to ±3°/s off. The car now settles 0.5 s and is held still for the 0.2 s, and estimates are within 0.06°/s.
+  - Prediction vs. result: 10–15° predicted; pitch measured about 10° (8.5° at touchdown), roll about 2°. "Accelerometer worst, lost in the air": yes.
+- **Explanation (owner, after the run):** "In actual racing, close to 1g effectively never happens. Here it seems the cars acceleration is much less than the forces around jumps. We could add telemetry - throttle and steering along with the grip estimate and maybe travel direction."
+- **Takeaway:** checking the size of the acceleration catches free fall and impacts, but not a push along the car (5 m/s² changes the total by only 11%). The fix is to know the car's own acceleration from other sensors (motor speed, commands) and subtract it, the owner's telemetry idea.
+
 ## Gate check
 
 ## Handoff to next phase

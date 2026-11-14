@@ -241,6 +241,20 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
   - `bash sdc/phase45/e4_runs.sh`.
   - Next: (b) the owner's GRU memory (the copying code needs a sequence version).
 - **Prediction (owner, before the run):** "I think the out lap will help the most, but from this batch I think the bigger network will help it on the training courses at least. Modest improvement, maybe 5pp closer." (The bigger network helps most of the three, about 5 points closer to the teacher.)
+- **Result (validation, gate range, 180 jumps):** [report](https://claude.ai/artifact/MqonTVRzUEZun3PA6gTv3Q).
+
+  | Student (copy of the steady expert) | Seed 0 / 1 | Training range (seed 0) | Imitation error |
+  |---|---|---|---|
+  | Baseline: 64-unit layers (E3b) | 69% / 61% | 77% | 0.020 |
+  | (a) 256-unit layers | 64% / 64% | 73% | 0.0175 |
+  | (c) + owner's filter (pitch, roll) | **71% / 71%** | 74% | 0.018 |
+  | (d) both | 67% / 68% | 79% | 0.014 |
+  | Steady expert (teacher) | 79% | | |
+
+  - The bigger network fits the expert's actions better, but lands no more jumps, even at training-range physics.
+  - The owner's filter as inputs: about +6 points at gate range on both seeds.
+  - Still 8 points under the teacher. Losing the lane is still the commonest ending.
+  - Prediction vs. result: "bigger network helps most, about 5 points closer": no. It fits better but drives no better. The filter helped most.
 
 ## Gate check
 

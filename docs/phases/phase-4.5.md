@@ -274,6 +274,8 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
   - Missed jumps are mostly tables and drops landed badly (seed 0: tables 48/63, drops 22/42).
   - Copying took 13 min per seed.
   - Prediction vs. result: about 74% predicted; 69–70% landed, but completion jumped from about 50% to 72–78%.
+- **Explanation (owner, after the run):** "Keeping the lane means smooth and small corrections, which short memory helps. Landing requires complex control in the air and learning how to drive like that."
+- **Correction (owner caught it, 2026-11-14):** E3–E4 (and their GIFs) ran on Phase 4's gap courses. The roller courses were only used by the out-lap crawl tests. From E5 on, training, validation and the gate use roller courses.
 
 ### Walk-through out-lap: first test (2026-11-14)
 

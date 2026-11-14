@@ -229,6 +229,7 @@ def walk(course, x0=0.0, max_steps=4000, filter_kw=None, **env_kw):
     filt.reset(c.still_gyro, c.still_acc)
     xs, zs, z, xh = [0.0], [0.0], 0.0, 0.0
     true_x = [c.state()["x"]]   # labels only (never used to build the profile)
+    pitches = [0.0]
     reason = None
     while True:
         obs, _, term, trunc, infos = b.step(drv(b))
@@ -245,6 +246,8 @@ def walk(course, x0=0.0, max_steps=4000, filter_kw=None, **env_kw):
         xs.append(xh)
         zs.append(z)
         true_x.append(c.state()["x"])
+        pitches.append(pitch)
+    walk.pitch = np.array(pitches)   # the filter's pitch per step (for find_jumps_pitch)
     return np.array(xs), np.array(zs), reason, np.array(true_x)
 
 
@@ -297,7 +300,7 @@ def _walk_job(args):
     xs, zs, reason, tx = walk(course, x0, **kw)
     c = crs.make(course, kinds=crs.KINDS45)
     rows = []
-    for j in find_jumps(xs, zs):
+    for j in find_jumps_pitch(xs, walk.pitch):
         k = c.jump_at(float(np.interp(j["lip"], xs, tx)))          # label only
         J = c.jumps[k] if k is not None else None
         rows.append(dict(meas=j, kind=J.kind if J else None, design=J.design_speed if J else None,
@@ -305,7 +308,7 @@ def _walk_job(args):
     return rows
 
 
-def walk_collect(courses, starts=(0.0,), dr="train", procs=3):
+def walk_collect(courses, starts=(0.0,), dr="train", procs=4):
     kw = dict(real="all", sensors="parts", dr=dr)
     with Pool(procs) as p:
         return [r for rs in p.map(_walk_job, [(c, x0, kw) for c in courses for x0 in starts]) for r in rs]
@@ -325,3 +328,47 @@ def fit_walk(rows, ridge=1e-1):
 def predict_walk(model, j):
     z = (jump_features(j) - np.array(model["mu"])) / np.array(model["sd"])
     return float(np.clip(z @ np.array(model["w"]), crs.DESIGN_SPEED[0] - 0.5, crs.DESIGN_SPEED[1] + 0.5))
+
+
+def find_jumps_pitch(xs, pitch, up=np.deg2rad(8), down=np.deg2rad(4), min_climb=0.15, flat_end=1.5):
+    """Jumps from the shape of the pitch trace along the odometer (no height integration).
+    Runs: up (pitch > 8°), down (< -4°: landing slopes are gentle), flat. A jump starts with an up run that climbs at least min_climb m.
+    lip = end of that climb. After it, until flat ground lasts flat_end m: the landing is the start of the LAST
+    down run (table: after the flat top; double: roller 2's crest; drop: right after the lip)."""
+    grid = np.arange(0, xs[-1], 0.05)
+    p = np.interp(grid, xs, pitch)
+    p = np.convolve(np.pad(p, 3, mode="edge"), np.ones(7) / 7, mode="valid")   # 0.35 m smoothing
+    state = np.where(p > up, 1, np.where(p < -down, -1, 0))   # landing slopes are gentle: a lower bar for descents
+    runs, i = [], 0                       # (kind, start index, end index)
+    while i < len(state):
+        j = i
+        while j + 1 < len(state) and state[j + 1] == state[i]:
+            j += 1
+        runs.append((int(state[i]), i, j))
+        i = j + 1
+    out, k = [], 0
+    while k < len(runs):
+        kind, a, b = runs[k]
+        climb = float(np.sum(np.sin(p[a:b + 1])) * 0.05) if kind == 1 else 0.0
+        if kind != 1 or climb < min_climb:
+            k += 1
+            continue
+        lip, last_down, m = b, None, k + 1
+        while m < len(runs):
+            kd, a2, b2 = runs[m]
+            if kd == 0 and (b2 - a2) * 0.05 >= flat_end and last_down is not None:
+                break   # back on flat ground after the landing (a table's flat top comes before any descent)
+            if kd == 0 and (a2 - lip) * 0.05 > 6.0 and last_down is None:
+                break   # no descent within 6 m: not a jump we can read
+            if kd == 1 and float(np.sum(np.sin(p[a2:b2 + 1])) * 0.05) >= min_climb and last_down is not None \
+                    and (a2 - lip) * 0.05 > 4.5:   # a big climb far after the lip: the next jump
+                break
+            if kd == -1:
+                last_down = (a2, b2)
+            m += 1
+        land, land_end = (last_down if last_down else (lip, lip))
+        out.append(dict(start=float(grid[a]), lip=float(grid[lip]), h=climb, angle=float(np.degrees(p[a:b + 1].max())),
+                        land=float(grid[land]), lh=float(np.sum(np.sin(-p[land:land_end + 1])) * 0.05),
+                        ll=float((land_end - land) * 0.05), end=float(grid[land_end])))
+        k = m
+    return out

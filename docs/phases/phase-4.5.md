@@ -240,6 +240,7 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
   - (d) both.
   - `bash sdc/phase45/e4_runs.sh`.
   - Next: (b) the owner's GRU memory (the copying code needs a sequence version).
+- **Prediction (owner, before the run):** "I think the out lap will help the most, but from this batch I think the bigger network will help it on the training courses at least. Modest improvement, maybe 5pp closer." (The bigger network helps most of the three, about 5 points closer to the teacher.)
 
 ## Gate check
 

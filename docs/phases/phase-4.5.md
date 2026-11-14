@@ -136,6 +136,20 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
 - **Explanation (owner, after the run):** "Acceleration and angle are very important, and soft springs change both. Maybe moreover, the car can tip while the wheels stay flat, so the rays point different directions compared with the linear motion of the car."
 - **Takeaway:** sensors bolted to a sprung body measure the body, not the car's path. Body roll and pitch must be estimated (the IMU, your filter in E2) or designed out (sensor placement), and a policy trained on a stiff car never learned to tell the two apart.
 
+### E2 — Your pitch and roll filter
+
+- **Owner's filter (`sdc/phase45/my_filter.py`, 2026-11-14):** a complementary filter.
+  1. Blend α = 0.98 at 50 Hz: the gyro carries the angle, and the accelerometer pulls out drift within about 1 s.
+  2. The accelerometer is ignored whenever the total isn't close to 1 g (in the air, landings, hard braking). Tolerance ±0.15 g (agent's default).
+  3. Gyro bias: the average while the car sits still for 0.2 s before the start, subtracted.
+  4. Both pitch and roll.
+- **Sim support:** the car now records 0.2 s of IMU readings while sitting still before each run (like a power-up calibration). The physics is restored afterwards, so runs start exactly as before. The noise stream shifts, so E1 reruns would differ slightly.
+- **Setup:**
+  - The 4.5 expert drives the realistic car (all physics, noisy IMU) on the validation courses, 3 starts, at nominal, training-range and gate-range physics.
+  - Estimators on the same logs: gyro only (with and without the bias fix), accelerometer only, your filter, and your filter without choice 2.
+  - Errors against the true pitch and roll: on the ground, in the air, at touchdown, and the worst in a run.
+  - `python -m sdc.phase45.e2`.
+
 ## Gate check
 
 ## Handoff to next phase

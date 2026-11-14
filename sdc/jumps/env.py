@@ -153,6 +153,7 @@ class JumpCar:
             self.servo_set = 0.0                 # the servo's current target angle (rad), speed-limited
             self.n_clipped = 0                   # control steps with an accelerometer sample clipped at 16 g
             self.tof_next, self.tof = 0.0, np.full(64, TOF_NORM)
+            self._calibrate()
             self._sample_imu()
             self._obs = self._read()
             return self._obs
@@ -217,6 +218,25 @@ class JumpCar:
         frac = min(abs(self._mean_wheel_speed()) / cr.TOP_SPEED, 1.0)
         self.imu.sample(sd[self.s_acc_raw:self.s_acc_raw + 3].copy(), sd[self.s_gyro:self.s_gyro + 3].copy(), frac,
                         cr.TIMESTEP)
+
+    def _calibrate(self):
+        """IMU readings while the car sits still before the start (0.2 s, 10 control-step reads), for a gyro-bias
+        calibration like a real car's on power-up. The physics state is restored afterwards, so the run itself
+        starts exactly as before (the car was resting anyway)."""
+        d = self.d
+        saved = (d.qpos.copy(), d.qvel.copy(), d.act.copy(), d.qacc_warmstart.copy(), d.time, d.ctrl.copy())
+        d.ctrl[:] = 0.0
+        acc, gyro = [], []
+        for _ in range(10):
+            for _ in range(cr.SUBSTEPS):
+                mujoco.mj_step(self.m, d, 1)
+                self._sample_imu()
+            a, g = self.imu.read()
+            acc.append(a)
+            gyro.append(g)
+        self.still_acc, self.still_gyro = np.array(acc), np.array(gyro)
+        d.qpos[:], d.qvel[:], d.act[:], d.qacc_warmstart[:], d.time, d.ctrl[:] = saved
+        mujoco.mj_forward(self.m, d)
 
     def _cast(self, origin_body, dirs_body, cutoff):
         R = self.d.xmat[1].reshape(3, 3)

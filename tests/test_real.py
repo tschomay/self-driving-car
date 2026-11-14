@@ -96,3 +96,26 @@ def test_tof_updates_at_15_hz():
             frames += 1
             last = c.tof.copy()
     assert 43 <= frames <= 46
+
+
+def test_owner_filter_conventions_and_bias():
+    from sdc.phase45 import my_filter as mf
+    # car pitched 10° nose up, at rest: gravity seen in the body frame
+    th = np.deg2rad(10)
+    acc = np.array([np.sin(th), 0, np.cos(th)]) * 9.81
+    f = mf.AttitudeFilter()
+    f.reset(still_gyro=np.tile([0.01, -0.02, 0.0], (10, 1)), still_acc=np.tile(acc, (10, 1)))
+    for _ in range(100):   # the biased gyro mustn't drift it
+        p, r = f.update(acc, np.array([0.01, -0.02, 0.0]))
+    assert abs(np.degrees(p) - 10) < 0.1 and abs(r) < 1e-3
+    # free fall: accelerometer reads ~0 and is ignored; a nose-up rate (-gyro_y) raises pitch
+    p0 = f.pitch
+    f.update(np.zeros(3), np.array([0.01, -0.02 - 1.0, 0.0]))
+    assert not f.trusted and abs(f.pitch - (p0 + 0.02)) < 1e-9
+
+
+def test_still_calibration_is_recorded():
+    c = je.JumpCar(np.random.default_rng(0), real="all", sensors="noisy", dr="train")
+    c.reset(10000)
+    assert c.still_gyro.shape == (10, 3)
+    assert np.abs(np.linalg.norm(c.still_acc, axis=1) / 9.81 - 1).max() < 0.2

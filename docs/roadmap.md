@@ -13,6 +13,7 @@ Status: **confirmed 2026-11-04** ([Confirm learning style, budget, and phase pla
   - Phase 3 exit: whether to do Phase 4, and if so which 3D engine (MuJoCo/MJX, Isaac Lab, Genesis, ...). **Decided (2026-11-11):** go to Phase 4 after a Phase 3.5 speed detour; the engine choice and Modal setup move to Phase 4 entry.
   - Phase 3.5 entry: the gate (reliability plus a lap-time target). **Decided (2026-11-11):** ≥ 85% gate-range completion on fresh test tracks 30000–30019, and mean lap at nominal ≤ 1.2× the hand-coded driver on the same tracks.
   - Phase 4 entry: engine, compute, gate details. **Decided (2026-11-12):** MuJoCo on the CPU (Modal only if a run exceeds about an hour); ≥ 80% of jumps landed (airborne ≥ 0.3 s, four wheels down, no rollover, still driving 1 s later) on fresh procedural jump courses at nominal physics; IMU + wheel speed + terrain rays; the owner writes the GRU memory.
+  - Phase 4 exit: add Phase 4.5 (sim-to-real readiness) before the real car. **Decided (2026-11-14, owner):** yes; the sensor list below is accepted as the working parts list. At Phase 4.5 entry: camera or not (CPU rendering speed, Modal), one phase or two steps, the gate numbers, and the learner-owned piece.
 
 ## Purpose
 
@@ -82,6 +83,25 @@ Each phase has a goal, the concepts it teaches, and a **gate**: a measurable ben
 - **Goal:** a 3D rigid-body sim with heightfield terrain, ramps, and an IMU (accelerometer + gyro) in the observation. Candidate engines: MuJoCo/MJX, Isaac Lab, Genesis; to be decided at Phase 4 entry.
 - **Learn:** 3D dynamics, partial observability (the car is airborne, so it uses memory/recurrence), using throttle to control pitch mid-air, massively parallel GPU simulation.
 - **Gate (provisional):** ≥ 80% of jumps landed wheels-down on a held-out jump track, within the $30/month Modal budget. **Set at entry (2026-11-12):** ≥ 80% of jumps landed (≥ 0.3 s airborne; four wheels down, no chassis contact, upright and driving 1 s later) on fresh test courses 40000–40019, nominal physics; 180 jumps (3 starts per course, owner 2026-11-13). **Passed 2026-11-13:** 90.6%, on the CPU ($0).
+
+### Phase 4.5 — Sim-to-real readiness (MuJoCo; CPU first) — added at the Phase 4 exit
+- **Goal:** close the gaps Phase 4's handoff listed (sphere wheels, 3 mm of sag, perfect sensors, nominal physics only) before any hardware. A 3D course with turns, jumps, and rough ground; sensors modelled on real hobby parts; realistic chassis dynamics; Phase 3's physics randomization carried into 3D.
+- **Learn:** sim-to-real transfer, sensor fusion and state estimation from noisy sensors, how suspension and weight transfer shape handling, domain randomization vs. fidelity, steering and pitch control at the same time.
+- **Course:** a 2D spline track (Phase 1's generator) draped onto the heightfield, with Phase 4's jumps, bumps and whoops, berms and off-camber turns. Jumps on straights first, then near turns (taking off while turning, landing into a turn). The hand-coded expert must handle all of it, since copy-then-fine-tune was Phase 4's main lesson; that expert is the phase's biggest engineering risk.
+- **Sensors (working parts list, owner 2026-11-14):** modelled on these parts, with their noise, rates, latency, and failure modes:
+
+  | Part (rough price) | Replaces in sim | Model |
+  |---|---|---|
+  | IMU: BNO085 or ICM-42688 ($10–25) | Perfect IMU | Noise, bias drift, motor vibration, clipping on hard landings (impacts can exceed ±16 g) |
+  | Motor RPM from a sensored ESC or hall sensor (single motor + differentials) | Per-wheel speeds | One speed signal; coarse at low speed; wrong when wheels spin or lock |
+  | TFmini-S single-point lidar ($40) and/or VL53L5CX 8×8 time-of-flight ($20) | 8 perfect rays | Fewer beams, dropouts, sunlight noise |
+  | Pi Camera 3 ($25–35) on a Pi 5 | — | Main sensor candidate; reuses the Phase 2 CNN. CPU rendering may be too slow: benchmark at entry |
+  | All of the above | Everything at 50 Hz, synchronized | Different rates (camera 30 Hz, IMU 200+ Hz), latency, timing jitter |
+
+- **Physics:** cylinder-shaped tires (MuJoCo friction is not a tire model; consider Phase 3's slip model), soft suspension (about 30% sag) with real damping and center-of-mass height, so body roll and weight transfer emerge on their own; one motor through differentials (changes air pitch control, adds one-wheel spin); servo lag and deadband; battery voltage sag. Prefer parameters that can be measured on the real car (weight, sag, servo speed), so Phase 5 can calibrate the sim; randomize the rest.
+- **Suggested order:** (a) new sensors and physics on Phase 4's existing jump courses, to see what breaks; (b) then the new course with turns. One phase with two steps, or 4.5 and 4.6: decided at entry.
+- **Learner-owned candidate:** a pitch/attitude estimator from the noisy IMU (complementary or Kalman filter).
+- **Gate (provisional):** ≥ X% of full courses (turns and jumps) finished on fresh test courses, with randomized physics and the parts-list sensors. Numbers set at entry.
 
 ### Phase 5 — Real car (future, not planned in this map)
 Hardware bill of materials (1/10 off-road chassis, onboard compute like a Raspberry Pi 5 or Jetson, camera, IMU), deployment, and real-world fine-tuning. Sketched here so the earlier phases keep sim-to-real in mind, for example by keeping camera resolution and control rate realistic.

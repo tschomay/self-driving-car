@@ -55,3 +55,44 @@ def test_motor_speed_is_quantized_and_imu_clips():
     assert imu.clipped
     acc, _ = imu.read()
     assert acc[2] < 16.5 * 9.81
+
+
+def test_noisy_sensors_alone_keep_phase4_physics():
+    """Review 2026-11-14: a float64 servo command made 'sensors only' runs drift from Phase 4's physics."""
+    acts = [np.array([0.7 * np.sin(0.13 * t), 0.6], np.float32) for t in range(200)]
+    paths = []
+    for kw in ({}, dict(sensors="noisy")):
+        c = je.JumpCar(np.random.default_rng(0), **kw)
+        c.reset(10001)
+        for a in acts:
+            c.step(a)
+        paths.append(c.d.qpos.copy())
+    assert np.array_equal(paths[0], paths[1])
+
+
+def test_lower_friction_lowers_contact_friction():
+    """Review 2026-11-14: MuJoCo takes the larger geom friction, so the ground must be scaled too."""
+    import mujoco
+    mus = []
+    for f in (0.5, 1.5):
+        c = je.JumpCar(np.random.default_rng(0), real=("tires",))
+        c.reset(10000)
+        c.phys.friction = f
+        c._apply_phys()
+        mujoco.mj_step(c.m, c.d, 5)
+        tire = set(c.tires.tolist())
+        mus.append([c.d.contact.friction[i][0] for i in range(c.d.ncon)
+                    if {int(c.d.contact.geom1[i]), int(c.d.contact.geom2[i])} & tire][0])
+    assert np.allclose(mus, [0.5, 1.5])
+
+
+def test_tof_updates_at_15_hz():
+    c = je.JumpCar(np.random.default_rng(0), sensors="parts")
+    c.reset(10000)
+    frames, last = 0, c.tof.copy()
+    for _ in range(150):   # 3 s
+        c.step(np.array([0.0, 0.5]))
+        if not np.array_equal(c.tof, last):
+            frames += 1
+            last = c.tof.copy()
+    assert 43 <= frames <= 46

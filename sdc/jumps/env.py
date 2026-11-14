@@ -94,19 +94,24 @@ class JumpCar:
         self.n_motor = 1 if "drive" in self.real else 4
         self.phys = rl.Phys()
         self.tof_dirs = rl.tof_dirs()
+        self._scratch = mujoco.MjData(self.m)
 
     def _apply_phys(self):
         m, b, p = self.m, self._base, self.phys
         m.body_mass[:] = b["body_mass"] * p.mass
         m.body_inertia[:] = b["body_inertia"] * p.mass
         m.geom_friction[:] = b["geom_friction"]
-        m.geom_friction[self.tires, 0] = b["geom_friction"][self.tires, 0] * p.friction
+        # MuJoCo uses the larger of the two geoms' friction, so scale the ground too (review, 2026-11-14:
+        # scaling only the tires could raise grip but never lower it)
+        sel = np.append(self.tires, self.ground)
+        m.geom_friction[sel, 0] = b["geom_friction"][sel, 0] * p.friction
         m.jnt_stiffness[:] = b["jnt_stiffness"]
         m.jnt_stiffness[self.susp_j] = b["jnt_stiffness"][self.susp_j] * p.spring
         m.dof_damping[:] = b["dof_damping"]
         m.dof_damping[self.susp_dof] = b["dof_damping"][self.susp_dof] * p.damping
         m.actuator_gear[:] = b["actuator_gear"]
         m.actuator_gear[:self.n_motor, 0] = b["actuator_gear"][:self.n_motor, 0] * p.motor
+        mujoco.mj_setConst(m, self._scratch)   # constants derived from the masses (it overwrites the data it's given)
 
     # ---- episode ---------------------------------------------------------------------
     def reset(self, course_seed=None, x0=0.0):
@@ -144,10 +149,10 @@ class JumpCar:
             self.imu = rl.IMU(self.prng, self.phys)
             self.sub = 0                         # physics steps since the start
             self.queue = []                      # (physics step it takes effect, action): command latency
-            self.applied = np.zeros(2)           # the command the actuators are acting on now
+            self.applied = np.zeros(2, np.float32)   # the command the actuators are acting on now
             self.servo_set = 0.0                 # the servo's current target angle (rad), speed-limited
             self.n_clipped = 0                   # control steps with an accelerometer sample clipped at 16 g
-            self.tof_t, self.tof = -1.0, np.full(64, TOF_NORM)
+            self.tof_next, self.tof = 0.0, np.full(64, TOF_NORM)
             self._sample_imu()
             self._obs = self._read()
             return self._obs
@@ -239,8 +244,8 @@ class JumpCar:
             return np.concatenate([acc / 9.81, gyro / 5.0, [spd, spd], rays, servo, self.last_act]).astype(np.float32)
         # parts: TFmini-S (3° down), VL53L5CX 8x8 at 15 Hz (sample-and-hold), VL53L1X left/right
         t = self.t * cr.DT
-        if t - self.tof_t >= 1.0 / rl.TOF_HZ - 1e-9:
-            self.tof_t = t
+        if t >= self.tof_next - 1e-9:   # frames on a 15 Hz schedule (sample-and-hold between them)
+            self.tof_next += 1.0 / rl.TOF_HZ
             r = self.phys.tof_range
             z = rl.ranges(rng, self._cast((0.235, 0, 0.02), self.tof_dirs, r), r, k, rl.TOF_DROPOUT)
             z[z >= r] = TOF_NORM
@@ -256,7 +261,7 @@ class JumpCar:
         """Set the controls for one physics step from the latest command that has arrived."""
         while self.queue and self.queue[0][0] <= self.sub:
             self.applied = self.queue.pop(0)[1]
-        target = float(self.applied[0]) * cr.STEER_MAX
+        target = self.applied[0] * cr.STEER_MAX   # float32, exactly as Phase 4 computes it (chaos amplifies 1e-9)
         if "servo" in self.real:   # speed-limited, with a deadband
             err = target - self.servo_set
             if abs(err) > self.phys.deadband:
@@ -274,7 +279,7 @@ class JumpCar:
         """One control step of physics with the realistic actuators and the IMU sampled every 2 ms."""
         delay = self.phys.delay if "delay" in self.real else 0.0
         lag = max(0, int(round((delay + self.prng.uniform(-0.001, 0.001) * (delay > 0)) / cr.TIMESTEP)))
-        self.queue.append((self.sub + lag, a.astype(float)))
+        self.queue.append((self.sub + lag, a))
         check = self.airborne or self.pending is not None
         self.v_prev = self.d.qvel[:3].copy()
         for _ in range(cr.SUBSTEPS):

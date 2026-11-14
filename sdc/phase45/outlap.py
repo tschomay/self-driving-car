@@ -290,3 +290,38 @@ def find_jumps(xs, zs, min_h=0.12):
 def jump_features(j):
     d = j["land"] - j["lip"]
     return np.array([1.0, j["h"], j["angle"], d, j["lh"], j["ll"], d * j["h"]])
+
+
+def _walk_job(args):
+    course, x0, kw = args
+    xs, zs, reason, tx = walk(course, x0, **kw)
+    c = crs.make(course, kinds=crs.KINDS45)
+    rows = []
+    for j in find_jumps(xs, zs):
+        k = c.jump_at(float(np.interp(j["lip"], xs, tx)))          # label only
+        J = c.jumps[k] if k is not None else None
+        rows.append(dict(meas=j, kind=J.kind if J else None, design=J.design_speed if J else None,
+                         true_land=(J.land_start - J.lip) if J else None, course=course, x0=x0, reason=reason))
+    return rows
+
+
+def walk_collect(courses, starts=(0.0,), dr="train", procs=3):
+    kw = dict(real="all", sensors="parts", dr=dr)
+    with Pool(procs) as p:
+        return [r for rs in p.map(_walk_job, [(c, x0, kw) for c in courses for x0 in starts]) for r in rs]
+
+
+def fit_walk(rows, ridge=1e-1):
+    rows = [r for r in rows if r["design"] is not None]
+    X = np.stack([jump_features(r["meas"]) for r in rows])
+    y = np.array([r["design"] for r in rows])
+    mu, sd = X.mean(0), X.std(0) + 1e-9
+    mu[0], sd[0] = 0.0, 1.0
+    Z = (X - mu) / sd
+    w = np.linalg.solve(Z.T @ Z + ridge * np.eye(Z.shape[1]), Z.T @ y)
+    return dict(w=w.tolist(), mu=mu.tolist(), sd=sd.tolist())
+
+
+def predict_walk(model, j):
+    z = (jump_features(j) - np.array(model["mu"])) / np.array(model["sd"])
+    return float(np.clip(z @ np.array(model["w"]), crs.DESIGN_SPEED[0] - 0.5, crs.DESIGN_SPEED[1] + 0.5))

@@ -121,5 +121,6 @@ def score(episodes):
                 mean_air=round(float(np.mean(airs)), 3) if airs else None,
                 missed=sum(1 for j in jumps if j.get("missed")),
                 by_kind={k: f"{sum(bool(j['landed']) for j in jumps if j['kind'] == k)}/"
-                            f"{sum(1 for j in jumps if j['kind'] == k)}" for k in ("gap", "table", "drop")},
+                            f"{sum(1 for j in jumps if j['kind'] == k)}"
+                 for k in [k for k in ("gap", "double", "table", "drop") if any(j["kind"] == k for j in jumps)]},
                 reasons={r: sum(e["reason"] == r for e in episodes) for r in {e["reason"] for e in episodes}})

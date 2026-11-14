@@ -231,6 +231,47 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
 - **Owner's question:** "We've added a lot of complexity but kept the same model. Do we need a bigger one or different architecture?"
 - **Agent's check:** the copy's imitation error on its own training data is twice Phase 4's (0.032 vs 0.017 for E3; 0.020 for E3b), and it rises as DAgger adds data. That points to underfitting (the network can't reproduce the expert from these inputs: too small, or missing information such as memory), not to overfitting.
 
+### E4 — What does the student need?
+
+- **Owner (2026-11-14):** "Do a, c, d now and build the GRU." Also: change the course for a realistic out-lap. "Roll at a slow pace to learn the track. No jumps, just measuring... instead of gap jumps we use rollers that can be doubled."
+- **Setup:** copies of the steady expert, E3b's recipe (parts-list sensors, training-range physics, scored at gate range), no fine-tuning. Seeds 0–1. Baseline: E3b's copies (64-unit layers, 61% / 69%).
+  - (a) bigger: 256-unit layers;
+  - (c) plus the owner's filter (pitch and roll, with telemetry) as two inputs;
+  - (d) both.
+  - `bash sdc/phase45/e4_runs.sh`.
+  - Next: (b) the owner's GRU memory (the copying code needs a sequence version).
+- **Prediction (owner, before the run):** "I think the out lap will help the most, but from this batch I think the bigger network will help it on the training courses at least. Modest improvement, maybe 5pp closer." (The bigger network helps most of the three, about 5 points closer to the teacher.)
+- **Result (validation, gate range, 180 jumps):** [report](https://claude.ai/artifact/MqonTVRzUEZun3PA6gTv3Q).
+
+  | Student (copy of the steady expert) | Seed 0 / 1 | Training range (seed 0) | Imitation error |
+  |---|---|---|---|
+  | Baseline: 64-unit layers (E3b) | 69% / 61% | 77% | 0.020 |
+  | (a) 256-unit layers | 64% / 64% | 73% | 0.0175 |
+  | (c) + owner's filter (pitch, roll) | **71% / 71%** | 74% | 0.018 |
+  | (d) both | 67% / 68% | 79% | 0.014 |
+  | Steady expert (teacher) | 79% | | |
+
+  - The bigger network fits the expert's actions better, but lands no more jumps, even at training-range physics.
+  - The owner's filter as inputs: about +6 points at gate range on both seeds.
+  - Still 8 points under the teacher. Losing the lane is still the commonest ending.
+  - Prediction vs. result: "bigger network helps most, about 5 points closer": no. It fits better but drives no better. The filter helped most.
+- **Explanation (owner, after the run):** "It's learning what the expert does, but not how to correct when things go awry. Knowing tilt combines with rays to give linear motion."
+- **Takeaway:** copying actions more closely doesn't teach recovery; inputs that make the situation readable (tilt) do.
+
+### E4(b) — Your GRU memory
+
+- **Setup:** E4 (c) (steady expert, parts-list sensors plus the owner's filter, training-range physics, scored at gate range), with the owner's GRU (64 memory, beside the inputs, separate actor and critic memories, 64-step chunks). DAgger copying in sequences (`sdc/phase45/bc_rnn.py`). Seeds 0–1. `bash sdc/phase45/e4b_runs.sh`.
+- **Prediction (owner, before the run):** "Modest increase, maybe 74%."
+
+### Walk-through out-lap: first test (2026-11-14)
+
+- Crawl at 2 m/s (sensor-only driver) on 300 practice courses (training range) and the validation courses (gate range, 3 starts). Height profile from the owner's filter pitch and the odometer, jumps found in that profile, ridge regression to the design speed.
+- **Result: it doesn't work yet.**
+  - The measured landing distance doesn't match the true one (correlation 0.06–0.14; median error 3.5–5 m). The design-speed estimate is no better than guessing the average (validation: 0.49 vs 0.46 m/s).
+  - The profile built from pitch × distance is too noisy (about 0.13 m error per 3 m), so the jump finder merges or splits jumps (1,174 detections for about 900 jumps).
+  - Tables alone looked fine on a few hand-checked runs. Doubles and gate-range physics break it.
+- **Next idea:** measure the terrain directly with the downward range sensors (the 8×8 grid looks 2.5–47° down: a small lidar scan), instead of integrating pitch.
+
 ## Gate check
 
 ## Handoff to next phase

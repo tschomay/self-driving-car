@@ -59,8 +59,9 @@ class JumpCar:
     """One car on one course."""
 
     def __init__(self, seed_rng, courses="random", size=1.0, kinds=crs.KINDS, fan=False, servo=False,
-                 real=(), sensors="ideal", dr=None, phys_seed=0):
+                 real=(), sensors="ideal", dr=None, phys_seed=0, attitude=False):
         self.real = rl.switches(real)
+        self.attitude = attitude   # parts sensors + the owner's filter's pitch and roll as two more inputs (E4)
         assert sensors in ("ideal", "noisy", "parts")
         self.sensors, self.dr, self.phys_seed = sensors, (None if dr == "nominal" else dr), phys_seed
         self.legacy = not self.real and sensors == "ideal" and self.dr is None   # Phase 4's car exactly
@@ -83,7 +84,7 @@ class JumpCar:
         self.steer_q = np.array([self.m.jnt_qposadr[self.m.joint(f"{w}_steer").id] for w in ("fl", "fr")])
         self.obs_dim = OBS_DIM + (len(cr.FAN_SITES) if fan else 0) + (1 if servo else 0)
         if sensors == "parts":
-            self.obs_dim = PARTS_DIM
+            self.obs_dim = PARTS_DIM + (2 if attitude else 0)
         m = self.m   # nominal values, for per-episode randomization in place
         self._base = dict(body_mass=m.body_mass.copy(), body_inertia=m.body_inertia.copy(),
                           geom_friction=m.geom_friction.copy(), jnt_stiffness=m.jnt_stiffness.copy(),
@@ -154,6 +155,10 @@ class JumpCar:
             self.n_clipped = 0                   # control steps with an accelerometer sample clipped at 16 g
             self.tof_next, self.tof = 0.0, np.full(64, TOF_NORM)
             self._calibrate()
+            if self.attitude:
+                from sdc.phase45 import my_filter as mf   # the owner's filter, run on the car's own sensors
+                self.filt = mf.AttitudeFilter(telemetry=True)
+                self.filt.reset(self.still_gyro, self.still_acc)
             self._sample_imu()
             self._obs = self._read()
             return self._obs
@@ -279,8 +284,11 @@ class JumpCar:
         tf = rl.ranges(rng, self._cast((0.235, 0, 0.02), tf_dir, rl.TFMINI_MAX), rl.TFMINI_MAX, k)
         side = rl.ranges(rng, self._cast((0, 0, 0.02), np.array([[0, 1.0, 0], [0, -1.0, 0]]), rl.SIDE_MAX),
                          rl.SIDE_MAX, k)
+        att = []
+        if self.attitude:
+            att = np.array(self.filt.update(acc, gyro, speed=spd * 10.0)) / 0.5   # rad / 0.5
         return np.concatenate([acc / 9.81, gyro / 5.0, [spd], tf / rl.TFMINI_MAX, self.tof / TOF_NORM,
-                               side / rl.SIDE_MAX, self.last_act]).astype(np.float32)
+                               side / rl.SIDE_MAX, self.last_act, att]).astype(np.float32)
 
     def _actuate(self):
         """Set the controls for one physics step from the latest command that has arrived."""
@@ -422,10 +430,10 @@ class JumpCar:
 class JumpBatch:
     def __init__(self, n, seed=0, courses="random", max_steps=1500, jump_bonus=10.0, size=1.0, kinds=crs.KINDS,
                  fan=False, servo=False, steer_cost=0.0, finish_bonus=0.0, real=(), sensors="ideal", dr=None,
-                 phys_seed=0):
+                 phys_seed=0, attitude=False):
         rng = np.random.default_rng(seed)
         self.cars = [JumpCar(np.random.default_rng(rng.integers(2**63)), courses, size, kinds, fan, servo,
-                             real, sensors, dr, phys_seed) for _ in range(n)]
+                             real, sensors, dr, phys_seed, attitude) for _ in range(n)]
         self.steer_cost, self.finish_bonus = steer_cost, finish_bonus
         if courses != "random":   # spread a fixed course list across the cars
             for i, c in enumerate(self.cars):

@@ -213,6 +213,7 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
 ### E3b — Copy the steady-speed expert
 
 - **Setup:** E3 arm B exactly (parts-list sensors, training-range physics, scored and kept at gate range, finish bonus 100), but the teacher drives a steady 7.4 m/s into every jump, a speed choice the student can copy. Seeds 0–1. `bash sdc/phase45/e3b_runs.sh`. Reference: the steady expert itself lands 95% at nominal and 79% at gate range.
+- **Prediction (owner, before the results):** "75% before, 78 after. Not as good as e3" (gate range: the copy 75%, after fine-tuning 78%).
 
 ## Gate check
 

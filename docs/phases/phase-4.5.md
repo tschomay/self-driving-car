@@ -170,6 +170,16 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
 - **Explanation (owner, after the run):** "In actual racing, close to 1g effectively never happens. Here it seems the cars acceleration is much less than the forces around jumps. We could add telemetry - throttle and steering along with the grip estimate and maybe travel direction."
 - **Takeaway:** checking the size of the acceleration catches free fall and impacts, but not a push along the car (5 m/s² changes the total by only 11%). The fix is to know the car's own acceleration from other sensors (motor speed, commands) and subtract it, the owner's telemetry idea.
 
+### E3 — Retrain for the real car
+
+- **Setup:**
+  - Phase 4's recipe on the realistic car. DAgger-copy the 4.5 expert into the owner's network (two 64-unit layers) on the **parts-list sensors** (76 inputs). Then fine-tune with the owner's PPO: finish bonus 100 (owner: "make sure you include a completion bonus so the PPO doesn't just regress"), std 0.15 → 0.05, γ 0.997, steering cost 0.03, 1M steps.
+  - Arm A trains at nominal physics, arm B on the training range; seeds 0–1 each.
+  - Both are scored at gate-range physics on the validation courses. Checkpoints are kept by that score too (early stopping on validation, as in Phases 3–4).
+  - `bash sdc/phase45/e3_runs.sh`. `sdc/phase4/train.py` and `bc.py` gained Phase 4.5 env options; Phase 4 defaults are unchanged.
+- **Prediction (owner, before the run):** "A. 65% B. 75% this has been a winning recipe but the task is hard so I expect less improvement."
+- **Owner's decision for E4:** upgrade the filter with telemetry: subtract the forward acceleration measured from motor speed before taking the accelerometer's angle (yes).
+
 ## Gate check
 
 ## Handoff to next phase

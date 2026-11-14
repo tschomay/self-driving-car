@@ -50,7 +50,7 @@ def _snap(c: je.JumpCar, a):
     wheels = [d.xpos[c.m.body(f"{w}_wheel").id].copy() for w in ("fl", "rl")]
     st = c.state()
     rays = []
-    for i, ang in enumerate(cr.RAY_ANGLES):
+    for i, ang in enumerate(cr.RAY_ANGLES if hasattr(c, "rays") else ()):   # the parts-list car has no Phase 4 rays
         sid = c.m.site(f"ray{i}").id
         o = d.site_xpos[sid]
         dirn = d.site_xmat[sid].reshape(3, 3)[:, 2]

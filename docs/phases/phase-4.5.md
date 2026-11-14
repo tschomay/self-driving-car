@@ -255,6 +255,22 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
   - The owner's filter as inputs: about +6 points at gate range on both seeds.
   - Still 8 points under the teacher. Losing the lane is still the commonest ending.
   - Prediction vs. result: "bigger network helps most, about 5 points closer": no. It fits better but drives no better. The filter helped most.
+- **Explanation (owner, after the run):** "It's learning what the expert does, but not how to correct when things go awry. Knowing tilt combines with rays to give linear motion."
+- **Takeaway:** copying actions more closely doesn't teach recovery; inputs that make the situation readable (tilt) do.
+
+### E4(b) — Your GRU memory
+
+- **Setup:** E4 (c) (steady expert, parts-list sensors plus the owner's filter, training-range physics, scored at gate range), with the owner's GRU (64 memory, beside the inputs, separate actor and critic memories, 64-step chunks). DAgger copying in sequences (`sdc/phase45/bc_rnn.py`). Seeds 0–1. `bash sdc/phase45/e4b_runs.sh`.
+- **Prediction (owner, before the run):** "Modest increase, maybe 74%."
+
+### Walk-through out-lap: first test (2026-11-14)
+
+- Crawl at 2 m/s (sensor-only driver) on 300 practice courses (training range) and the validation courses (gate range, 3 starts). Height profile from the owner's filter pitch and the odometer, jumps found in that profile, ridge regression to the design speed.
+- **Result: it doesn't work yet.**
+  - The measured landing distance doesn't match the true one (correlation 0.06–0.14; median error 3.5–5 m). The design-speed estimate is no better than guessing the average (validation: 0.49 vs 0.46 m/s).
+  - The profile built from pitch × distance is too noisy (about 0.13 m error per 3 m), so the jump finder merges or splits jumps (1,174 detections for about 900 jumps).
+  - Tables alone looked fine on a few hand-checked runs. Doubles and gate-range physics break it.
+- **Next idea:** measure the terrain directly with the downward range sensors (the 8×8 grid looks 2.5–47° down: a small lidar scan), instead of integrating pitch.
 
 ## Gate check
 

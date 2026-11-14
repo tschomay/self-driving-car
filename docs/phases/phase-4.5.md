@@ -227,6 +227,9 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
   - At gate range it doesn't help: 61–69%, the same as E3. The teacher drops to 79%, and the copy loses another 10–18 points. The main ending is now off the lane (20–24 of 60 runs).
   - PPO fine-tuning hurt again: −10 to −15 points within 50k steps, with no recovery (both E3 and E3b).
   - Prediction vs. result: 75% / 78% predicted; measured 61–69%, and fine-tuning lowered it. "Not as good as E3": about the same at gate range, better at nominal.
+- **Explanation (owner, after the run):** "The copy is over fit. It learns a safe medium for the training range that doesn't generalize to the gate. It doesn't learn how to adjust to the track/conditions. That's why I was pushing for the other options - it needs something the expert can't show. Fine tuning hurts because the car doesn't know how to drive yet, so it's pushing fine tuning to take over the primary learning, which it can't do."
+- **Owner's question:** "We've added a lot of complexity but kept the same model. Do we need a bigger one or different architecture?"
+- **Agent's check:** the copy's imitation error on its own training data is twice Phase 4's (0.032 vs 0.017 for E3; 0.020 for E3b), and it rises as DAgger adds data. That points to underfitting (the network can't reproduce the expert from these inputs: too small, or missing information such as memory), not to overfitting.
 
 ## Gate check
 

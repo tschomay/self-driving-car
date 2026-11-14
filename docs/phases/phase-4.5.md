@@ -89,6 +89,16 @@ All switches are off by default, and then the car is Phase 4's exactly: the same
 
 **Test set:** courses 45000–45019 with physics seed 45, never used by experiments.
 
+**Code review (owner's request, 2026-11-14, before E1).** A background agent reviewed the new code. It found and verified:
+1. **Randomized grip could only go up.** MuJoCo uses the larger of the two surfaces' friction, and only the tires were scaled. Now the ground is scaled too.
+2. **"Sensors only" also changed the physics.** The steering command was computed in float64 instead of Phase 4's float32. The difference was about 1e-9, but chaos grew it to 1.85 m within 200 steps. Fixed: with no physics switches, the realistic-sensor car now drives exactly Phase 4's trajectory (a test checks it).
+3. **The 8×8 sensor updated at 12.5 Hz, not 15 Hz.** Fixed.
+4. Minor: after mass changes, MuJoCo's mass-derived constants are now recomputed.
+
+No oracle leakage was found. The `noisy` layout matches Phase 4's slot by slot, and the physics draws don't depend on batching. The numbers (sag, damping, battery sag, noise, hall counts) are plausible.
+
+After the fixes, the expert lands 98% at nominal physics, 91% on the training range and 84% on the gate range (validation, 180 jumps each).
+
 ## Experiments
 
 ### E1 — What breaks?

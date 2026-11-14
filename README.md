@@ -24,7 +24,8 @@ Full plan, feasibility research, and sources: [`docs/roadmap.md`](docs/roadmap.m
 | 3 | Tire slip, dirt patches, delays, sensor noise, randomized physics | Finishes at least 85% of laps with physics outside its training range; then decide whether to go 3D | Gate passed (96%, second attempt) |
 | 3.5 | Speed: close the lap-time gap without losing reliability | Still finishes at least 85% of laps (gate-range physics, fresh test tracks), with mean lap at nominal ≤ 1.2× the hand-coded driver | Gate passed (90%, 1.07×) |
 | 4 | 3D terrain with jumps and an accelerometer (MuJoCo, on the CPU) | Lands at least 80% of jumps wheels-down, within $30 a month | Gate passed (90.6%) |
-| 4.5 | Sim-to-real readiness: a 3D course with turns, jumps, and rough ground; sensors modelled on real hobby parts; soft suspension, body roll, randomized physics | Provisional: finishes at least X% of full courses on fresh test courses, randomized physics, realistic sensors (set at entry) | Not started |
+| 4.5 | Sim-to-real readiness: sensors modelled on real hobby parts; soft suspension, body roll, realistic tires; randomized physics (on Phase 4's jump courses) | Lands at least 80% of jumps on fresh test courses, with realistic sensors and physics outside its training range | In progress |
+| 4.6 | A 3D course with turns, jumps, and rough ground | Finishes at least 80% of full courses on fresh test courses, same sensors and randomization | Not started |
 | 5 | The real car | Not planned yet | Future |
 
 Each phase's log (experiments, predictions, results, gate verdict) lives in [`docs/phases/`](docs/phases/).

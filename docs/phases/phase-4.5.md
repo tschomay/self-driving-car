@@ -262,6 +262,18 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
 
 - **Setup:** E4 (c) (steady expert, parts-list sensors plus the owner's filter, training-range physics, scored at gate range), with the owner's GRU (64 memory, beside the inputs, separate actor and critic memories, 64-step chunks). DAgger copying in sequences (`sdc/phase45/bc_rnn.py`). Seeds 0–1. `bash sdc/phase45/e4b_runs.sh`.
 - **Prediction (owner, before the run):** "Modest increase, maybe 74%."
+- **Result (validation, gate range, 180 jumps per seed):** [report](https://claude.ai/artifact/7PdpLPrB4t6qar4KMsDEgu).
+
+  | Student | Landed | Courses finished | Off the lane (of 60) |
+  |---|---|---|---|
+  | E3b: no memory, no filter | 69% / 61% | 47% / 38% | 20 / 24 |
+  | E4 (c): filter, no memory | 71% / 71% | 53% / 45% | 14 / 21 |
+  | **E4(b): owner's GRU + filter** | **70% / 69%** | **78% / 72%** | **2 / 6** |
+
+  - Landing rate unchanged, but memory nearly ends losing the lane (the commonest failure since E3), and far more courses are finished.
+  - Missed jumps are mostly tables and drops landed badly (seed 0: tables 48/63, drops 22/42).
+  - Copying took 13 min per seed.
+  - Prediction vs. result: about 74% predicted; 69–70% landed, but completion jumped from about 50% to 72–78%.
 
 ### Walk-through out-lap: first test (2026-11-14)
 

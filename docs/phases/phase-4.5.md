@@ -196,6 +196,20 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
 - **Takeaway:** a teacher that uses information the student can't sense can't be copied. Either the teacher drives only on what the student could know, or the student gets that knowledge (a map, an out-lap).
 - **Owner's decision for E4:** upgrade the filter with telemetry: subtract the forward acceleration measured from motor speed before taking the accelerometer's angle (yes).
 
+### E3c — Out-lap map (owner's choice, 2026-11-14)
+
+- **Owner:** "C is the only one that's realistic in real life. Let's try it first and fall back if it fails." (Options were: (a) steady-speed teacher, (b) a hand-measured track map, (c) a steady out-lap that builds the map.)
+- **Built:** `sdc/phase45/outlap.py`, sensor-only.
+  - An odometer from motor speed; in free fall it holds the last ground speed.
+  - A per-jump recorder: takeoff position, takeoff speed, lip pitch from the owner's filter (with telemetry), airtime, touchdown pitch and jolt, and the speed lost after touchdown.
+  - A ridge-regression estimator, fitted on practice-course out-laps against the true design speeds.
+- **Feasibility check** (stand-in out-lap driver: the steady 7.4 m/s expert, 200 practice courses, training-range physics):
+  - The estimator barely beats guessing the average: 0.38 m/s error vs 0.42 m/s.
+  - Best single cues on gaps and tables: touchdown jolt (−0.45 correlation), airtime (−0.37), speed lost after touchdown (+0.32).
+  - What really sets the design speed is where the landing ramp starts (correlation 0.81). These measurements don't capture it.
+- **What a perfect map is worth** (expert, validation, 180 jumps): per-jump speeds vs a steady 7.4 m/s, 98% vs 95% at nominal, 87% vs 79% at gate range.
+- **Decision pending** (owner): build a landing-ramp measurement for the out-lap, or fall back to (a).
+
 ## Gate check
 
 ## Handoff to next phase

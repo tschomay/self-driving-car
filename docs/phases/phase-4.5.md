@@ -91,6 +91,10 @@ All switches are off by default, and then the car is Phase 4's exactly: the same
 
 ## Experiments
 
+### E1 — What breaks?
+
+- **Prediction (owner, before the run):** "I think the physics will hurt most. 45% of gates." (The physics changes hurt more than the sensors; about 45% landed with everything on at gate-range physics.)
+
 ## Gate check
 
 ## Handoff to next phase

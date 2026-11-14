@@ -196,6 +196,41 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
 - **Takeaway:** a teacher that uses information the student can't sense can't be copied. Either the teacher drives only on what the student could know, or the student gets that knowledge (a map, an out-lap).
 - **Owner's decision for E4:** upgrade the filter with telemetry: subtract the forward acceleration measured from motor speed before taking the accelerometer's angle (yes).
 
+### E3c — Out-lap map (owner's choice, 2026-11-14)
+
+- **Owner:** "C is the only one that's realistic in real life. Let's try it first and fall back if it fails." (Options were: (a) steady-speed teacher, (b) a hand-measured track map, (c) a steady out-lap that builds the map.)
+- **Built:** `sdc/phase45/outlap.py`, sensor-only.
+  - An odometer from motor speed; in free fall it holds the last ground speed.
+  - A per-jump recorder: takeoff position, takeoff speed, lip pitch from the owner's filter (with telemetry), airtime, touchdown pitch and jolt, and the speed lost after touchdown.
+  - A ridge-regression estimator, fitted on practice-course out-laps against the true design speeds.
+- **Feasibility check** (stand-in out-lap driver: the steady 7.4 m/s expert, 200 practice courses, training-range physics):
+  - The estimator barely beats guessing the average: 0.38 m/s error vs 0.42 m/s.
+  - Best single cues on gaps and tables: touchdown jolt (−0.45 correlation), airtime (−0.37), speed lost after touchdown (+0.32).
+  - What really sets the design speed is where the landing ramp starts (correlation 0.81). These measurements don't capture it.
+- **What a perfect map is worth** (expert, validation, 180 jumps): per-jump speeds vs a steady 7.4 m/s, 98% vs 95% at nominal, 87% vs 79% at gate range.
+- **Decision (owner, 2026-11-14):** fall back to (a) first ("Sure"). Its result shows whether the half day of landing-ramp measurement is worth it.
+
+### E3b — Copy the steady-speed expert
+
+- **Setup:** E3 arm B exactly (parts-list sensors, training-range physics, scored and kept at gate range, finish bonus 100), but the teacher drives a steady 7.4 m/s into every jump, a speed choice the student can copy. Seeds 0–1. `bash sdc/phase45/e3b_runs.sh`. Reference: the steady expert itself lands 95% at nominal and 79% at gate range.
+- **Prediction (owner, before the results):** "75% before, 78 after. Not as good as e3" (gate range: the copy 75%, after fine-tuning 78%).
+- **Result (validation, 180 jumps each):** [report](https://claude.ai/artifact/BWj5WycbAnYFmJzMu6JPdb).
+
+  | Driver | Nominal | Training range | Gate range |
+  |---|---|---|---|
+  | Steady expert (teacher) | 95% | | 79% |
+  | Steady copy, seeds 0/1 | 89% / – | 77% / – | 69% / 61% |
+  | Steady copy + PPO (kept = the copy, step 0) | | | 69% / 61% |
+  | E3: per-jump expert / copy (B, seed 0) | 98% / 81% | 90% / 76% | 87% / 66% |
+
+  - At nominal physics, the steady teacher fixes the speed problem: the copy is 6 points behind its teacher (E3: 15–17).
+  - At gate range it doesn't help: 61–69%, the same as E3. The teacher drops to 79%, and the copy loses another 10–18 points. The main ending is now off the lane (20–24 of 60 runs).
+  - PPO fine-tuning hurt again: −10 to −15 points within 50k steps, with no recovery (both E3 and E3b).
+  - Prediction vs. result: 75% / 78% predicted; measured 61–69%, and fine-tuning lowered it. "Not as good as E3": about the same at gate range, better at nominal.
+- **Explanation (owner, after the run):** "The copy is over fit. It learns a safe medium for the training range that doesn't generalize to the gate. It doesn't learn how to adjust to the track/conditions. That's why I was pushing for the other options - it needs something the expert can't show. Fine tuning hurts because the car doesn't know how to drive yet, so it's pushing fine tuning to take over the primary learning, which it can't do."
+- **Owner's question:** "We've added a lot of complexity but kept the same model. Do we need a bigger one or different architecture?"
+- **Agent's check:** the copy's imitation error on its own training data is twice Phase 4's (0.032 vs 0.017 for E3; 0.020 for E3b), and it rises as DAgger adds data. That points to underfitting (the network can't reproduce the expert from these inputs: too small, or missing information such as memory), not to overfitting.
+
 ## Gate check
 
 ## Handoff to next phase

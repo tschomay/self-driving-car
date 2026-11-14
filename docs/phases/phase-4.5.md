@@ -133,6 +133,8 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
   - The retuned expert holds 87% at gate range, so a copy of it has room above the 80% bar, but not much.
   - The rebuilt gate car, scored as Phase 4 scored it, lands 91.1% on Phase 4's car: exactly the original's number.
   - Prediction vs. result: "physics hurts most": yes. The worst single change is physical (the suspension), but it breaks the car through its sensors (body roll tilts the rays). All physics (73%) and all sensors (74%) cost about the same. Predicted 45%, measured 61%.
+- **Explanation (owner, after the run):** "Acceleration and angle are very important, and soft springs change both. Maybe moreover, the car can tip while the wheels stay flat, so the rays point different directions compared with the linear motion of the car."
+- **Takeaway:** sensors bolted to a sprung body measure the body, not the car's path. Body roll and pitch must be estimated (the IMU, your filter in E2) or designed out (sensor placement), and a policy trained on a stiff car never learned to tell the two apart.
 
 ## Gate check
 

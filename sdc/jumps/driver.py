@@ -6,6 +6,10 @@ ExpertDriver:
   reaction torque to match the car's pitch to the landing slope: throttle tips the nose up,
   brake tips it down (a PD controller on pitch).
 NoAirControl: the same driver, but it holds the throttle steady in the air (what pitch control buys).
+
+Phase 4.5 options: `ki` adds an integral term to the speed control (holds the target speed on a weak motor or a
+flat battery), and `adapt=True` aims the in-air pitch control at the pitch expected when the command arrives (pitch + rate x the
+car's true control delay: an oracle, like Phase 3's hand-coded driver knowing the grip).
 """
 
 from __future__ import annotations
@@ -30,8 +34,10 @@ def landing_slope(course, s):
 
 
 class ExpertDriver:
-    def __init__(self, v_target=6.5, kp=4.0, kd=0.5, air_control=True, lead=0.0, plan=True, plan_offset=0.0):
+    def __init__(self, v_target=6.5, kp=4.0, kd=0.5, air_control=True, lead=0.0, plan=True, plan_offset=0.0,
+                 ki=0.0, adapt=False):
         self.plan, self.plan_offset = plan, plan_offset
+        self.ki, self.adapt, self._i = ki, adapt, {}
         self.v_target, self.kp, self.kd, self.air_control, self.lead = v_target, kp, kd, air_control, lead
         self._u0 = {}
 
@@ -48,7 +54,10 @@ class ExpertDriver:
             if u0 is None:
                 u0 = self._u0[id(car)] = float(car.last_act[1])
             target, _ = landing_slope(car.course, s)
-            throttle = u0 + self.kp * (target + self.lead - s["pitch"]) - self.kd * s["pitch_rate"]
+            pitch = s["pitch"]
+            if self.adapt and "delay" in car.real:   # act on the pitch expected when this command arrives
+                pitch += s["pitch_rate"] * car.phys.delay
+            throttle = u0 + self.kp * (target + self.lead - pitch) - self.kd * s["pitch_rate"]
         elif car.airborne:
             throttle = float(car.last_act[1])     # hold whatever it took off with
         else:
@@ -56,7 +65,13 @@ class ExpertDriver:
             if self.plan:   # approach each jump at the speed it was built for (oracle knowledge)
                 nxt = [j for j in car.course.jumps if j.lip > s["x"]]
                 v = (nxt[0] if nxt else car.course.jumps[-1]).design_speed + self.plan_offset
-            throttle = 0.8 * (v - s["v_fwd"]) + 0.45
+            e = v - s["v_fwd"]
+            i = 0.0
+            if self.ki:
+                i = self._i[id(car)] = float(np.clip(self._i.get(id(car), 0.0) + e * 0.02, -0.4 / self.ki, 0.4 / self.ki))
+                if car.t <= 1:
+                    i = self._i[id(car)] = 0.0
+            throttle = 0.8 * e + 0.45 + self.ki * i
         return np.array([steer, np.clip(throttle, -1, 1)], np.float32)
 
     def __call__(self, batch: je.JumpBatch):

@@ -39,8 +39,11 @@ import mujoco
 
 from sdc.jumps import car as cr
 from sdc.jumps import course as crs
+from sdc.jumps import real as rl
 
 OBS_DIM = 20
+PARTS_DIM = 6 + 1 + 1 + 64 + 2 + 2   # sensors="parts": IMU, motor speed, TFmini, 8x8 ToF, side ToF x2, last action
+TOF_NORM = 4.0                       # m: 8x8 zones are reported / 4 m (1.0 = no valid return)
 ON_GROUND = 0.01   # m: a tire this close to the terrain counts as on the ground
 MIN_AIR = 0.3
 LAND_WINDOW = 1.0
@@ -55,8 +58,13 @@ def _pitch_roll(R):
 class JumpCar:
     """One car on one course."""
 
-    def __init__(self, seed_rng, courses="random", size=1.0, kinds=crs.KINDS, fan=False, servo=False):
-        self.m = cr.build_model()
+    def __init__(self, seed_rng, courses="random", size=1.0, kinds=crs.KINDS, fan=False, servo=False,
+                 real=(), sensors="ideal", dr=None, phys_seed=0):
+        self.real = rl.switches(real)
+        assert sensors in ("ideal", "noisy", "parts")
+        self.sensors, self.dr, self.phys_seed = sensors, (None if dr == "nominal" else dr), phys_seed
+        self.legacy = not self.real and sensors == "ideal" and self.dr is None   # Phase 4's car exactly
+        self.m = cr.build_model(self.real)
         self.d = mujoco.MjData(self.m)
         self.rng = seed_rng
         self.courses = courses
@@ -74,6 +82,31 @@ class JumpCar:
         self.servo = servo
         self.steer_q = np.array([self.m.jnt_qposadr[self.m.joint(f"{w}_steer").id] for w in ("fl", "fr")])
         self.obs_dim = OBS_DIM + (len(cr.FAN_SITES) if fan else 0) + (1 if servo else 0)
+        if sensors == "parts":
+            self.obs_dim = PARTS_DIM
+        m = self.m   # nominal values, for per-episode randomization in place
+        self._base = dict(body_mass=m.body_mass.copy(), body_inertia=m.body_inertia.copy(),
+                          geom_friction=m.geom_friction.copy(), jnt_stiffness=m.jnt_stiffness.copy(),
+                          dof_damping=m.dof_damping.copy(), actuator_gear=m.actuator_gear.copy())
+        self.susp_j = np.array([m.joint(f"{w}_susp").id for w in cr.WHEELS])
+        self.susp_dof = m.jnt_dofadr[self.susp_j]
+        self.s_acc_raw = s["accel"][0]
+        self.n_motor = 1 if "drive" in self.real else 4
+        self.phys = rl.Phys()
+        self.tof_dirs = rl.tof_dirs()
+
+    def _apply_phys(self):
+        m, b, p = self.m, self._base, self.phys
+        m.body_mass[:] = b["body_mass"] * p.mass
+        m.body_inertia[:] = b["body_inertia"] * p.mass
+        m.geom_friction[:] = b["geom_friction"]
+        m.geom_friction[self.tires, 0] = b["geom_friction"][self.tires, 0] * p.friction
+        m.jnt_stiffness[:] = b["jnt_stiffness"]
+        m.jnt_stiffness[self.susp_j] = b["jnt_stiffness"][self.susp_j] * p.spring
+        m.dof_damping[:] = b["dof_damping"]
+        m.dof_damping[self.susp_dof] = b["dof_damping"][self.susp_dof] * p.damping
+        m.actuator_gear[:] = b["actuator_gear"]
+        m.actuator_gear[:self.n_motor, 0] = b["actuator_gear"][:self.n_motor, 0] * p.motor
 
     # ---- episode ---------------------------------------------------------------------
     def reset(self, course_seed=None, x0=0.0):
@@ -85,6 +118,10 @@ class JumpCar:
                 self._course_i += 1
         self.course = crs.make(course_seed, kinds=self.kinds, size=self.size)
         self.m.hfield_data[:] = self.course.hfield().ravel()
+        if not self.legacy:   # physics and sensor noise drawn from (course, start, phys_seed): batching-independent
+            self.prng = np.random.default_rng([int(course_seed), int(round(x0 * 1000)) + 10_000, int(self.phys_seed)])
+            self.phys = rl.draw(self.dr, self.prng)
+            self._apply_phys()
         mujoco.mj_resetData(self.m, self.d)
         self.d.qpos[0] = crs.START_X + x0      # x0: start offset (evaluation repeats a course from a few starts)
         self.d.qpos[2] = self.course.height(crs.START_X + x0) + 0.17
@@ -103,6 +140,17 @@ class JumpCar:
         self.results = [None] * len(self.course.jumps)   # per course jump: dict or None
         self.air_log = []            # every airborne spell >= MIN_AIR
         self.max_air = 0.0
+        if not self.legacy:
+            self.imu = rl.IMU(self.prng, self.phys)
+            self.sub = 0                         # physics steps since the start
+            self.queue = []                      # (physics step it takes effect, action): command latency
+            self.applied = np.zeros(2)           # the command the actuators are acting on now
+            self.servo_set = 0.0                 # the servo's current target angle (rad), speed-limited
+            self.n_clipped = 0                   # control steps with an accelerometer sample clipped at 16 g
+            self.tof_t, self.tof = -1.0, np.full(64, TOF_NORM)
+            self._sample_imu()
+            self._obs = self._read()
+            return self._obs
         return self.obs()
 
     def contacts(self):
@@ -138,6 +186,11 @@ class JumpCar:
                     pitch_rate=float(-d.qvel[4]), yaw_rate=float(d.qvel[5]))
 
     def obs(self):
+        if not self.legacy:
+            return self._obs
+        return self._ideal_obs()
+
+    def _ideal_obs(self):
         sd = self.d.sensordata
         self.rays = cr.cast_rays(self.m, self.d, self.ray_sites)
         rays = self.rays / cr.RAY_CUTOFF
@@ -150,10 +203,95 @@ class JumpCar:
         return np.concatenate([acc / 9.81, sd[self.s_gyro:self.s_gyro + 3] / 5.0,
                                [w[:2].mean(), w[2:].mean()], rays, servo, self.last_act]).astype(np.float32)
 
+    # ---- realistic sensors and actuators (Phase 4.5) ----------------------------------
+    def _mean_wheel_speed(self):
+        return float(self.d.qvel[self.spin_dof].mean() * cr.WHEEL_R)
+
+    def _sample_imu(self):
+        sd = self.d.sensordata
+        frac = min(abs(self._mean_wheel_speed()) / cr.TOP_SPEED, 1.0)
+        self.imu.sample(sd[self.s_acc_raw:self.s_acc_raw + 3].copy(), sd[self.s_gyro:self.s_gyro + 3].copy(), frac,
+                        cr.TIMESTEP)
+
+    def _cast(self, origin_body, dirs_body, cutoff):
+        R = self.d.xmat[1].reshape(3, 3)
+        o = self.d.xpos[1] + R @ np.asarray(origin_body, float)
+        vec = (dirs_body @ R.T).ravel()
+        n = len(dirs_body)
+        dist, gid = np.empty(n), np.empty(n, np.int32)
+        mujoco.mj_multiRay(self.m, self.d, o, vec, np.array([1, 0, 0, 0, 0, 0], np.uint8), True, -1, gid, dist,
+                           None, n, cutoff)
+        dist[(dist < 0) | (dist > cutoff)] = cutoff
+        return dist
+
+    def _read(self):
+        """The policy's observation from the realistic sensors (end of a control step)."""
+        if self.sensors == "ideal":   # Phase 4's perfect sensors on the realistic car
+            self.imu.clear()
+            return self._ideal_obs()
+        rng, k = self.prng, self.phys.noise
+        acc, gyro = self.imu.read()
+        spd = rl.motor_speed(rng, self._mean_wheel_speed()) / 10.0
+        if self.sensors == "noisy":   # Phase 4's layout
+            self.rays = cr.cast_rays(self.m, self.d, self.ray_sites)
+            rays = rl.ranges(rng, self.rays, cr.RAY_CUTOFF, k) / cr.RAY_CUTOFF
+            servo = [float(self.last_act[0])] if self.servo else []   # no position feedback: the command
+            return np.concatenate([acc / 9.81, gyro / 5.0, [spd, spd], rays, servo, self.last_act]).astype(np.float32)
+        # parts: TFmini-S (3° down), VL53L5CX 8x8 at 15 Hz (sample-and-hold), VL53L1X left/right
+        t = self.t * cr.DT
+        if t - self.tof_t >= 1.0 / rl.TOF_HZ - 1e-9:
+            self.tof_t = t
+            r = self.phys.tof_range
+            z = rl.ranges(rng, self._cast((0.235, 0, 0.02), self.tof_dirs, r), r, k, rl.TOF_DROPOUT)
+            z[z >= r] = TOF_NORM
+            self.tof = z
+        tf_dir = np.array([[np.cos(np.deg2rad(3)), 0, -np.sin(np.deg2rad(3))]])
+        tf = rl.ranges(rng, self._cast((0.235, 0, 0.02), tf_dir, rl.TFMINI_MAX), rl.TFMINI_MAX, k)
+        side = rl.ranges(rng, self._cast((0, 0, 0.02), np.array([[0, 1.0, 0], [0, -1.0, 0]]), rl.SIDE_MAX),
+                         rl.SIDE_MAX, k)
+        return np.concatenate([acc / 9.81, gyro / 5.0, [spd], tf / rl.TFMINI_MAX, self.tof / TOF_NORM,
+                               side / rl.SIDE_MAX, self.last_act]).astype(np.float32)
+
+    def _actuate(self):
+        """Set the controls for one physics step from the latest command that has arrived."""
+        while self.queue and self.queue[0][0] <= self.sub:
+            self.applied = self.queue.pop(0)[1]
+        target = float(self.applied[0]) * cr.STEER_MAX
+        if "servo" in self.real:   # speed-limited, with a deadband
+            err = target - self.servo_set
+            if abs(err) > self.phys.deadband:
+                rate = np.deg2rad(60) / self.phys.servo_s60
+                self.servo_set += float(np.clip(err, -rate * cr.TIMESTEP, rate * cr.TIMESTEP))
+        else:
+            self.servo_set = target
+        u = float(self.applied[1])
+        if "battery" in self.real:
+            u *= self.phys.charge * (1.0 - self.phys.sag * abs(u))
+        self.d.ctrl[:self.n_motor] = u
+        self.d.ctrl[self.n_motor:self.n_motor + 2] = self.servo_set
+
+    def _physics(self, a):
+        """One control step of physics with the realistic actuators and the IMU sampled every 2 ms."""
+        delay = self.phys.delay if "delay" in self.real else 0.0
+        lag = max(0, int(round((delay + self.prng.uniform(-0.001, 0.001) * (delay > 0)) / cr.TIMESTEP)))
+        self.queue.append((self.sub + lag, a.astype(float)))
+        check = self.airborne or self.pending is not None
+        self.v_prev = self.d.qvel[:3].copy()
+        for _ in range(cr.SUBSTEPS):
+            self._actuate()
+            mujoco.mj_step(self.m, self.d, 1)
+            self.sub += 1
+            if check:
+                self.body_hit |= self._chassis_contact()
+            self._sample_imu()
+        self.n_clipped += int(self.imu.clipped)
+
     # ---- one control step ------------------------------------------------------------
     def step(self, action, jump_bonus=10.0, max_steps=1500, steer_cost=0.0, finish_bonus=0.0):
         a = np.clip(np.asarray(action, np.float32), -1, 1)
         d_steer = abs(float(a[0]) - float(self.last_act[0]))
+        if not self.legacy:
+            return self._step_tail(a, d_steer, jump_bonus, max_steps, steer_cost, finish_bonus)
         self.d.ctrl[:4] = a[1]
         self.d.ctrl[4:6] = a[0] * cr.STEER_MAX
         v0 = self.d.qvel[:3].copy()
@@ -167,6 +305,11 @@ class JumpCar:
         else:
             mujoco.mj_step(self.m, self.d, cr.SUBSTEPS)
         self.v_prev = v0
+        return self._step_tail(a, d_steer, jump_bonus, max_steps, steer_cost, finish_bonus, physics_done=True)
+
+    def _step_tail(self, a, d_steer, jump_bonus, max_steps, steer_cost, finish_bonus, physics_done=False):
+        if not physics_done:
+            self._physics(a)
         self.t += 1
         self.last_act = a
         t = self.t * cr.DT
@@ -225,6 +368,8 @@ class JumpCar:
         if truncated:
             reason = "time limit"
         self.ret += reward
+        if not self.legacy:
+            self._obs = self._read()
         return reward, reason is not None and not truncated, truncated, reason
 
     def summary(self, reason):
@@ -239,15 +384,18 @@ class JumpCar:
         return dict(r=round(self.ret, 3), l=self.t, course=self.course.seed, reason=reason,
                     finished=reason == "finished", x=round(self.x_prev, 2),
                     landed=sum(bool(j["landed"]) for j in jumps), n_jumps=len(jumps), jumps=jumps,
-                    max_air=round(self.max_air, 3), air_log=self.air_log)
+                    max_air=round(self.max_air, 3), air_log=self.air_log,
+                    **({} if self.legacy else dict(phys={k: round(v, 4) for k, v in vars(self.phys).items()},
+                                                   clipped=self.n_clipped)))
 
 
 class JumpBatch:
     def __init__(self, n, seed=0, courses="random", max_steps=1500, jump_bonus=10.0, size=1.0, kinds=crs.KINDS,
-                 fan=False, servo=False, steer_cost=0.0, finish_bonus=0.0):
+                 fan=False, servo=False, steer_cost=0.0, finish_bonus=0.0, real=(), sensors="ideal", dr=None,
+                 phys_seed=0):
         rng = np.random.default_rng(seed)
-        self.cars = [JumpCar(np.random.default_rng(rng.integers(2**63)), courses, size, kinds, fan, servo)
-                     for _ in range(n)]
+        self.cars = [JumpCar(np.random.default_rng(rng.integers(2**63)), courses, size, kinds, fan, servo,
+                             real, sensors, dr, phys_seed) for _ in range(n)]
         self.steer_cost, self.finish_bonus = steer_cost, finish_bonus
         if courses != "random":   # spread a fixed course list across the cars
             for i, c in enumerate(self.cars):

@@ -104,6 +104,35 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
 ### E1 — What breaks?
 
 - **Prediction (owner, before the run):** "I think the physics will hurt most. 45% of gates." (The physics changes hurt more than the sensors; about 45% landed with everything on at gate-range physics.)
+- **Setup:**
+  - Phase 4's gate car (rebuilt from its logged commands; its weights were lost with the old container) drives the realistic car unchanged.
+  - Experts for comparison: Phase 4's, and the retuned 4.5 one.
+  - Validation courses 10000–10019, 3 starts each (180 jumps), one car at a time.
+  - Each change on its own, then stacked.
+  - `python -m sdc.phase45.e1`, about 10 min on 4 cores.
+- **Result:** [report](https://claude.ai/artifact/QaJLi1MkZ1Qps1DM7ShrwZ).
+
+  | Setup | Gate car | Expert (Phase 4) | Expert (4.5) |
+  |---|---|---|---|
+  | Phase 4's car | 91% | 93% | 94% |
+  | Wide tires | 94% | 91% | 95% |
+  | Soft suspension | **52%** | 97% | 98% |
+  | One motor + diffs | 88% | 94% | 96% |
+  | Servo lag | 89% | 94% | 92% |
+  | Battery sag | 84% | 95% | 94% |
+  | Control delay | 81% | 92% | 95% |
+  | Realistic sensors | 74% | 93% | 94% |
+  | All physics | 73% | 84% | 98% |
+  | All physics + sensors | 78% | 87% | 98% |
+  | … + training-range physics | 59% | 76% | 90% |
+  | … + gate-range physics | **61%** | 73% | 87% |
+
+  - **Soft suspension alone breaks the learned car**: 38 of 60 runs end off the lane. Its side "fan" rays are fixed level to the chassis. In a turn, the car now rolls about 6° (1° with stiff springs), and the low side's rays hit the ground 0.3–0.9 m away instead of reaching the lane edge 2–5 m out. It reads a wall beside it. The experts, which read the true state, don't mind (97–98%).
+  - Realistic sensors alone: 74%, again mostly off the lane.
+  - Stacking isn't additive: all physics 73%; plus sensors 78% (within the noise of 180 jumps). Randomized physics is the next step down (59–61%). Drops are hit hardest (12/42 at gate range).
+  - The retuned expert holds 87% at gate range, so a copy of it has room above the 80% bar, but not much.
+  - The rebuilt gate car, scored as Phase 4 scored it, lands 91.1% on Phase 4's car: exactly the original's number.
+  - Prediction vs. result: "physics hurts most": yes. The worst single change is physical (the suspension), but it breaks the car through its sensors (body roll tilts the rays). All physics (73%) and all sensors (74%) cost about the same. Predicted 45%, measured 61%.
 
 ## Gate check
 

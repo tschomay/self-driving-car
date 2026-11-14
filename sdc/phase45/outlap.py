@@ -184,3 +184,109 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# ---- the walk-through out-lap (owner, 2026-11-14: "just roll at a slow pace to learn the track") ----------------
+I_SIDE = slice(72, 74)   # parts layout: VL53L1X left, right (/ 3 m)
+CRAWL_V = 2.0
+
+
+class Crawler:
+    """Hand-coded, sensor-only crawl: hold CRAWL_V on the motor speed, centre on the two side sensors.
+    (A careful driver walking the track; it never reads the sim's state.)"""
+
+    def __init__(self, v=CRAWL_V, k_steer=1.5, k_head=6.0):
+        self.v, self.k, self.kd = v, k_steer, k_head
+        self.prev = None
+        self.i = 0.0
+
+    def reset(self, n):
+        self.prev, self.i = None, 0.0
+
+    def act(self, obs):
+        left, right = (np.asarray(obs[I_SIDE]) * 3.0).tolist()
+        off = 0.5 * (left - right)                     # > 0: car is right of centre
+        d_off = 0.0 if self.prev is None else (off - self.prev) / DT
+        self.prev = off
+        steer = np.clip(self.k * off + self.kd * d_off * DT * 5, -0.5, 0.5)
+        e = self.v - float(obs[I_SPEED]) * 10.0
+        self.i = float(np.clip(self.i + e * DT, -2, 3))
+        throttle = np.clip(0.6 * e + 0.15 + 0.3 * self.i, -0.6, 1.0)
+        return np.array([steer, throttle], np.float32)
+
+    def __call__(self, b):
+        return np.stack([self.act(o) for o in b.obs()])
+
+
+def walk(course, x0=0.0, max_steps=4000, filter_kw=None, **env_kw):
+    """Crawl the course once; return the height profile measured from the car's own sensors:
+    odometer (m) and height (m) per step, plus the run's ending (labels come from the caller, not from here)."""
+    b = je.JumpBatch(1, courses=[course], max_steps=max_steps, kinds=crs.KINDS45, **env_kw)
+    c = b.cars[0]
+    b._obs = c.reset(course, x0=x0)[None]
+    drv = Crawler()
+    odo, filt = Odometer(), mf.AttitudeFilter(**(filter_kw or dict(telemetry=True, window=25)))
+    filt.reset(c.still_gyro, c.still_acc)
+    xs, zs, z, xh = [0.0], [0.0], 0.0, 0.0
+    true_x = [c.state()["x"]]   # labels only (never used to build the profile)
+    reason = None
+    while True:
+        obs, _, term, trunc, infos = b.step(drv(b))
+        if term[0] or trunc[0]:
+            reason = infos[0]["episode"]["reason"]
+            break
+        o = obs[0]
+        before = odo.odo
+        odo.update(o)
+        pitch, _ = filt.update(np.asarray(o[I_ACC]) * G, np.asarray(o[I_GYRO]) * 5.0, speed=float(o[I_SPEED]) * 10.0)
+        ds = odo.odo - before
+        z += np.sin(pitch) * ds
+        xh += np.cos(pitch) * ds        # horizontal distance (the odometer measures along the slopes)
+        xs.append(xh)
+        zs.append(z)
+        true_x.append(c.state()["x"])
+    return np.array(xs), np.array(zs), reason, np.array(true_x)
+
+
+def find_jumps(xs, zs, min_h=0.12):
+    """Jumps in a measured profile: each is a stretch standing at least min_h above the ground before it.
+    Per jump: lip (end of the first climb), its height and steepest climb, where the final descent begins (the
+    landing), its height and length. All in the out-lap's own odometer metres."""
+    grid = np.arange(0, xs[-1], 0.05)
+    z = np.interp(grid, xs, zs)
+    z = np.convolve(np.pad(z, 3, mode="edge"), np.ones(7) / 7, mode="valid")   # 0.35 m smoothing
+    slope = np.gradient(z, grid)
+    # ground level: the lowest point within ±4 m (wider than any jump), smoothed; it follows the slow height drift
+    w = 80
+    pad = np.pad(z, w, mode="edge")
+    ground = np.lib.stride_tricks.sliding_window_view(pad, 2 * w + 1).min(1)
+    ground = np.convolve(np.pad(ground, 20, mode="edge"), np.ones(41) / 41, mode="valid")
+    above = z - ground
+    out, i = [], 0
+    while i < len(grid):
+        if above[i] < min_h:
+            i += 1
+            continue
+        s0 = i
+        while s0 > 0 and above[s0 - 1] > 0.03:             # back to where the climb began
+            s0 -= 1
+        e = i
+        while e < len(grid) - 1 and above[e] > 0.03:      # forward to back on the ground
+            e += 1
+        base = 0.0
+        zz, ss = above[s0:e + 1], slope[s0:e + 1]
+        top = int(np.argmax(ss))                           # steepest point of the first climb
+        flat = np.flatnonzero(ss[top:] < 0.25 * ss[top])
+        lip = top + (int(flat[0]) if len(flat) else int(np.argmax(zz[top:])))
+        rising = np.flatnonzero(ss > -0.1)                 # the final descent starts after the last non-descending point
+        land = max(int(rising[-1]) if len(rising) else lip, lip)
+        out.append(dict(start=float(grid[s0]), lip=float(grid[s0 + lip]), h=float(zz[lip]),
+                        angle=float(np.degrees(np.arctan(ss[top]))), land=float(grid[s0 + land]),
+                        lh=float(zz[land]), ll=float(grid[e] - grid[s0 + land]), end=float(grid[e])))
+        i = e + 1
+    return out
+
+
+def jump_features(j):
+    d = j["land"] - j["lip"]
+    return np.array([1.0, j["h"], j["angle"], d, j["lh"], j["ll"], d * j["h"]])

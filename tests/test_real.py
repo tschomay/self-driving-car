@@ -139,6 +139,7 @@ def test_roller_courses_keep_tables_and_drops_in_place():
     for seed in crs.VAL_SEEDS:
         a, b = crs.make(seed), crs.make(seed, kinds=crs.KINDS45)
         assert [j.kind.replace("gap", "double") for j in a.jumps] == [j.kind for j in b.jumps]
-        for ja, jb in zip(a.jumps, b.jumps):
-            assert ja.lip == jb.lip and ja.design_speed == jb.design_speed
-        assert b.jumps[-1].end < crs.FINISH_X - 8
+        for ja, jb in zip(a.jumps, b.jumps):   # same draws; positions shift a little (crawlable drops are longer)
+            assert ja.height == jb.height and ja.design_speed == jb.design_speed
+    for seed in list(range(300)) + list(range(45000, 45020)) + list(range(100000, 100100)):
+        crs.make(seed, kinds=crs.KINDS45)   # every course still fits before the finish (make() asserts it)

@@ -149,6 +149,7 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
   - Estimators on the same logs: gyro only (with and without the bias fix), accelerometer only, your filter, and your filter without choice 2.
   - Errors against the true pitch and roll: on the ground, in the air, at touchdown, and the worst in a run.
   - `python -m sdc.phase45.e2`.
+- **Prediction (owner, before the run):** "10-15 deg. Accelerometer will be worst. It'll be lost on the air and give bass [bad] input on the ground." (Your filter about 10–15° off in the air and at touchdown; accelerometer-only the worst estimator.)
 
 ## Gate check
 

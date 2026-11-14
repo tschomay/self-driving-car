@@ -214,6 +214,19 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
 
 - **Setup:** E3 arm B exactly (parts-list sensors, training-range physics, scored and kept at gate range, finish bonus 100), but the teacher drives a steady 7.4 m/s into every jump, a speed choice the student can copy. Seeds 0–1. `bash sdc/phase45/e3b_runs.sh`. Reference: the steady expert itself lands 95% at nominal and 79% at gate range.
 - **Prediction (owner, before the results):** "75% before, 78 after. Not as good as e3" (gate range: the copy 75%, after fine-tuning 78%).
+- **Result (validation, 180 jumps each):** [report](https://claude.ai/artifact/BWj5WycbAnYFmJzMu6JPdb).
+
+  | Driver | Nominal | Training range | Gate range |
+  |---|---|---|---|
+  | Steady expert (teacher) | 95% | | 79% |
+  | Steady copy, seeds 0/1 | 89% / – | 77% / – | 69% / 61% |
+  | Steady copy + PPO (kept = the copy, step 0) | | | 69% / 61% |
+  | E3: per-jump expert / copy (B, seed 0) | 98% / 81% | 90% / 76% | 87% / 66% |
+
+  - At nominal physics, the steady teacher fixes the speed problem: the copy is 6 points behind its teacher (E3: 15–17).
+  - At gate range it doesn't help: 61–69%, the same as E3. The teacher drops to 79%, and the copy loses another 10–18 points. The main ending is now off the lane (20–24 of 60 runs).
+  - PPO fine-tuning hurt again: −10 to −15 points within 50k steps, with no recovery (both E3 and E3b).
+  - Prediction vs. result: 75% / 78% predicted; measured 61–69%, and fine-tuning lowered it. "Not as good as E3": about the same at gate range, better at nominal.
 
 ## Gate check
 

@@ -305,6 +305,7 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
   - **Critic warm-up:** the first 100k fine-tune steps update only the critic. The sequence copier trains no critic, and Phase 2 showed an untrained critic wrecks a copy.
   - Scored and kept at gate range on the validation courses (rollers). Seeds 0–1. `bash sdc/phase45/e5_runs.sh`.
   - References on rollers at gate range: steady expert 84%, per-jump expert 92%.
+- **Prediction (owner, before the run):** "75, tuning up to 77" (the copy 75%, after fine-tuning 77%; short of the 80% gate).
 
 ## Gate check
 

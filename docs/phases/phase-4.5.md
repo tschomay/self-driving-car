@@ -285,6 +285,16 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
   - The profile built from pitch × distance is too noisy (about 0.13 m error per 3 m), so the jump finder merges or splits jumps (1,174 detections for about 900 jumps).
   - Tables alone looked fine on a few hand-checked runs. Doubles and gate-range physics break it.
 - **Next idea:** measure the terrain directly with the downward range sensors (the 8×8 grid looks 2.5–47° down: a small lidar scan), instead of integrating pitch.
+- **Second version (2026-11-15): jump shapes from the pitch trace** (no height integration).
+  - Up runs, flat runs and down runs along the odometer. Lip = end of the climb; landing = start of the last descent before flat ground.
+  - The first jump finder was itself wrong, even on the true terrain: it split doubles in two and put table landings at the end of the down ramp.
+  - Results (300 practice courses; validation at gate range):
+    - Detections now match the jumps (909 for 884 real).
+    - Heights are close.
+    - Table landing distance: +0.2 m typical, but noisy (correlation 0.22–0.32).
+    - Double landing distance: about 1 m long, uncorrelated, because the crawler's wheels slip climbing roller 2 and the odometer runs ahead.
+    - Speed estimate: no better than guessing on validation (tables 0.41 vs 0.40 m/s, doubles 0.55 vs 0.51).
+  - **Ceiling** (perfectly measured geometry): 0.15 m/s for tables, 0.17 for doubles, vs 0.42 for guessing. Drops don't depend on speed. The landing has to be located to about ±0.2 m; the pitch-and-odometer version is at ±1 m or worse.
 
 ## Gate check
 

@@ -306,6 +306,19 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
   - Scored and kept at gate range on the validation courses (rollers). Seeds 0–1. `bash sdc/phase45/e5_runs.sh`.
   - References on rollers at gate range: steady expert 84%, per-jump expert 92%.
 - **Prediction (owner, before the run):** "75, tuning up to 77" (the copy 75%, after fine-tuning 77%; short of the 80% gate).
+- **Result (validation, rollers, gate range, 180 jumps per seed):** [report](https://claude.ai/artifact/WnmM3DGF8iKNt9YJVKzVKt).
+
+  | Car | Seed 0 | Seed 1 |
+  |---|---|---|
+  | Copy (GRU + filter) | **84%** (finished 90%) | **80%** (finished 90%) |
+  | Copy + PPO, kept checkpoint | 78% (500k) | 83% (950k) |
+  | Steady expert (teacher) | 84% | |
+
+  - On rollers the copy matches its teacher (on gaps: 70% vs 79%).
+  - Fine-tuning is mixed: one seed down, one up. Checkpoints are picked on a noisy 60-jump score.
+  - Remaining misses are mostly drops (27–29 of 42).
+  - Prediction vs. result: copy 75% / fine-tuned 77% predicted; measured copy 80–84%, fine-tuned 78–83%.
+- **ToF scan out-lap (run alongside, 2026-11-15):** the forward lidar and pitch every 0.25 m for 3 m after each lip, added to the pitch-shape features. Validation, gate range: tables 0.24–0.26 m/s error vs 0.40 for guessing (pitch only: 0.38–0.41); doubles 0.42 vs 0.51 (pitch only: 0.55–0.58). The ceiling with perfect geometry is 0.15–0.17.
 
 ## Gate check
 

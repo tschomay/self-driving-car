@@ -188,6 +188,7 @@ if __name__ == "__main__":
 
 # ---- the walk-through out-lap (owner, 2026-11-14: "just roll at a slow pace to learn the track") ----------------
 I_SIDE = slice(72, 74)   # parts layout: VL53L1X left, right (/ 3 m)
+I_TF = 7                 # parts layout: TFmini-S (/ 8 m)
 CRAWL_V = 2.0
 
 
@@ -229,7 +230,7 @@ def walk(course, x0=0.0, max_steps=4000, filter_kw=None, **env_kw):
     filt.reset(c.still_gyro, c.still_acc)
     xs, zs, z, xh = [0.0], [0.0], 0.0, 0.0
     true_x = [c.state()["x"]]   # labels only (never used to build the profile)
-    pitches = [0.0]
+    pitches, tfs = [0.0], [float(b._obs[0][I_TF]) * 8.0]
     reason = None
     while True:
         obs, _, term, trunc, infos = b.step(drv(b))
@@ -247,7 +248,9 @@ def walk(course, x0=0.0, max_steps=4000, filter_kw=None, **env_kw):
         zs.append(z)
         true_x.append(c.state()["x"])
         pitches.append(pitch)
+        tfs.append(float(o[I_TF]) * 8.0)
     walk.pitch = np.array(pitches)   # the filter's pitch per step (for find_jumps_pitch)
+    walk.tf = np.array(tfs)          # the forward lidar's range per step (m)
     return np.array(xs), np.array(zs), reason, np.array(true_x)
 
 
@@ -300,7 +303,7 @@ def _walk_job(args):
     xs, zs, reason, tx = walk(course, x0, **kw)
     c = crs.make(course, kinds=crs.KINDS45)
     rows = []
-    for j in find_jumps_pitch(xs, walk.pitch):
+    for j in add_scan(find_jumps_pitch(xs, walk.pitch), xs, walk.pitch, walk.tf):
         k = c.jump_at(float(np.interp(j["lip"], xs, tx)))          # label only
         J = c.jumps[k] if k is not None else None
         rows.append(dict(meas=j, kind=J.kind if J else None, design=J.design_speed if J else None,
@@ -308,25 +311,27 @@ def _walk_job(args):
     return rows
 
 
-def walk_collect(courses, starts=(0.0,), dr="train", procs=4):
+def walk_collect(courses, starts=(0.0,), dr="train", procs=2):
     kw = dict(real="all", sensors="parts", dr=dr)
     with Pool(procs) as p:
         return [r for rs in p.map(_walk_job, [(c, x0, kw) for c in courses for x0 in starts]) for r in rs]
 
 
-def fit_walk(rows, ridge=1e-1):
+def fit_walk(rows, ridge=1e-1, feats=None):
+    feats = feats or jump_features
     rows = [r for r in rows if r["design"] is not None]
-    X = np.stack([jump_features(r["meas"]) for r in rows])
+    X = np.stack([feats(r["meas"]) for r in rows])
     y = np.array([r["design"] for r in rows])
     mu, sd = X.mean(0), X.std(0) + 1e-9
     mu[0], sd[0] = 0.0, 1.0
     Z = (X - mu) / sd
     w = np.linalg.solve(Z.T @ Z + ridge * np.eye(Z.shape[1]), Z.T @ y)
-    return dict(w=w.tolist(), mu=mu.tolist(), sd=sd.tolist())
+    return dict(w=w.tolist(), mu=mu.tolist(), sd=sd.tolist(), feats=feats.__name__)
 
 
 def predict_walk(model, j):
-    z = (jump_features(j) - np.array(model["mu"])) / np.array(model["sd"])
+    feats = scan_features if model.get("feats") == "scan_features" else jump_features
+    z = (feats(j) - np.array(model["mu"])) / np.array(model["sd"])
     return float(np.clip(z @ np.array(model["w"]), crs.DESIGN_SPEED[0] - 0.5, crs.DESIGN_SPEED[1] + 0.5))
 
 
@@ -372,3 +377,21 @@ def find_jumps_pitch(xs, pitch, up=np.deg2rad(8), down=np.deg2rad(4), min_climb=
                         ll=float((land_end - land) * 0.05), end=float(grid[land_end])))
         k = m
     return out
+
+
+TF_OFFSETS = np.arange(0.0, 3.01, 0.25)   # m after the lip
+
+
+def add_scan(jumps, xs, pitch, tf):
+    """The ToF scan (owner, 2026-11-15): what the forward lidar and the pitch read at each 0.25 m for 3 m after
+    every lip. Optical ranges aren't fooled by wheel slip: on a table top the range holds until the beam passes the
+    far edge; at a roller's crest the beam reaches the next roller's face."""
+    for j in jumps:
+        q = j["lip"] + TF_OFFSETS
+        j["scan_tf"] = np.interp(q, xs, tf).tolist()
+        j["scan_pitch"] = np.degrees(np.interp(q, xs, pitch)).tolist()
+    return jumps
+
+
+def scan_features(j):
+    return np.concatenate([jump_features(j), np.minimum(j["scan_tf"], 8.0), np.array(j["scan_pitch"]) / 10.0])

@@ -126,6 +126,8 @@ def main():
                   sensors=ENV.get("sensors", "ideal"), dr=ENV.get("val_dr"))
     if ENV.get("attitude"):
         env_kw["attitude"] = True
+    if ENV.get("kinds"):
+        env_kw["kinds"] = tuple(ENV["kinds"])
     data, log = [], []
     for r in range(a.rounds):
         O, A, S, H = collect(net, expert, a.steps, a.seed * 1000 + r, use_expert=(r == 0))

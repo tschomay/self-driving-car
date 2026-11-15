@@ -296,6 +296,16 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
     - Speed estimate: no better than guessing on validation (tables 0.41 vs 0.40 m/s, doubles 0.55 vs 0.51).
   - **Ceiling** (perfectly measured geometry): 0.15 m/s for tables, 0.17 for doubles, vs 0.42 for guessing. Drops don't depend on speed. The landing has to be located to about ±0.2 m; the pitch-and-odometer version is at ±1 m or worse.
 
+### E5 — The best student on rollers, then fine-tuned
+
+- **Owner (2026-11-15):** "Do 2 first, then come back to the ToF out-lap."
+- **Setup:**
+  - **Copy:** the owner's GRU and filter inputs, copying the steady expert (7.4 m/s), parts-list sensors, training-range physics, **roller courses** (doubles, tables, crawlable drops).
+  - **Fine-tune:** the owner's PPO with the GRU, finish bonus 100, std 0.15 → 0.05, γ 0.997, steering cost 0.03, 1M steps.
+  - **Critic warm-up:** the first 100k fine-tune steps update only the critic. The sequence copier trains no critic, and Phase 2 showed an untrained critic wrecks a copy.
+  - Scored and kept at gate range on the validation courses (rollers). Seeds 0–1. `bash sdc/phase45/e5_runs.sh`.
+  - References on rollers at gate range: steady expert 84%, per-jump expert 92%.
+
 ## Gate check
 
 ## Handoff to next phase

@@ -33,8 +33,8 @@ DEFAULTS = dict(n_envs=8, n_steps=256, batch_size=256, n_epochs=10, lr=3e-4, lr_
 ENV = dict(jump_bonus=10.0, max_steps=1500, size=1.0, fan=False, servo=False, steer_cost=0.0, finish_bonus=0.0)
 # Phase 4.5 options (defaults = Phase 4): real (physics switches), sensors, dr (training physics range), and
 # val_dr: the physics range validation scores at (checkpoint selection), which can differ from training's.
-ENV45 = dict(real=(), sensors="ideal", dr=None, val_dr=None, attitude=False)
-OBS_KEYS = ("size", "max_steps", "fan", "servo", "real", "sensors", "dr", "attitude")
+ENV45 = dict(real=(), sensors="ideal", dr=None, val_dr=None, attitude=False, kinds=None)
+OBS_KEYS = ("size", "max_steps", "fan", "servo", "real", "sensors", "dr", "attitude", "kinds")
 OBS_CLIP = 5.0
 GIF_COURSES = (10000, 10004)
 
@@ -74,9 +74,11 @@ def train(seed=0, total_timesteps=1_000_000, out="runs/p4", eval_every=50_000, l
           gif=True, env=None, **overrides) -> dict:
     cfg = {**DEFAULTS, **overrides}
     env_cfg = {**ENV, **ENV45, **(env or {})}
-    train_env = {k: v for k, v in env_cfg.items() if k != "val_dr"}
+    train_env = {k: v for k, v in env_cfg.items() if k != "val_dr" and not (k == "kinds" and v is None)}
     val_env = dict(size=env_cfg["size"], fan=env_cfg["fan"], servo=env_cfg["servo"], real=env_cfg["real"],
                    sensors=env_cfg["sensors"], dr=env_cfg["val_dr"], attitude=env_cfg["attitude"])
+    if env_cfg.get("kinds"):
+        val_env["kinds"] = tuple(env_cfg["kinds"])
     torch.set_num_threads(threads)
     torch.manual_seed(seed)
     out = Path(out)
@@ -215,6 +217,8 @@ def env_kw(m):
         kw.update(real=e.get("real", ()), sensors=e.get("sensors", "ideal"), dr=e.get("val_dr"))
         if e.get("attitude"):
             kw["attitude"] = True
+        if e.get("kinds"):
+            kw["kinds"] = tuple(e["kinds"])
     return kw
 
 

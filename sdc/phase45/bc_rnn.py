@@ -33,7 +33,7 @@ EXPERT = dict(plan=False, v_target=7.4, kd=1.0)
 
 def collect(net, expert, n_steps, seed, use_expert, noise=0.1, n=16):
     """Per step: obs, expert action, episode-started flag, and the student's memory before the step."""
-    b = je.JumpBatch(n, seed=seed, **{k: v for k, v in ENV.items() if k != "val_dr"})
+    b = je.JumpBatch(n, seed=seed, **{k: v for k, v in ENV.items() if k not in ("val_dr", "val_map")})
     b.reset()
     rng = np.random.default_rng(seed)
     h = net.init_memory(n)
@@ -119,7 +119,7 @@ def main():
     if not my_gru.ready():
         raise SystemExit("my_gru.py has OWNER TODOs")
     L = my_gru.CONFIG["seq_len"]
-    obs_dim = je.JumpBatch(1, **{k: v for k, v in ENV.items() if k != "val_dr"}).obs_dim
+    obs_dim = je.JumpBatch(1, **{k: v for k, v in ENV.items() if k not in ("val_dr", "val_map")}).obs_dim
     net = trr.RecurrentActorCritic(obs_dim=obs_dim)
     expert = dr.ExpertDriver(**EXPERT)
     env_kw = dict(fan=ENV.get("fan", False), servo=ENV.get("servo", False), real=ENV.get("real", ()),
@@ -128,6 +128,8 @@ def main():
         env_kw["attitude"] = True
     if ENV.get("kinds"):
         env_kw["kinds"] = tuple(ENV["kinds"])
+    if ENV.get("val_map"):   # E6: validation runs use the validation courses' out-lap maps
+        env_kw["track_map"] = ENV["val_map"]
     data, log = [], []
     for r in range(a.rounds):
         O, A, S, H = collect(net, expert, a.steps, a.seed * 1000 + r, use_expert=(r == 0))

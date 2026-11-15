@@ -319,6 +319,21 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
   - Remaining misses are mostly drops (27–29 of 42).
   - Prediction vs. result: copy 75% / fine-tuned 77% predicted; measured copy 80–84%, fine-tuned 78–83%.
 - **ToF scan out-lap (run alongside, 2026-11-15):** the forward lidar and pitch every 0.25 m for 3 m after each lip, added to the pitch-shape features. Validation, gate range: tables 0.24–0.26 m/s error vs 0.40 for guessing (pitch only: 0.38–0.41); doubles 0.42 vs 0.51 (pitch only: 0.55–0.58). The ceiling with perfect geometry is 0.15–0.17.
+- **Explanation (owner, after the run):** "Not sure about rollers vs gaps. Besides being able to take them slow they should race the same. Let's try ToF again."
+
+### E6 — The out-lap map in the timed lap
+
+- **Owner (2026-11-15):** "Let's try ToF again."
+- **Built:**
+  - Each course is crawled first: the sensor-only crawl driver, with pitch shape plus the ToF scan after each lip.
+  - Its map, `[(lip odometer, mapped speed)]` from the scan estimator, gives the timed lap two more inputs: distance to the next mapped lip by the car's own odometer (re-synced to the nearest mapped lip at each takeoff), and that jump's mapped speed.
+  - Practice-course maps are cross-fitted, so they are as noisy as maps of unseen courses. `python -m sdc.phase45.maps`; env option `track_map`.
+- **The teacher with the map** (validation, rollers, gate range, 180 jumps): aiming 0.3 / 0.6 / 0.9 m/s above the mapped speed lands 86% / **88%** / 83%. One steady speed: 84%. Perfect per-jump speeds: 92%. The realistic map recovers about half of a perfect map's value.
+- **Setup:**
+  - E5's copy (the owner's GRU and filter inputs, parts-list sensors, rollers) plus the two map inputs, copying the map-following teacher (+0.6 m/s).
+  - Trained on practice courses 100000–100299 at training-range physics; scored at gate range on validation with the validation maps.
+  - Copy only, no fine-tune (E5: mixed). Seeds 0–1. `bash sdc/phase45/e6_runs.sh`.
+  - Baseline: E5's copies, 84% / 80%.
 
 ## Gate check
 

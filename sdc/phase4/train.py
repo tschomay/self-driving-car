@@ -34,7 +34,7 @@ ENV = dict(jump_bonus=10.0, max_steps=1500, size=1.0, fan=False, servo=False, st
 # Phase 4.5 options (defaults = Phase 4): real (physics switches), sensors, dr (training physics range), and
 # val_dr: the physics range validation scores at (checkpoint selection), which can differ from training's.
 ENV45 = dict(real=(), sensors="ideal", dr=None, val_dr=None, attitude=False, kinds=None)
-OBS_KEYS = ("size", "max_steps", "fan", "servo", "real", "sensors", "dr", "attitude", "kinds")
+OBS_KEYS = ("size", "max_steps", "fan", "servo", "real", "sensors", "dr", "attitude", "kinds", "track_map")
 OBS_CLIP = 5.0
 GIF_COURSES = (10000, 10004)
 
@@ -219,6 +219,8 @@ def env_kw(m):
             kw["attitude"] = True
         if e.get("kinds"):
             kw["kinds"] = tuple(e["kinds"])
+        if e.get("val_map"):
+            kw["track_map"] = e["val_map"]
     return kw
 
 

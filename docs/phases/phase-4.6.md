@@ -71,8 +71,9 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - The teacher laps in about 30 s and lands 88% of jumps at gate range (98% nominal). Its four failures: two rollovers landing jump 1, two off the lane (one with grip 0.56).
   - Sensors: they first register a turn a median 0.75 m before it begins (furthest 3.25 m); that is 0.1 s at 7.4 m/s. The 8×8 ToF sees it first; the side sensors never do before the turn begins. The teacher starts slowing a median 2.25 m before. The sensors saw the turn before that point in 6 of 40 turns.
   - Prediction vs. result: teacher 80% predicted, 93% measured. Car 45% predicted, 0% measured. "Going off the track ends runs": yes, 58 of 60.
-- **Explanation (owner, after the run):** …
-- **Takeaway:** …
+- **Explanation (owner, after the run):** "Phase 4.5 learned that minimal steering input is important. Now it has to be aggressive about corners or it doesn't turn enough."
+- **Agent's check (first turn, 10 validation loops, gate range):** the Phase 4.5 car does steer, harder than the teacher (peak command 0.41 of full lock vs 0.27). But it arrives at 6.5 m/s where the teacher is down to 4.8 m/s. At 6.5 m/s a 4 m radius needs about 10 m/s² sideways, more than the tires can give at any steering angle. It never learned to brake for a turn, and its sensors show the turn only 0.1 s ahead.
+- **Takeaway:** on turns the missing skill is speed, not steering: the car has to slow down before it can see why. The knowledge of what is coming has to arrive some other way: the out-lap map (E2).
 
 ## Gate check
 

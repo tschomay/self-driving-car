@@ -75,6 +75,21 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
 - **Agent's check (first turn, 10 validation loops, gate range):** the Phase 4.5 car does steer, harder than the teacher (peak command 0.41 of full lock vs 0.27). But it arrives at 6.5 m/s where the teacher is down to 4.8 m/s. At 6.5 m/s a 4 m radius needs about 10 m/s² sideways, more than the tires can give at any steering angle. It never learned to brake for a turn, and its sensors show the turn only 0.1 s ahead.
 - **Takeaway:** on turns the missing skill is speed, not steering: the car has to slow down before it can see why. The knowledge of what is coming has to arrive some other way: the out-lap map (E2).
 
+### E2 — Your dead reckoning
+
+- **Owner's estimator (`sdc/phase46/my_deadreckoning.py`, 2026-11-16, "Agree" to the recommended set):**
+  1. Heading from the gyro's turn rate, minus its bias measured at standstill.
+  2. Tilt-corrected: the gyro is projected onto the vertical with the attitude filter's pitch and roll.
+  3. Distance from motor speed, holding the last ground speed in free fall.
+  4. At the finish line, the closing error is spread evenly back along the lap, so the mapped loop closes.
+  - Agent's details: only the horizontal part of the distance counts (× cos pitch); the map's curvature is the heading change per metre, smoothed over 1 m.
+- **Sim support:** `sdc/phase46/laps.py` records a lap's sensor readings with the truth alongside.
+- **Crawl driver, not solved yet (2026-11-16):** Phase 4.5's sensor-only crawler finishes about 9 of 12 practice loops; a rewrite (`laps.LoopCrawler`) finishes 10 of 24. Causes found:
+  - The two side sensors can't tell being off-centre from pointing the wrong way.
+  - In a banked turn or under body roll, the low side's beam hits the ground and the high side's beam passes over the 0.35 m bank, so both go blind.
+  - Hard steering rolls the body and makes it worse; kickers stall a 2 m/s crawl unless it speeds up on the climb.
+  - Decision pending (owner): who drives the out-lap.
+
 ## Gate check
 
 ## Handoff to next phase

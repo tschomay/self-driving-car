@@ -36,10 +36,17 @@ def main():
     ap.add_argument("--run", default="runs/p45-e6-s1")
     a = ap.parse_args()
     torch.set_num_threads(1)
-    if not MAP.exists():   # 1) out-laps of the test courses, at the gate's physics
-        rows = ol.walk_collect(TEST_SEEDS, starts=dr.STARTS, dr="gate", procs=4, phys_seed=PHYS_SEED_TEST)
-        model = json.loads(Path("runs/p45-maps-estimator.json").read_text())
-        MAP.write_text(json.dumps(mp.build(rows, model)))
+    # 1) out-laps of the test courses, at the gate's physics; always rebuilt (pre-gate review: no stale maps)
+    rows = ol.walk_collect(TEST_SEEDS, starts=dr.STARTS, dr="gate", procs=4, phys_seed=PHYS_SEED_TEST)
+    model = json.loads(Path("runs/p45-maps-estimator.json").read_text())
+    test_map = mp.build(rows, model)
+    for c in TEST_SEEDS:            # every run gets a map entry, even if its crawl found no jump (pre-gate review)
+        for x0 in dr.STARTS:
+            test_map.setdefault(f"{c}|{x0:.2f}", [])
+    assert len(test_map) == len(TEST_SEEDS) * len(dr.STARTS)
+    MAP.write_text(json.dumps(test_map))
+    crawl = dict(mapped_jumps={k: len(v) for k, v in test_map.items()},
+                 endings={f"{r['course']}|{r['x0']:.2f}": r["reason"] for r in rows})
     env = dict(real="all", sensors="parts", attitude=True, kinds=crs.KINDS45, dr="gate", phys_seed=PHYS_SEED_TEST,
                track_map=str(MAP))
     pol, m = trr.load(Path(a.run))
@@ -49,10 +56,11 @@ def main():
                          n_envs=1, starts=dr.STARTS, **env))
     commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
     out = dict(run=a.run, commit=commit, bar=BAR, verdict="PASS" if sc["rate"] >= BAR else "FAIL", score=sc,
-               expert=ex, validation=m["final"]["rate"], episodes=eps)
+               expert=ex, validation=m["final"]["rate"], crawl=crawl, episodes=eps)
     Path(a.run, "gate.json").write_text(json.dumps(out, indent=1, default=float))
     print(f"GATE {out['verdict']}: {sc['landed']}/{sc['jumps']} = {sc['rate']:.1%} (bar {BAR:.0%}); "
-          f"expert {ex['rate']:.1%}; by kind {sc['by_kind']}; endings {sc['reasons']}")
+          f"expert {ex['rate']:.1%}; by kind {sc['by_kind']}; endings {sc['reasons']}; "
+          f"mapped jumps per run {sorted(crawl['mapped_jumps'].values())}")
     g = Path(a.run, "gate-45000.gif")
     ep = render3d.gif(WithEnv(pol, **env), 45000, g, "Phase 4.5 gate car · test course 45000")
     rows = [["gate car", f"{sc['rate']:.1%}", *[sc["by_kind"].get(k, "–") for k in ("double", "table", "drop")],

@@ -350,5 +350,11 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
   - Each test course is first crawled at the same physics (sensor-only crawl driver), and its map is built with the estimator fitted on practice courses only.
   - Pass: ≥ 80% of the 180 jumps landed under Phase 4's definition.
   - Before the run: a code review for oracle leakage, and the compute budget on a Pi 5.
+- **Pre-gate review (background agent, 2026-11-16): no oracle leakage.**
+  - With the course truth mangled (design speeds, jump positions), the gate car's inputs and actions were bit-identical. The out-lap map was identical too.
+  - The estimator reproduces exactly from practice courses alone. Test seeds and physics seed 45 were never used.
+  - Doubles are scored, and a jump never credited counts as missed.
+  - Two gate-script fixes adopted before the run: every test run gets a map entry even if its crawl finds no jump (the crawl's endings and mapped-jump counts are recorded), and the test map is always rebuilt.
+- **Compute budget:** the gate car (owner's GRU network plus filter) takes 0.21 ms per step on one container core (82,757 parameters). That is about 0.5–0.9 ms on a Pi 5, inside the 2 ms budget and the 20 ms control step.
 
 ## Handoff to next phase

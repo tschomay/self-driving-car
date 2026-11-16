@@ -29,6 +29,11 @@ lane edge, |y| > 1.5 m),
 stuck (< 0.3 m/s for 2 s), or the step cap (truncated).
 
 Reward: forward progress in metres + jump_bonus for each landed jump.
+
+loop=True (Phase 4.6): the course is a closed loop with turns (sdc/jumps/loop.py). The car starts just past the
+start/finish line and the episode finishes when it crosses the line again (one lap). Position is then measured in
+track coordinates: the state's x is metres along the centreline (progress, the reward), y is metres left of it
+(off the lane: |y| > 1.5 m), yaw is the heading relative to the track. Sensors and jump scoring are unchanged.
 """
 
 from __future__ import annotations
@@ -39,6 +44,7 @@ import mujoco
 
 from sdc.jumps import car as cr
 from sdc.jumps import course as crs
+from sdc.jumps import loop as lp
 from sdc.jumps import real as rl
 
 OBS_DIM = 20
@@ -72,8 +78,11 @@ class JumpCar:
     """One car on one course."""
 
     def __init__(self, seed_rng, courses="random", size=1.0, kinds=crs.KINDS, fan=False, servo=False,
-                 real=(), sensors="ideal", dr=None, phys_seed=0, attitude=False, track_map=None):
+                 real=(), sensors="ideal", dr=None, phys_seed=0, attitude=False, track_map=None, loop=False):
         self.real = rl.switches(real)
+        # Phase 4.6: loop courses with turns (sdc/jumps/loop.py). The state's x and y are then track coordinates:
+        # metres along the centreline from the line (counting on past one lap) and metres left of it.
+        self.loop = loop
         self.attitude = attitude   # parts sensors + the owner's filter's pitch and roll as two more inputs (E4)
         # E6: an out-lap map {"course|x0": [[lip odometer m, speed m/s], ...]} (or a JSON path). Adds two inputs:
         # distance to the next mapped lip by the car's own odometer, and that jump's mapped speed.
@@ -82,7 +91,7 @@ class JumpCar:
         assert sensors in ("ideal", "noisy", "parts")
         self.sensors, self.dr, self.phys_seed = sensors, (None if dr == "nominal" else dr), phys_seed
         self.legacy = not self.real and sensors == "ideal" and self.dr is None   # Phase 4's car exactly
-        self.m = cr.build_model(self.real)
+        self.m = cr.build_model(self.real, lp.TERRAIN if loop else None)
         self.d = mujoco.MjData(self.m)
         self.rng = seed_rng
         self.courses = courses
@@ -139,7 +148,10 @@ class JumpCar:
             else:
                 course_seed = self.courses[self._course_i % len(self.courses)]
                 self._course_i += 1
-        self.course = crs.make(course_seed, kinds=self.kinds, size=self.size)
+        if self.loop:
+            self.course = lp.make(course_seed, kinds=self.kinds if "double" in self.kinds else lp.KINDS, size=self.size)
+        else:
+            self.course = crs.make(course_seed, kinds=self.kinds, size=self.size)
         self.m.hfield_data[:] = self.course.hfield().ravel()
         if not self.legacy:   # physics and sensor noise drawn from (course, start, phys_seed): batching-independent
             self.prng = np.random.default_rng([int(course_seed), int(round(x0 * 1000)) + 10_000, int(self.phys_seed)])
@@ -148,13 +160,18 @@ class JumpCar:
         mujoco.mj_resetData(self.m, self.d)
         self.d.qpos[0] = crs.START_X + x0      # x0: start offset (evaluation repeats a course from a few starts)
         self.d.qpos[2] = self.course.height(crs.START_X + x0) + 0.17
+        if self.loop:   # on the centreline, START_X + x0 past the line, facing along the track
+            X, Y, th = self.course.pose(crs.START_X + x0)
+            self.d.qpos[:2] = X, Y
+            self.d.qpos[3:7] = np.cos(th / 2), 0.0, 0.0, np.sin(th / 2)
+            self._si, self._s = int(round((crs.START_X + x0) / self.course.ds)), crs.START_X + x0
         mujoco.mj_forward(self.m, self.d)
         mujoco.mj_step(self.m, self.d, int(0.2 / cr.TIMESTEP))     # settle on the suspension (0.2 s)
         self.v_prev = self.d.qvel[:3].copy()
         self.t = 0
         self.last_act = np.zeros(2, np.float32)
         self.ret = 0.0
-        self.x_prev = float(self.d.qpos[0])
+        self.x_prev = self.state()["x"]
         self.slow = 0
         self.airborne = False
         self.takeoff = None          # (t, x)
@@ -212,6 +229,17 @@ class JumpCar:
         pitch, roll = _pitch_roll(R)
         yaw = np.arctan2(R[1, 0], R[0, 0])
         v_world = d.qvel[:3]
+        if self.loop:   # track coordinates
+            c = self.course
+            s, off, th, self._si = c.project(d.qpos[0], d.qpos[1], self._si)
+            self._s += (s - self._s + c.length / 2) % c.length - c.length / 2    # keeps counting past the line
+            kap = float(c.curvature(s))
+            vs = float(np.cos(th) * v_world[0] + np.sin(th) * v_world[1])
+            return dict(x=float(self._s), y=off, z=float(d.qpos[2]), pitch=float(pitch), roll=float(roll),
+                        yaw=float((yaw - th + np.pi) % (2 * np.pi) - np.pi), up_z=float(R[2, 2]),
+                        v_fwd=float(R[:, 0] @ v_world), vx=vs, vz=float(v_world[2]), pitch_rate=float(-d.qvel[4]),
+                        yaw_rate=float(d.qvel[5]) - vs * kap, kappa=kap, X=float(d.qpos[0]), Y=float(d.qpos[1]),
+                        heading=float(yaw))
         return dict(x=float(d.qpos[0]), y=float(d.qpos[1]), z=float(d.qpos[2]), pitch=float(pitch),
                     roll=float(roll), yaw=float(yaw), up_z=float(R[2, 2]),
                     v_fwd=float(R[:, 0] @ v_world), vx=float(v_world[0]), vz=float(v_world[2]),
@@ -272,6 +300,8 @@ class JumpCar:
     def _cast(self, origin_body, dirs_body, cutoff):
         R = self.d.xmat[1].reshape(3, 3)
         o = self.d.xpos[1] + R @ np.asarray(origin_body, float)
+        if self.loop:   # the loops' heightfield is large: march the height map instead of MuJoCo's ray cast
+            return lp.cast(self.course, o, dirs_body @ R.T, cutoff)
         vec = (dirs_body @ R.T).ravel()
         n = len(dirs_body)
         dist, gid = np.empty(n), np.empty(n, np.int32)
@@ -437,7 +467,7 @@ class JumpCar:
         # endings
         self.slow = self.slow + 1 if st["v_fwd"] < 0.3 else 0
         reason = None
-        if st["x"] >= crs.FINISH_X:
+        if st["x"] >= (self.course.finish if self.loop else crs.FINISH_X):
             reason = "finished"
             reward += finish_bonus
         elif st["up_z"] < 0.2:
@@ -474,10 +504,10 @@ class JumpCar:
 class JumpBatch:
     def __init__(self, n, seed=0, courses="random", max_steps=1500, jump_bonus=10.0, size=1.0, kinds=crs.KINDS,
                  fan=False, servo=False, steer_cost=0.0, finish_bonus=0.0, real=(), sensors="ideal", dr=None,
-                 phys_seed=0, attitude=False, track_map=None):
+                 phys_seed=0, attitude=False, track_map=None, loop=False):
         rng = np.random.default_rng(seed)
         self.cars = [JumpCar(np.random.default_rng(rng.integers(2**63)), courses, size, kinds, fan, servo,
-                             real, sensors, dr, phys_seed, attitude, track_map) for _ in range(n)]
+                             real, sensors, dr, phys_seed, attitude, track_map, loop) for _ in range(n)]
         self.steer_cost, self.finish_bonus = steer_cost, finish_bonus
         if courses != "random":   # spread a fixed course list across the cars
             for i, c in enumerate(self.cars):

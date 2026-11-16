@@ -131,6 +131,64 @@ def _arc_x(lip_x, h, v, ang_deg, z_hit):
     return lip_x + vx * t
 
 
+def build_jump(rng, x, z, pos, kinds=KINDS, size=1.0) -> Jump:
+    """Draw one jump starting at `pos` and add its shape to the profile z (in place) over the grid x."""
+    kind = kinds[rng.integers(len(kinds))]
+    h = rng.uniform(*HEIGHTS) * size
+    ang_deg = rng.uniform(*ANGLES)
+    ang = np.deg2rad(ang_deg)
+    vd = rng.uniform(*DESIGN_SPEED)
+    face = 2 * h / np.tan(ang)
+    start, lip = pos, pos + face
+    # kicker: a transition curving up from flat ground to the lip angle, then a flat 0.15 m lip
+    m = (x >= start) & (x <= lip)
+    t = (x[m] - start) / face
+    z[m] = np.maximum(z[m], h * t * t)
+    top = (x > lip) & (x <= lip + 0.15)
+    z[top] = np.maximum(z[top], h)
+    lip_end = lip + 0.15
+    launch = (lip + 0.1, h, vd - 0.6, ang_deg - 3.0)
+    if kind in ("gap", "double"):
+        lh = h * rng.uniform(0.7, 1.0)
+        ll = rng.uniform(2.0, 3.5)
+        aim = 0.4
+        x_aim = _arc_x(*launch, lh * (1 - _smoothstep(aim)))
+        land_start = max(x_aim - aim * ll, lip_end + 0.6)
+        m = (x >= land_start) & (x <= land_start + ll)
+        z[m] = np.maximum(z[m], lh * (1 - _smoothstep((x[m] - land_start) / ll)))
+        if kind == "gap":   # back face of the kicker: steep drop to the gap floor
+            m = (x > lip_end) & (x < lip_end + 0.3)
+            z[m] = np.maximum(z[m], h * (1 - (x[m] - lip_end) / 0.3))
+        else:               # double: rounded rollers. Roller 1's back side and roller 2's up face at ROLLER_FACE,
+                            # smoothed; where they meet they form the valley (or merge into one hump if close)
+            run_down = h / np.tan(np.deg2rad(ROLLER_FACE))
+            m = (x > lip_end) & (x < lip_end + run_down)
+            z[m] = np.maximum(z[m], h * (1 - _smoothstep((x[m] - lip_end) / run_down)))
+            run_up = lh / np.tan(np.deg2rad(ROLLER_FACE))
+            m = (x > land_start - run_up) & (x < land_start)
+            z[m] = np.maximum(z[m], lh * _smoothstep((x[m] - (land_start - run_up)) / run_up))
+        end = land_start + ll
+    elif kind == "table":
+        dl = rng.uniform(2.0, 3.5)
+        aim = 0.35
+        x_aim = _arc_x(*launch, h * (1 - _smoothstep(aim)))
+        land_start = max(x_aim - aim * dl, lip_end + 0.6)
+        m = (x > lip_end) & (x <= land_start)
+        z[m] = np.maximum(z[m], h)
+        m = (x > land_start) & (x <= land_start + dl)
+        z[m] = np.maximum(z[m], h * (1 - _smoothstep((x[m] - land_start) / dl)))
+        end = land_start + dl
+    else:  # drop
+        # Phase 4.5 roller courses: the back side is a 30° slope a crawling car can roll down (jumped at speed,
+        # it is still a drop: fly over it, land flat). Phase 4: a near-vertical 0.3 m ledge.
+        back = h / np.tan(np.deg2rad(30.0)) if "double" in kinds else 0.3
+        m = (x > lip_end) & (x < lip_end + back)
+        z[m] = np.maximum(z[m], h * (1 - (x[m] - lip_end) / back))
+        land_start = lip_end + back
+        end = land_start
+    return Jump(kind, float(start), float(lip), float(h), float(ang_deg), float(land_start), float(end), float(vd))
+
+
 def make(seed: int, kinds=KINDS, size=1.0) -> Course:
     """Generate the course for `seed`. `size` scales the kicker heights (curricula, experiments).
 
@@ -147,61 +205,7 @@ def make(seed: int, kinds=KINDS, size=1.0) -> Course:
     jumps = []
     pos = 10.0 + rng.uniform(0, 3)    # first kicker after a run-up
     for _ in range(N_JUMPS):
-        kind = kinds[rng.integers(len(kinds))]
-        h = rng.uniform(*HEIGHTS) * size
-        ang_deg = rng.uniform(*ANGLES)
-        ang = np.deg2rad(ang_deg)
-        vd = rng.uniform(*DESIGN_SPEED)
-        face = 2 * h / np.tan(ang)
-        start, lip = pos, pos + face
-        # kicker: a transition curving up from flat ground to the lip angle, then a flat 0.15 m lip
-        m = (x >= start) & (x <= lip)
-        t = (x[m] - start) / face
-        z[m] = np.maximum(z[m], h * t * t)
-        top = (x > lip) & (x <= lip + 0.15)
-        z[top] = np.maximum(z[top], h)
-        lip_end = lip + 0.15
-        launch = (lip + 0.1, h, vd - 0.6, ang_deg - 3.0)
-        if kind in ("gap", "double"):
-            lh = h * rng.uniform(0.7, 1.0)
-            ll = rng.uniform(2.0, 3.5)
-            aim = 0.4
-            x_aim = _arc_x(*launch, lh * (1 - _smoothstep(aim)))
-            land_start = max(x_aim - aim * ll, lip_end + 0.6)
-            m = (x >= land_start) & (x <= land_start + ll)
-            z[m] = np.maximum(z[m], lh * (1 - _smoothstep((x[m] - land_start) / ll)))
-            if kind == "gap":   # back face of the kicker: steep drop to the gap floor
-                m = (x > lip_end) & (x < lip_end + 0.3)
-                z[m] = np.maximum(z[m], h * (1 - (x[m] - lip_end) / 0.3))
-            else:               # double: rounded rollers. Roller 1's back side and roller 2's up face at ROLLER_FACE,
-                                # smoothed; where they meet they form the valley (or merge into one hump if close)
-                run_down = h / np.tan(np.deg2rad(ROLLER_FACE))
-                m = (x > lip_end) & (x < lip_end + run_down)
-                z[m] = np.maximum(z[m], h * (1 - _smoothstep((x[m] - lip_end) / run_down)))
-                run_up = lh / np.tan(np.deg2rad(ROLLER_FACE))
-                m = (x > land_start - run_up) & (x < land_start)
-                z[m] = np.maximum(z[m], lh * _smoothstep((x[m] - (land_start - run_up)) / run_up))
-            end = land_start + ll
-        elif kind == "table":
-            dl = rng.uniform(2.0, 3.5)
-            aim = 0.35
-            x_aim = _arc_x(*launch, h * (1 - _smoothstep(aim)))
-            land_start = max(x_aim - aim * dl, lip_end + 0.6)
-            m = (x > lip_end) & (x <= land_start)
-            z[m] = np.maximum(z[m], h)
-            m = (x > land_start) & (x <= land_start + dl)
-            z[m] = np.maximum(z[m], h * (1 - _smoothstep((x[m] - land_start) / dl)))
-            end = land_start + dl
-        else:  # drop
-            # Phase 4.5 roller courses: the back side is a 30° slope a crawling car can roll down (jumped at speed,
-            # it is still a drop: fly over it, land flat). Phase 4: a near-vertical 0.3 m ledge.
-            back = h / np.tan(np.deg2rad(30.0)) if "double" in kinds else 0.3
-            m = (x > lip_end) & (x < lip_end + back)
-            z[m] = np.maximum(z[m], h * (1 - (x[m] - lip_end) / back))
-            land_start = lip_end + back
-            end = land_start
-        jumps.append(Jump(kind, float(start), float(lip), float(h), float(ang_deg), float(land_start),
-                          float(end), float(vd)))
-        pos = end + rng.uniform(9.0, 13.0)
+        jumps.append(build_jump(rng, x, z, pos, kinds, size))
+        pos = jumps[-1].end + rng.uniform(9.0, 13.0)
     assert jumps[-1].end < FINISH_X - 8.0, "course too long"
     return Course(seed, x, z, jumps)

@@ -334,6 +334,7 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
   - Trained on practice courses 100000–100299 at training-range physics; scored at gate range on validation with the validation maps.
   - Copy only, no fine-tune (E5: mixed). Seeds 0–1. `bash sdc/phase45/e6_runs.sh`.
   - Baseline: E5's copies, 84% / 80%.
+- **Prediction (owner, before the run):** "I hope so, but not by much. Maybe 85%."
 
 ## Gate check
 

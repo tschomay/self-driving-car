@@ -68,7 +68,7 @@ def _straightened(c, s_from, s_to):
     return lp.LoopCourse(c.seed, center, np.zeros(n), np.zeros(n), n * c.ds, c.profile[idx], c.rough[idx], np.zeros(n))
 
 
-def sensor_look(courses, threshold=0.25, back=12.0):
+def sensor_look(courses, threshold=0.25, back=8.0):
     teacher = LoopExpert()
     car = je.JumpCar(np.random.default_rng(0), real="all", sensors="parts", loop=True)
     rows = []
@@ -80,8 +80,9 @@ def sensor_look(courses, threshold=0.25, back=12.0):
         for s0, s1, radius in corners(c):
             lo = s0 - back
             busy = any(j.start - 1 < s0 and j.end + 4 > lo for j in c.jumps) or (c.whoops[1] > lo and c.whoops[0] < s0)
-            if lo < 3.0 or busy or s0 + 9.0 > c.length:
-                continue                                 # a jump, the whoops or the line just before this turn: skip it
+            prev_turn = np.abs(c.kappa[int((lo - 3.0) / c.ds):int(s0 / c.ds) - 1]).max() >= lp.STRAIGHT if lo > 3.0 else True
+            if lo < 3.0 or busy or prev_turn or s0 + 9.0 > c.length:
+                continue             # a jump, the whoops, another turn or the line just before this turn: skip it
             twin = _straightened(c, lo - 2.0, s0 + 9.0)
             seen = {"lidar": 0.0, "tof": 0.0, "side": 0.0}
             for dist in np.arange(back, -0.01, -0.25):
@@ -93,9 +94,13 @@ def sensor_look(courses, threshold=0.25, back=12.0):
                 for name, sl in (("lidar", slice(0, 1)), ("tof", slice(1, 65)), ("side", slice(65, 67))):
                     if seen[name] == 0.0 and diff[sl].max() > threshold:
                         seen[name] = float(dist)
-            i0 = int(s0 / c.ds)
-            slow = [k for k in range(i0, i0 - int(back / c.ds), -1) if plan[k] < teacher.v_cruise]
-            brake = (i0 - slow[-1]) * c.ds if slow else 0.0
+            # where the teacher starts slowing for this turn: walk back from the turn's slowest point while its
+            # speed plan is under the cruise speed (metres before the turn's start; negative = inside the turn)
+            i0, i1 = int(s0 / c.ds), int(s1 / c.ds)
+            k = i0 + int(np.argmin(plan[i0:i1]))
+            while k > i0 - int(back / c.ds) and plan[k - 1] < teacher.v_cruise:
+                k -= 1
+            brake = (i0 - k) * c.ds
             rows.append(dict(course=seed, s=round(s0, 2), radius=round(radius, 2), **seen,
                              any=max(seen.values()), brake=round(float(brake), 2),
                              v_corner=round(float(plan[int((s0 + s1) / 2 / c.ds)]), 2)))

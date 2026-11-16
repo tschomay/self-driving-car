@@ -49,6 +49,31 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
 
 ## Experiments
 
+### E1 — What breaks on turns?
+
+- **Prediction (owner, before the run):** "Teacher 80%, car 45%. Going off the track ends runs" (laps finished of 60 at gate-range physics; the Phase 4.5 car's runs mostly end off the lane).
+- **Setup:**
+  - Drivers: the loop teacher (reads the true state), and Phase 4.5's car unchanged: the owner's GRU and filter, copied from the steady expert on straight roller lanes (E5 seed 0, rebuilt from the logged command; 84% on straight lanes, as logged).
+  - 20 validation loops × 3 starts = 60 laps each, at nominal and gate-range physics, one car at a time.
+  - Sensor check: the car stands on the centreline every 0.25 m before a turn. A sensor "sees" the turn when any reading differs by more than 0.25 m from the same stretch laid out straight (no noise). 40 turns that follow at least 11 m of clear straight.
+  - `python -m sdc.phase46.e1`, about 4 min on 4 cores.
+  - The teacher's scores were first seen during the build (tuning), before the prediction; the Phase 4.5 car and the sensor check were run after it.
+- **Result:** [report](https://claude.ai/artifact/FwYEQ9uqiBm77HzCtBZtG1).
+
+  | Driver | Physics | Laps finished | Median distance | Endings | Jump 1 landed |
+  |---|---|---|---|---|---|
+  | Teacher | nominal | 60/60 | 100% | | 60/60 |
+  | Teacher | gate range | **56/60 (93%)** | 100% | 2 off the lane, 2 rolled over | |
+  | Phase 4.5 car | nominal | 0/60 | 22% of a lap | 59 off the lane, 1 rolled over | 56/60 |
+  | Phase 4.5 car | gate range | **0/60** | 23% of a lap | 58 off the lane, 2 rolled over | 53/60 |
+
+  - The Phase 4.5 car still lands jump 1, then leaves the lane at the first turn in 50 of 60 runs (gate range). Eight more ended in the second turn and two in the third. The furthest run covered 35% of a lap.
+  - The teacher laps in about 30 s and lands 88% of jumps at gate range (98% nominal). Its four failures: two rollovers landing jump 1, two off the lane (one with grip 0.56).
+  - Sensors: they first register a turn a median 0.75 m before it begins (furthest 3.25 m); that is 0.1 s at 7.4 m/s. The 8×8 ToF sees it first; the side sensors never do before the turn begins. The teacher starts slowing a median 2.25 m before. The sensors saw the turn before that point in 6 of 40 turns.
+  - Prediction vs. result: teacher 80% predicted, 93% measured. Car 45% predicted, 0% measured. "Going off the track ends runs": yes, 58 of 60.
+- **Explanation (owner, after the run):** …
+- **Takeaway:** …
+
 ## Gate check
 
 ## Handoff to next phase

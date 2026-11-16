@@ -311,8 +311,8 @@ def _walk_job(args):
     return rows
 
 
-def walk_collect(courses, starts=(0.0,), dr="train", procs=2):
-    kw = dict(real="all", sensors="parts", dr=dr)
+def walk_collect(courses, starts=(0.0,), dr="train", procs=2, phys_seed=0):
+    kw = dict(real="all", sensors="parts", dr=dr, phys_seed=phys_seed)
     with Pool(procs) as p:
         return [r for rs in p.map(_walk_job, [(c, x0, kw) for c in courses for x0 in starts]) for r in rs]
 

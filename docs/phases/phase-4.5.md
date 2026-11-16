@@ -1,11 +1,14 @@
 # Phase 4.5 — Sim-to-real readiness: sensors and physics
 
-- **Status:** in progress
+- **Status:** gate passed (91.1%, first attempt)
 - **Goal:** close the gaps Phase 4's handoff listed (sphere wheels, 3 mm of sag, perfect sensors, nominal physics only) on Phase 4's jump courses. Sensors are modelled on real hobby parts, the chassis is realistic, and Phase 3's physics randomization is carried into 3D. The course with turns moves to Phase 4.6.
 - **Learn:** sim-to-real transfer, state estimation from noisy sensors (your pitch filter), how suspension and weight transfer shape handling, domain randomization vs. fidelity, compute and sensor delay as part of control.
 - **Gate (owner, 2026-11-14):** at least 80% of jumps landed, using Phase 4's definition (airborne at least 0.3 s; within 1 s all four wheels down, no chassis contact, upright and still driving). Measured on fresh test courses 45000–45019, 3 starts each (180 jumps), with the parts-list sensors and physics drawn from a range **wider** than training (as in Phase 3).
 - **Code:** `sdc/jumps/` (sim), `sdc/phase45/` (training, evaluation, reports).
-- **How to reproduce the gate:** to be added.
+- **How to reproduce the gate** (CPU, about 3 h; 3D GIFs need `apt-get install -y libosmesa6`):
+  1. Crawl the practice and validation courses and build their maps: `python -m sdc.phase45.maps --collect` (about 1 h).
+  2. Copy the map-following expert into the owner's GRU car: `bash sdc/phase45/e6_runs.sh` (seed 1 is the gate car, about 15 min).
+  3. Gate: `python -m sdc.phase45.gate --run runs/p45-e6-s1` (crawls the test courses, builds their maps, drives 180 test jumps; about 30 min).
 
 ## Phase-entry decisions (owner, 2026-11-14)
 
@@ -357,4 +360,62 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
   - Two gate-script fixes adopted before the run: every test run gets a map entry even if its crawl finds no jump (the crawl's endings and mapped-jump counts are recorded), and the test map is always rebuilt.
 - **Compute budget:** the gate car (owner's GRU network plus filter) takes 0.21 ms per step on one container core (82,757 parameters). That is about 0.5–0.9 ms on a Pi 5, inside the 2 ms budget and the 20 ms control step.
 
+- **Run:** 2026-11-16, `python -m sdc.phase45.gate --run runs/p45-e6-s1`, commit 54e973a, 1 torch thread, cloud container (4 CPU), $0. [Gate report](https://claude.ai/artifact/TYriP7MpsQVCUQcWSMRGqS)
+- **Crawl out-laps of the test courses:** 55 of 60 finished (3 off the lane, 2 stuck). Most maps found all 3 jumps; a few found 1–2, or 4 (one spurious).
+- **Result vs. threshold:** **164/180 = 91.1%** landed on the roller test courses 45000–45019, with gate-range physics (physics seed 45) and parts-list sensors. Bar: ≥ 80%: **pass**.
+  - By kind: doubles 53/54, tables 59/60, drops 52/66. Drops are the weak spot again.
+  - Runs: 59 of 60 finished, 1 off the lane.
+  - Same 180 jumps: the map-following expert (reads the true state) 91.1%. Validation for this car: 87%. Test came in 4 points above validation (earlier phases: about 4 below).
+- **Verdict: PASS** (first attempt).
+
 ## Handoff to next phase
+
+**Result:** the gate passed on the first attempt. The car landed 91.1% of 180 jumps on fresh roller test courses, with physics wider than training, using only parts-list sensors and a map it built itself on a crawl. That matches the true-state expert on the same jumps. Compute: CPU only, $0; Modal was never needed.
+
+**What got it there (in order of what mattered)**
+1. **A teacher the student can follow.** The per-jump expert read each jump's design speed from the course plan, which the student can't sense, so its copies trailed by 15–20 points (E3). A steady-speed teacher (E3b), or one aiming at the student's own map (E6), can be copied.
+2. **The owner's GRU memory** (E4b). It nearly ended losing the lane (off the lane: 14–21 → 2–6 of 60 runs) and lifted completion from about 50% to 75%.
+3. **The owner's filter as inputs** (E4c): about +6 points.
+4. **Roller courses** (owner): needed for a realistic out-lap. Copies then kept up with their teacher (80–84% vs 84%; on gaps, 70% vs 79%).
+5. **The walk-through out-lap map** (owner's idea, E6): +2 points on average, within noise. The forward-lidar scan made it work for tables.
+
+**What didn't help:** a bigger network (fits the expert better, drives no better); PPO fine-tuning (hurt in E3/E3b, mixed in E5); integrating pitch into a height profile (too noisy; reading the pitch's shape plus the lidar scan works).
+
+**What the owner learned (in their words, condensed)**
+- E1: soft springs change acceleration and angle; the car tips while the wheels stay flat, so the rays point differently from the car's motion.
+- E2: in racing, "close to 1 g" almost never happens; telemetry can separate the car's own push from tilt.
+- E3: "The expert knows the track"; the out-lap and map ideas.
+- E3b: the copy needs something the expert can't show; fine-tuning can't do the primary learning. Asked whether the model was too small, which became E4.
+- E4: copying actions closely doesn't teach recovery; tilt plus rays gives linear motion.
+- E4b: lane keeping is small, smooth corrections that short memory helps; landing needs complex control in the air.
+- E6: the map is approximate, and an average speed already does well, so a map must be very precise to add much.
+
+**Surprises worth remembering**
+- The soft suspension broke the learned car through its sensors, not its physics: 6° of body roll pointed the level side rays into the ground (E1: 91% → 52%).
+- MuJoCo cylinders snag on heightfields, so the tires are capsules. Light damping made a pogo kick off the kicker lips.
+- Review-found sim bugs:
+  - Randomized grip could only go up (MuJoCo takes the larger friction).
+  - A float64 steering command made "sensors only" runs drift by chaos.
+  - The IMU calibration was taken while the springs still bounced (found in E2).
+- E3–E4 ran on gap courses while the out-lap tests used rollers; the owner caught it from a GIF.
+- Test scored 4 points above validation this time.
+
+**Built and reusable**
+- `sdc/jumps/real.py`: physics switches, parts-list sensor models, randomization ranges.
+- `env.py`: `real`, `sensors` (`ideal`/`noisy`/`parts`), `dr`, `attitude`, `track_map`.
+- `course.py`: `KINDS45` roller courses.
+- `sdc/phase45/my_filter.py`: the owner's complementary filter (5 choices, including telemetry).
+- `sdc/phase45/bc_rnn.py`: DAgger copying into the owner's GRU. `sdc/phase4/train_rnn.py`: Phase 4.5 options and critic warm-up.
+- `sdc/phase45/outlap.py` and `maps.py`: the sensor-only crawl, pitch-shape jump finder, lidar scan, estimator and maps.
+- `gate.py`, experiment launchers, reports E1–E6.
+
+**Open questions and deferred ideas**
+- Drops (52/66 on test) are the weakest kind.
+- The out-lap's estimate for doubles is weak (0.42 m/s error vs 0.17 possible).
+- PPO fine-tuning of a good copy is still unreliable.
+- A camera clone (entry decision 1) was not attempted.
+
+**For Phase 4.6 (the course with turns)**
+- Gate (set at 4.5 entry): ≥ 80% of full courses (turns and jumps) finished on fresh test courses, with the same sensors and randomization.
+- Carry over: a teacher the student can follow; the owner's GRU and filter; course features a car can crawl for its out-lap; a leakage review and compute check before every gate.
+- Turns add lateral load and roll, so the side sensors and the filter's roll matter more.

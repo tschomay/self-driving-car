@@ -1,5 +1,7 @@
 """E6: out-lap maps for the timed lap, from walk-through crawls (sdc/phase45/outlap.py: pitch shape + ToF scan).
 
+    python -m sdc.phase45.maps --collect     # crawl practice (100000-100299, training range) and validation courses
+                                             # (gate range, 3 starts) first: about 1 h on 2 cores
     python -m sdc.phase45.maps --rows runs/p45-walk-rows-scan.pkl
 
 Writes runs/p45-maps-train.json (practice courses 100000-100299, training-range physics) and runs/p45-maps-val.json
@@ -31,7 +33,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--rows", default="runs/p45-walk-rows-scan.pkl")
     ap.add_argument("--ridge", type=float, default=10.0)
+    ap.add_argument("--collect", action="store_true", help="crawl the practice and validation courses first")
     a = ap.parse_args()
+    if a.collect:
+        from sdc.jumps import course as crs
+        from sdc.jumps import driver as dr
+        tr = ol.walk_collect(range(100000, 100300), dr="train")
+        va = ol.walk_collect(crs.VAL_SEEDS, starts=dr.STARTS, dr="gate")
+        pickle.dump(dict(tr=tr, va=va), open(a.rows, "wb"))
     D = pickle.load(open(a.rows, "rb"))
     tr, va = D["tr"], D["va"]
     courses = sorted({r["course"] for r in tr})

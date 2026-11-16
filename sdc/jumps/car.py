@@ -80,9 +80,13 @@ SOFT_C = 18.0           # N·s/m per corner: about critically damped with the 0.
 BATTERY_M, BATTERY_Z = 0.4, 0.05   # moved from the chassis box to a pack on top (centre of mass about 1 cm higher)
 
 
-def model_xml(real=()) -> str:
+def model_xml(real=(), terrain=None) -> str:
+    """terrain: None = the straight jump lane (course.py); or a dict(nrow, ncol, rx, ry, cx, cy) for another
+    heightfield (Phase 4.6's loops: sdc/jumps/loop.py)."""
     real = set(real)
     L, W = crs.LENGTH, crs.WIDTH
+    t = terrain or dict(nrow=crs.NROW, ncol=crs.NCOL, rx=L / 2, ry=W / 2, cx=L / 2, cy=0.0)
+    texrep = "60 4" if terrain is None else f"{int(t['rx'])} {int(t['ry'])}"
     rays = []
     for i, a in enumerate(RAY_ANGLES):
         r = np.deg2rad(a)
@@ -145,11 +149,11 @@ def model_xml(real=()) -> str:
   <asset>
     <texture name="sky" type="skybox" builtin="gradient" rgb1="0.75 0.85 0.95" rgb2="0.95 0.97 1" width="64" height="64"/>
     <texture name="dirt" type="2d" builtin="checker" rgb1="0.62 0.50 0.34" rgb2="0.56 0.45 0.30" width="64" height="64"/>
-    <material name="dirt" texture="dirt" texrepeat="60 4" reflectance="0"/>
-    <hfield name="terrain" nrow="{crs.NROW}" ncol="{crs.NCOL}" size="{L / 2} {W / 2} {crs.ZMAX} 0.3"/>
+    <material name="dirt" texture="dirt" texrepeat="{texrep}" reflectance="0"/>
+    <hfield name="terrain" nrow="{t['nrow']}" ncol="{t['ncol']}" size="{t['rx']} {t['ry']} {crs.ZMAX} 0.3"/>
   </asset>
   <worldbody>
-    <geom name="ground" type="hfield" contype="0" conaffinity="1" hfield="terrain" pos="{L / 2} 0 0" friction="1.0 0.005 0.0001"
+    <geom name="ground" type="hfield" contype="0" conaffinity="1" hfield="terrain" pos="{t['cx']} {t['cy']} 0" friction="1.0 0.005 0.0001"
           material="dirt"/>
     <light name="sun" pos="30 -10 20" dir="-0.3 0.4 -1" directional="true" diffuse="0.7 0.7 0.7" castshadow="true"/>
     <body name="car" pos="{crs.START_X} 0 0.25">
@@ -175,9 +179,10 @@ def model_xml(real=()) -> str:
 _BASE = {}
 
 
-def build_model(real=()) -> mujoco.MjModel:
+def build_model(real=(), terrain=None) -> mujoco.MjModel:
     """A fresh model (each env owns one so each can hold its own course in the heightfield)."""
-    key = tuple(sorted(set(real) & set(MODEL_SWITCHES)))
+    sw = tuple(sorted(set(real) & set(MODEL_SWITCHES)))
+    key = (sw, None if terrain is None else tuple(sorted(terrain.items())))
     if key not in _BASE:
-        _BASE[key] = model_xml(key)
+        _BASE[key] = model_xml(sw, terrain)
     return mujoco.MjModel.from_xml_string(_BASE[key])

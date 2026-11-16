@@ -35,9 +35,10 @@ def landing_slope(course, s):
 
 class ExpertDriver:
     def __init__(self, v_target=6.5, kp=4.0, kd=0.5, air_control=True, lead=0.0, plan=True, plan_offset=0.0,
-                 ki=0.0, adapt=False):
+                 ki=0.0, adapt=False, use_map=False):
         self.plan, self.plan_offset = plan, plan_offset
         self.ki, self.adapt, self._i = ki, adapt, {}
+        self.use_map = use_map   # E6: aim at the out-lap map's speed for the next jump (what the student also sees)
         self.v_target, self.kp, self.kd, self.air_control, self.lead = v_target, kp, kd, air_control, lead
         self._u0 = {}
 
@@ -62,7 +63,9 @@ class ExpertDriver:
             throttle = float(car.last_act[1])     # hold whatever it took off with
         else:
             v = self.v_target
-            if self.plan:   # approach each jump at the speed it was built for (oracle knowledge)
+            if self.use_map and getattr(car, "map_next_speed", None):
+                v = car.map_next_speed + self.plan_offset
+            elif self.plan:   # approach each jump at the speed it was built for (oracle knowledge)
                 nxt = [j for j in car.course.jumps if j.lip > s["x"]]
                 v = (nxt[0] if nxt else car.course.jumps[-1]).design_speed + self.plan_offset
             e = v - s["v_fwd"]

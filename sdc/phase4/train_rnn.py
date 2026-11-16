@@ -27,7 +27,8 @@ from sdc.phase1 import my_ppo as owner
 from sdc.phase4 import my_gru
 from sdc.phase4 import train as tr
 
-DEFAULTS = {**tr.DEFAULTS, "n_seq_batch": 32}   # sequences per minibatch
+DEFAULTS = {**tr.DEFAULTS, "n_seq_batch": 32,   # sequences per minibatch
+            "critic_warmup": 0}                  # steps that train only the critic (Phase 4.5: from a copy without one)
 
 
 class RecurrentActorCritic(nn.Module):
@@ -89,18 +90,26 @@ def train(seed=0, total_timesteps=1_000_000, out="runs/p4-rnn", eval_every=50_00
     if not my_gru.ready():
         raise SystemExit("my_gru.py still has OWNER TODOs (gru_step, reset_memory, CONFIG)")
     cfg = {**DEFAULTS, **overrides}
-    env_cfg = {**tr.ENV, **(env or {})}
+    env_cfg = {**tr.ENV, **tr.ENV45, **(env or {})}
+    train_env = {k: v for k, v in env_cfg.items() if k != "val_dr" and not (k == "kinds" and v is None)}
+    val_kw = dict(fan=env_cfg["fan"], servo=env_cfg["servo"])
+    if env_cfg["real"] or env_cfg["sensors"] != "ideal" or env_cfg["val_dr"]:   # Phase 4.5 options (as in train.py)
+        val_kw.update(real=env_cfg["real"], sensors=env_cfg["sensors"], dr=env_cfg["val_dr"])
+        if env_cfg["attitude"]:
+            val_kw["attitude"] = True
+        if env_cfg.get("kinds"):
+            val_kw["kinds"] = tuple(env_cfg["kinds"])
     torch.set_num_threads(threads)
     torch.manual_seed(seed)
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
-    batch = je.JumpBatch(cfg["n_envs"], seed=seed, **env_cfg)
+    batch = je.JumpBatch(cfg["n_envs"], seed=seed, **train_env)
     net = RecurrentActorCritic(obs_dim=batch.obs_dim, mlp_hidden=cfg["hidden"])
     if cfg["init"]:
         net.load_state_dict(torch.load(cfg["init"]), strict=False)
     opt = torch.optim.Adam(net.parameters(), lr=cfg["lr"], eps=1e-5)
     owner.POLICY_LOSS_VARIANT = "textbook"
-    greedy = GreedyRNN(net, dict(fan=env_cfg["fan"], servo=env_cfg["servo"]))
+    greedy = GreedyRNN(net, val_kw)
     L = my_gru.CONFIG["seq_len"]
 
     def val():
@@ -124,7 +133,7 @@ def train(seed=0, total_timesteps=1_000_000, out="runs/p4-rnn", eval_every=50_00
         resumed = r.get("resumed", []) + [steps]
         t0 -= r["wall"]
         torch.manual_seed(seed + steps)
-        batch = je.JumpBatch(cfg["n_envs"], seed=seed + steps, **env_cfg)   # fresh courses; env state isn't saved
+        batch = je.JumpBatch(cfg["n_envs"], seed=seed + steps, **train_env)   # fresh courses; env state isn't saved
         obs = tr._t(batch.reset())
         print(f"resumed at {steps} steps", flush=True)
     while steps < total_timesteps:
@@ -202,8 +211,10 @@ def train(seed=0, total_timesteps=1_000_000, out="runs/p4-rnn", eval_every=50_00
                 new_val = torch.stack(values, 1).reshape(-1)
                 a = adv[tt, i2]
                 a = (a - a.mean()) / (a.std() + 1e-8)
-                loss = (owner.policy_loss(new_logp, LP[tt, i2], a, cfg["clip"])                 # owner
-                        + cfg["vf_coef"] * owner.value_loss(new_val, ret[tt, i2]))             # owner
+                pl = owner.policy_loss(new_logp, LP[tt, i2], a, cfg["clip"])                   # owner
+                if steps <= cfg["critic_warmup"]:   # warm-up: the critic learns the copy's values first
+                    pl = pl * 0.0
+                loss = pl + cfg["vf_coef"] * owner.value_loss(new_val, ret[tt, i2])             # owner
                 opt.zero_grad()
                 loss.backward()
                 nn.utils.clip_grad_norm_(net.parameters(), cfg["max_grad_norm"])

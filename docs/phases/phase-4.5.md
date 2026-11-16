@@ -335,6 +335,11 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
   - Copy only, no fine-tune (E5: mixed). Seeds 0–1. `bash sdc/phase45/e6_runs.sh`.
   - Baseline: E5's copies, 84% / 80%.
 - **Prediction (owner, before the run):** "I hope so, but not by much. Maybe 85%."
+- **Result (validation, rollers, gate range, 180 jumps per seed):** [report](https://claude.ai/artifact/Rq2MUSc5n3dStJoAarXNDx).
+  - With the map: **81% / 87%** (mean 84%), finished 87% / 87%. Without it (E5): 84% / 80% (mean 82%).
+  - About +2 points on average, within the seed spread.
+  - Seed 1 lands 62/63 tables and 33/42 drops (the best drops this phase). Doubles stay at 62–65 of 75 (the map's double estimate is the weakest).
+  - Prediction vs. result: "not by much, maybe 85%": 84% mean, +2.
 
 ## Gate check
 

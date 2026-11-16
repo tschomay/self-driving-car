@@ -340,7 +340,15 @@ After the fixes, the expert lands 98% at nominal physics, 91% on the training ra
   - About +2 points on average, within the seed spread.
   - Seed 1 lands 62/63 tables and 33/42 drops (the best drops this phase). Doubles stay at 62–65 of 75 (the map's double estimate is the weakest).
   - Prediction vs. result: "not by much, maybe 85%": 84% mean, +2.
+- **Explanation (owner, after the run):** "I think it's because the car's map is approximate. It can do so well on these courses with just an average that the map would have to be really precise to help fine tune any."
 
 ## Gate check
+
+- **Candidate and protocol (owner, 2026-11-16, fixed before any test result):**
+  - Candidate: E6 seed 1 (`runs/p45-e6-s1`), the owner's GRU, filter inputs and out-lap map. Validation 87%; it is the best of several cars there, which flatters it.
+  - Test set: the roller versions of courses 45000–45019, never used before, each from 3 starts (0, −0.3, +0.3 m) = 180 jumps. Gate-range physics from the unused physics seed 45. Parts-list sensors, one car at a time.
+  - Each test course is first crawled at the same physics (sensor-only crawl driver), and its map is built with the estimator fitted on practice courses only.
+  - Pass: ≥ 80% of the 180 jumps landed under Phase 4's definition.
+  - Before the run: a code review for oracle leakage, and the compute budget on a Pi 5.
 
 ## Handoff to next phase

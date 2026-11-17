@@ -156,6 +156,9 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - Sensors only does far better than Phase 4.5's car (0 of 60). What changed: turns in training and the two 45° sensors. The experiment doesn't separate the two.
   - Bug fixed after the run: the per-round check timed laps against the wrong teacher laps. It changed nothing (every finished lap was well inside the limit); the final scores were always matched correctly.
   - Prediction vs. result: 40 predicted; 27–40 measured (mean 35).
+- **Explanation (owner, after the run):** "Sensors allow it to react to the actual situation. The map is only an estimate of where it is. It seems the better sensors are sufficient for it to respond."
+- **Takeaway:** with sensors that show its heading to the banks, the car reacts well enough to turns without knowing them in advance; an approximate map adds little. Both arms were still improving.
+- **Owner's decision (2026-11-17):** "Let's increase training time." (E4)
 
 ## Gate check
 

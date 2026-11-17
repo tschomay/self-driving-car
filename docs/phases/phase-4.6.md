@@ -190,6 +190,17 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
 
 - **Setup:** no training. Two cars driven by the average of two E4 students' throttle and steering, each student keeping its own memory: sensors-only seeds 0 + 1, and map seeds 0 + 1. Same 60 validation runs as E4. `python -m sdc.phase46.ensemble`, about 20 min each, run beside E5.
 - **Prediction (owner, before the run):** "No, I don't think driving strategies can be averaged at a step by step basis. But maybe if it isn't planning ahead much or if the styles don't conflict" (the average won't beat the better student).
+- **Result:** [report](https://claude.ai/artifact/GafL33A8bLyYhYvaZ4iRwp). Laps finished of 60, validation loops, gate-range physics:
+
+  | Arm | Seed 0 alone | Seed 1 alone | Average of the two |
+  |---|---|---|---|
+  | A: sensors only | 46 | 39 | **46** |
+  | B: + out-lap map | 41 | 40 | **45** |
+
+  - Run by run, sensors only: the average finished 1 of the 7 runs both students failed and 18 of 19 runs only one student finished, but failed 5 of 34 runs both students finished. Map arm: 5 of 13, 8 of 9, and failed 2 of 38.
+  - So averaging rescues most runs where the students disagree, but sometimes breaks a run both students handled: two good lines averaged can be a bad one.
+  - Median lap 30.2–30.5 s, the same as the students alone.
+  - Prediction vs. result: "won't beat the better student" predicted; it tied the better student in A (46 vs 46) and beat it in B (45 vs 41).
 
 ## Gate check
 

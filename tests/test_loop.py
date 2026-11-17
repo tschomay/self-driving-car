@@ -74,3 +74,25 @@ def test_straight_courses_are_unchanged_by_the_loop_option():
     assert a.legacy and not a.loop and a.m.hfield_nrow[0] == crs.NROW
     b = je.JumpCar(np.random.default_rng(0), loop=True)
     assert b.m.hfield_nrow[0] == lp.N
+
+
+def test_angled_sensors_append_two_inputs():
+    a = je.JumpCar(np.random.default_rng(0), real="all", sensors="parts", attitude=True, loop=True)
+    b = je.JumpCar(np.random.default_rng(0), real="all", sensors="parts", attitude=True, loop=True, angled=True)
+    oa, ob = a.reset(10000), b.reset(10000)
+    assert len(ob) == len(oa) + 2
+    assert np.all(np.abs(ob[-2:] * 3.0 - 1.5 / np.cos(np.pi / 4)) < 0.4)   # centred on a 3 m lane: about 2.1 m each
+
+
+def test_dead_reckoning_closes_a_square():
+    from sdc.phase46 import my_deadreckoning as mdr
+    est = mdr.DeadReckoning(start_x=0.0)
+    est.reset(np.zeros((10, 3)))
+    for leg in range(4):                     # 4 x (2 s straight at 2 m/s, then a 90° left turn over 1 s)
+        for _ in range(100):
+            est.update([0, 0, 0], 2.0)
+        for _ in range(50):
+            est.update([0, 0, np.pi / 2], 0.0)
+    path, (err_xy, err_h) = est.at_line()
+    assert err_xy < 0.2 and abs(err_h) < 1e-6 and abs(path[-1, 0] - 16.0) < 1e-6
+    assert np.hypot(path[-1, 1], path[-1, 2]) < 1e-9          # "spread": the mapped loop closes

@@ -68,3 +68,23 @@ class LoopExpert(dr.ExpertDriver):
         e = target - s["v_fwd"]
         throttle = 0.8 * e + 0.06 * target
         return np.array([steer, np.clip(throttle, -1, 1)], np.float32)
+
+
+class OutLapDriver(LoopExpert):
+    """The out-lap (owner, 2026-11-16): a person drives one slow lap by remote while the car records. This
+    stand-in reads the true state, as a person watching the car does: it rolls round at V, keeps to the middle,
+    and gives it more throttle up the ramps so it doesn't stall on a kicker (up to V_RAMP while climbing)."""
+
+    V, V_RAMP = 2.0, 3.0
+
+    def __init__(self, **kw):
+        super().__init__(v_target=self.V, v_cruise=self.V, **kw)
+
+    def act(self, car):
+        a = super().act(car)
+        if car.airborne:
+            return a
+        s = car.state()
+        target = self.V_RAMP if s["pitch"] > np.deg2rad(6) else self.V
+        a[1] = np.clip(0.8 * (target - s["v_fwd"]) + 0.06 * target + 1.2 * np.sin(s["pitch"]), -1, 1)
+        return a

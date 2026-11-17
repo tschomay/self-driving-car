@@ -85,6 +85,8 @@ def record(policy, course, x0=0.0, dr="gate", phys_seed=0, max_steps=None, **kw)
     if hasattr(policy, "reset"):
         policy.reset(1)
     X0, Y0, th0 = c.course.pose(0.0)
+    # taken now: when the lap ends the batch resets the car for another run, with a new standstill calibration
+    still_gyro, still_acc, length = c.still_gyro.copy(), c.still_acc.copy(), c.course.length
     obs, truth = [b._obs[0].copy()], []
 
     def true_pose():
@@ -101,5 +103,5 @@ def record(policy, course, x0=0.0, dr="gate", phys_seed=0, max_steps=None, **kw)
             break
         obs.append(o[0].copy())
         truth.append(true_pose())
-    return dict(course=course, x0=x0, obs=np.array(obs), truth=np.array(truth), still_gyro=c.still_gyro,
-                still_acc=c.still_acc, reason=ep["reason"], episode=ep, length=c.course.length)
+    return dict(course=course, x0=x0, obs=np.array(obs), truth=np.array(truth), still_gyro=still_gyro,
+                still_acc=still_acc, reason=ep["reason"], episode=ep, length=length)

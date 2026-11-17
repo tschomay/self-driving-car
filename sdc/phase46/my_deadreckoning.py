@@ -65,7 +65,7 @@ class DeadReckoning:
         still_gyro: (n, 3) gyro readings while standing still; their mean is the bias (as in the attitude filter)."""
         self.bias = np.zeros(3) if still_gyro is None else np.mean(still_gyro, axis=0)
         self.x, self.y, self.h, self.s = self.start_x, 0.0, 0.0, self.start_x
-        self.v_ground = 0.0
+        self.v_ground, self._cos = 0.0, 1.0
         self.path = [(self.s, self.x, self.y, self.h)]
 
     def update(self, gyro, speed, pitch=0.0, roll=0.0, acc=None, steer=0.0):
@@ -78,7 +78,12 @@ class DeadReckoning:
         free = acc is not None and np.linalg.norm(acc) / G < FREE_G
         if self.distance == "raw" or not free:
             self.v_ground = float(speed)
-        ds = self.v_ground * self.dt * float(np.cos(pitch))   # agent: the horizontal part of the distance rolled
+        # agent: only the horizontal part of the distance counts. On the ground that is cos(pitch). In the air
+        # (2026-11-17, after E2) the car keeps the horizontal speed it left the lip with, so the pitch at takeoff is
+        # used for the whole flight: with the current pitch the held speed overcounted by about 15%.
+        if not free:
+            self._cos = float(np.cos(pitch))
+        ds = self.v_ground * self.dt * self._cos
         # owner, choice 1: the gyro carries the heading
         model_rate = self.v_ground * np.tan(steer * STEER_MAX) / WHEELBASE
         if self.heading_src == "gyro":

@@ -19,12 +19,16 @@ WHEELBASE = 0.30
 
 
 class LoopExpert(dr.ExpertDriver):
-    def __init__(self, a_lat=3.5, a_brake=3.0, v_cruise=None, look=0.15, k_ff=1.0, **kw):
+    def __init__(self, a_lat=3.5, a_brake=3.0, v_cruise=None, look=0.15, k_ff=1.0, use_turn_map=False, **kw):
         kw.setdefault("plan", False)
         kw.setdefault("v_target", 7.4)
         kw.setdefault("kd", 1.0)
         super().__init__(**kw)
         self.a_lat, self.a_brake, self.look, self.k_ff = a_lat, a_brake, look, k_ff
+        # E3: plan from the car's own out-lap map (curvature along its odometer) instead of the true track: the same
+        # knowledge the student gets as inputs. Lane-centring feedback still reads the true state.
+        self.use_turn_map = use_turn_map
+        self._mplans = {}
         self.v_cruise = v_cruise if v_cruise is not None else self.v_target
         self._plans = {}
 
@@ -39,6 +43,24 @@ class LoopExpert(dr.ExpertDriver):
                     v[i] = min(v[i], np.sqrt(nxt * nxt + 2 * self.a_brake * ds))
             self._plans[course.seed] = v
         return self._plans[course.seed]
+
+    def map_speed(self, car):
+        """The speed limit at the car's odometer position, planned on its mapped curvature."""
+        ds, kap = car.tmap
+        if not len(kap):
+            return 20.0
+        key = id(kap)
+        if key not in self._mplans:
+            v = np.minimum(np.sqrt(self.a_lat / np.maximum(np.abs(kap), 1e-6)), 20.0)
+            for _ in range(2):
+                for i in range(len(v) - 1, -1, -1):
+                    nxt = v[(i + 1) % len(v)]
+                    v[i] = min(v[i], np.sqrt(nxt * nxt + 2 * self.a_brake * ds))
+            if len(self._mplans) > 2000:
+                self._mplans.clear()
+            self._mplans[key] = (kap, v)          # keeps the array alive, so its id stays unique
+        v = self._mplans[key][1]
+        return float(v[int(round(car.dead.s / ds)) % len(v)])
 
     def jump_speed(self, car, s):
         """The speed to carry into the next jump (as ExpertDriver: steady, the course plan, or the car's map)."""
@@ -57,14 +79,14 @@ class LoopExpert(dr.ExpertDriver):
         c = car.course
         self._u0[id(car)] = None
         v = max(s["v_fwd"], 0.5)
-        kap = float(c.curvature(s["x"] + self.look * v))
+        kap = car.map_kappa(self.look * v) if self.use_turn_map else float(c.curvature(s["x"] + self.look * v))
         ff = self.k_ff * np.arctan(WHEELBASE * kap) / cr.STEER_MAX
         steer = np.clip(ff - 1.0 * s["y"] - 1.5 * s["yaw"] - 0.15 * s["yaw_rate"], -1, 1)
         i = int((s["x"] % c.length) / c.ds) % len(c.center)
         x = s["x"] % c.length
         near_jump = any(j.start - 6.0 <= x <= j.end for j in c.jumps)
         target = self.jump_speed(car, s) if near_jump else self.v_cruise
-        target = min(target, float(self.corner_speed(c)[i]))
+        target = min(target, self.map_speed(car) if self.use_turn_map else float(self.corner_speed(c)[i]))
         e = target - s["v_fwd"]
         throttle = 0.8 * e + 0.06 * target
         return np.array([steer, np.clip(throttle, -1, 1)], np.float32)

@@ -55,3 +55,19 @@ def lap_score(episodes, teacher=None):
         sc["in_time_n"] = int(sum(ok))
         sc["in_time"] = round(float(np.mean(ok)), 3)
     return sc
+
+
+def load_student(run, obs_dim=None):
+    """A Phase 4.6 student (bc_loop.py): the owner's GRU network, greedy. Env options come from the caller
+    (training's are in metrics.json under env46)."""
+    import json
+    from pathlib import Path
+
+    import torch
+
+    from sdc.phase4 import train_rnn as trr
+    if obs_dim is None:
+        obs_dim = json.loads((Path(run) / "metrics.json").read_text())["obs_dim"]
+    net = trr.RecurrentActorCritic(obs_dim=obs_dim)
+    net.load_state_dict(torch.load(Path(run) / "model.pt"))
+    return trr.GreedyRNN(net, {})

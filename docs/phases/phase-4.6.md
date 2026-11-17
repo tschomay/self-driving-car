@@ -176,6 +176,8 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - The gain is mostly A seed 0 (27 → 46); A seed 1 didn't move (40 → 39). The 20-lap practice check bounced in the last rounds (B: 17 → 13), so seed noise is still large.
   - The arms swapped order: sensors only is now ahead (42.5 vs 40.5), still inside seed noise.
   - Prediction vs. result: +2–3 per arm predicted; +9 (A) and +4 (B) measured.
+- **Explanation (owner, after the run):** "Training longer helped. It's a bigger network and harder task, so that seems reasonable. The difference between seeds is a bit concerning. It seems it isn't really converging on a great way to drive."
+- **Takeaway:** more copied data still pays (the gain beat the prediction), but two seeds of the same recipe land 7 laps apart, so the student hasn't settled on one reliable way to drive. Leaving the lane is still the main failure.
 
 ## Gate check
 

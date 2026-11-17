@@ -78,8 +78,14 @@ class JumpCar:
     """One car on one course."""
 
     def __init__(self, seed_rng, courses="random", size=1.0, kinds=crs.KINDS, fan=False, servo=False,
-                 real=(), sensors="ideal", dr=None, phys_seed=0, attitude=False, track_map=None, loop=False):
+                 real=(), sensors="ideal", dr=None, phys_seed=0, attitude=False, track_map=None, loop=False,
+                 angled=False):
         self.real = rl.switches(real)
+        # Phase 4.6 (owner, 2026-11-16): two more VL53L1X on the front corners, 45° forward-left and forward-right,
+        # level, 3 m: with the side sensors they tell the car's heading relative to the banks. Two more inputs,
+        # appended at the END of the observation, so every earlier slot keeps its place.
+        self.angled = angled
+        assert not angled or sensors == "parts", "the angled sensors belong to the parts layout"
         # Phase 4.6: loop courses with turns (sdc/jumps/loop.py). The state's x and y are then track coordinates:
         # metres along the centreline from the line (counting on past one lap) and metres left of it.
         self.loop = loop
@@ -110,7 +116,7 @@ class JumpCar:
         self.steer_q = np.array([self.m.jnt_qposadr[self.m.joint(f"{w}_steer").id] for w in ("fl", "fr")])
         self.obs_dim = OBS_DIM + (len(cr.FAN_SITES) if fan else 0) + (1 if servo else 0)
         if sensors == "parts":
-            self.obs_dim = PARTS_DIM + (2 if attitude else 0) + (2 if self.track_map is not None else 0)
+            self.obs_dim = PARTS_DIM + (2 if attitude else 0) + (2 if self.track_map is not None else 0) + (2 if angled else 0)
         m = self.m   # nominal values, for per-episode randomization in place
         self._base = dict(body_mass=m.body_mass.copy(), body_inertia=m.body_inertia.copy(),
                           geom_friction=m.geom_friction.copy(), jnt_stiffness=m.jnt_stiffness.copy(),
@@ -341,8 +347,13 @@ class JumpCar:
             if self.track_map is not None:
                 mp = self._map_inputs(acc, spd * 10.0, att[0])
             att = att / 0.5   # rad / 0.5
+        ang = []
+        if self.angled:
+            c45 = np.cos(np.pi / 4)
+            ang = [rl.ranges(rng, self._cast((0.2, y, 0.02), np.array([[c45, sy * c45, 0.0]]), rl.SIDE_MAX),
+                             rl.SIDE_MAX, k)[0] / rl.SIDE_MAX for y, sy in ((0.08, 1.0), (-0.08, -1.0))]
         return np.concatenate([acc / 9.81, gyro / 5.0, [spd], tf / rl.TFMINI_MAX, self.tof / TOF_NORM,
-                               side / rl.SIDE_MAX, self.last_act, att, mp]).astype(np.float32)
+                               side / rl.SIDE_MAX, self.last_act, att, mp, ang]).astype(np.float32)
 
     def _map_inputs(self, acc, speed, pitch):
         """Odometer (motor speed, held in free fall, horizontal via the filter's pitch), re-synced to the nearest mapped
@@ -504,10 +515,10 @@ class JumpCar:
 class JumpBatch:
     def __init__(self, n, seed=0, courses="random", max_steps=1500, jump_bonus=10.0, size=1.0, kinds=crs.KINDS,
                  fan=False, servo=False, steer_cost=0.0, finish_bonus=0.0, real=(), sensors="ideal", dr=None,
-                 phys_seed=0, attitude=False, track_map=None, loop=False):
+                 phys_seed=0, attitude=False, track_map=None, loop=False, angled=False):
         rng = np.random.default_rng(seed)
         self.cars = [JumpCar(np.random.default_rng(rng.integers(2**63)), courses, size, kinds, fan, servo,
-                             real, sensors, dr, phys_seed, attitude, track_map, loop) for _ in range(n)]
+                             real, sensors, dr, phys_seed, attitude, track_map, loop, angled) for _ in range(n)]
         self.steer_cost, self.finish_bonus = steer_cost, finish_bonus
         if courses != "random":   # spread a fixed course list across the cars
             for i, c in enumerate(self.cars):

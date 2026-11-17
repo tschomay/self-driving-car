@@ -96,7 +96,12 @@ VIB_ACC = 2.0                  # m/s² per sample of motor/drivetrain vibration 
 VIB_GYRO = 0.05                # rad/s per sample at top speed
 ACC_BIAS = 0.1                 # m/s² per axis (per episode, 1 sigma)
 GYRO_BIAS = np.deg2rad(0.5)    # rad/s per axis (per episode, 1 sigma)
-GYRO_WALK = np.deg2rad(0.05)   # rad/s per sqrt(s): bias drift
+# Bias drift, rad/s per sqrt(s). 0.01°/s per sqrt(s) is about 3° of heading per minute (5° at the gate range's
+# double noise). Lowered from 0.05 in Phase 4.6 (owner, 2026-11-17, after E2): that gave about 13° per minute, above
+# what the parts are quoted at (BNO086 game rotation vector: 0.5° per minute dynamic heading drift; ICM-42688-P
+# zero-rate drift 0.005 to 0.06 °/s per °C depending on the source, so roughly 1 to 9° per minute if the board
+# warms 5 °C over a lap). Phase 4.5's runs lasted 12 s, where either value gives about 1° or less.
+GYRO_WALK = np.deg2rad(0.01)
 # Motor speed from a sensored ESC: hall-sensor events per metre travelled (4-pole motor, 12 events per
 # motor rev, about 10:1 gearing, 5.5 cm wheels). Counted per 20 ms control step.
 HALL_PER_M = 12 * 10 / (2 * np.pi * 0.055)

@@ -75,6 +75,54 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
 - **Agent's check (first turn, 10 validation loops, gate range):** the Phase 4.5 car does steer, harder than the teacher (peak command 0.41 of full lock vs 0.27). But it arrives at 6.5 m/s where the teacher is down to 4.8 m/s. At 6.5 m/s a 4 m radius needs about 10 m/s² sideways, more than the tires can give at any steering angle. It never learned to brake for a turn, and its sensors show the turn only 0.1 s ahead.
 - **Takeaway:** on turns the missing skill is speed, not steering: the car has to slow down before it can see why. The knowledge of what is coming has to arrive some other way: the out-lap map (E2).
 
+### E2 — Your dead reckoning
+
+- **Owner's estimator (`sdc/phase46/my_deadreckoning.py`, 2026-11-16, "Agree" to the recommended set):**
+  1. Heading from the gyro's turn rate, minus its bias measured at standstill.
+  2. Tilt-corrected: the gyro is projected onto the vertical with the attitude filter's pitch and roll.
+  3. Distance from motor speed, holding the last ground speed in free fall.
+  4. At the finish line, the closing error is spread evenly back along the lap, so the mapped loop closes.
+  - Agent's details: only the horizontal part of the distance counts (× cos pitch); the map's curvature is the heading change per metre, smoothed over 1 m.
+- **Sim support:** `sdc/phase46/laps.py` records a lap's sensor readings with the truth alongside.
+- **Crawl driver, not solved yet (2026-11-16):** Phase 4.5's sensor-only crawler finishes about 9 of 12 practice loops; a rewrite (`laps.LoopCrawler`) finishes 10 of 24. Causes found:
+  - The two side sensors can't tell being off-centre from pointing the wrong way.
+  - In a banked turn or under body roll, the low side's beam hits the ground and the high side's beam passes over the 0.35 m bank, so both go blind.
+  - Hard steering rolls the body and makes it worse; kickers stall a 2 m/s crawl unless it speeds up on the climb.
+- **Owner's decision (2026-11-16):** "We should do both 1 and 2. If it can't tell where it is for the out lap, it definitely can't while racing."
+  1. A person drives the out-lap by remote while the car records. In the sim a slow hand-coded driver that reads the true position stands in (`teacher.OutLapDriver`). The timed lap stays autonomous.
+  2. Two angled range sensors join the parts list (VL53L1X, about $10–20): 45° forward-left and forward-right, so the car can see its heading relative to the banks. Env option `angled=True`, two more inputs.
+- **Prediction (owner, before the run):** "I think distance error with be worse and hurt more. I think we'll be plus/minus 20% on the slow lap and 40% racing." (Read as: position off by about 20% of the distance driven on the slow lap and 40% on the race lap, mostly from distance error, not heading drift.)
+
+- **Setup:**
+  - Slow lap: the remote-driven stand-in at 2 m/s (87 s). Race lap: the teacher (30 s, three jumps). 20 validation loops × 3 starts, gate-range physics, parts-list sensors.
+  - Each lap's sensor log is replayed through your estimator and through its alternatives, one choice changed at a time. Scored against the true pose when the car is back at the line, before the finish-line correction.
+  - `python -m sdc.phase46.e2`, about 8 min on 4 cores.
+- **Result:** [report](https://claude.ai/artifact/Jzqry6UvE4pND4adhFSfj1).
+
+  | Lap | Position off at the line | Share of distance | Heading off | Distance off | From heading alone | From distance alone |
+  |---|---|---|---|---|---|---|
+  | Slow (51 of 60 finished) | **8.3 m** | 5.5% | 16° | +3.2% | 7.8 m | 1.2 m |
+  | Race (56 of 60 finished) | **3.3 m** | 2.0% | 3.6° | +4.2% | 2.2 m | 1.9 m |
+
+  - Heading hurts more than distance, and the slow lap is worse than the race lap: it lasts three times as long, and the sim's gyro bias keeps wandering after the standstill calibration.
+  - Your choices against the alternatives (position off, slow / race): steering-model heading 19 m / 26 m; blend 19 m / 25 m; no tilt correction 8.3 m / 4.0 m (race heading 6.7° instead of 3.6°); raw distance 8.6 m / 3.5 m (race distance +7.6% instead of +4.2%).
+  - The map after your finish-line correction: mean position error 3.9 m → 2.3 m (slow), 2.6 m → 1.6 m (race). Mapped corner radii are within about 9% (0.2 m/s of corner speed). A mapped turn sits a median 2.9 m from the true one, mostly late (+2.4 m), because the odometer reads long; 1 in 10 is off by more than 8 m.
+  - **Check, gyro drift model:** the sim's gyro bias wanders 0.05°/s per √s, set in Phase 4.5 when runs lasted 12 s. With a tenth of that, the slow lap is off by 3.1 m (4.2°) and the race lap by 2.4 m. The agent's recollection of the ICM-42688 datasheet is that real drift over a minute is well below the modelled value; not verified.
+  - **Recorder bug found and fixed before any result was reported:** the lap recorder took the standstill gyro calibration after the run had ended and the car had been reset, so two of every three laps (the offset starts) used another run's calibration and drifted up to 85°.
+  - The out-lap stand-in failed 9 of 60 slow laps at gate range, on 4 loops: stuck on a kicker (4), off the lane (4), rolled over (1). It needs fixing before E3, since a failed out-lap is a failed gate run.
+  - Prediction vs. result: about 20% (slow) and 40% (race) predicted; 5.5% and 2.0% measured. "Distance error will hurt more": no, heading does, and the slow lap is the worse one.
+- **Explanation (owner, after the run):** "I assumed that where you are on the track left to right would have a lot of impact on distance, but it seems that wasn't an issue for it and the gyro drift won out. Error for both is pretty low, but to be useful tolerance is even lower."
+- **Takeaway:** dead reckoning's error grows with time through the heading, not with distance: a slow lap is the hard case. A few percent sounds small, but the car has to brake within about 2 m of the right place, so the map needs landmarks to re-sync on, not just a closed loop.
+- **Owner's decision (2026-11-17):** "Yes check the fact sheet."
+  - Found: no official bias-instability figure for the ICM-42688-P. Zero-rate drift with temperature is quoted as ±0.005 °/s per °C in a TDK comparison table and ±0.06 in distributor copies of the datasheet (they conflict). The BNO086's gyro-only heading is quoted at 0.5° per minute of dynamic drift.
+  - So real heading drift is roughly 0.5–2° per minute, perhaps 9° per minute in the worst case. The sim's 0.05°/s per √s gave about 13° per minute.
+  - Changed: `GYRO_WALK` is now 0.01°/s per √s (about 3° per minute; 5° at the gate range's double noise), for training and the gate alike. Phase 4.5's 12 s runs see about 1° or less either way, but its gate no longer reproduces bit for bit.
+- **E2 again with the lowered drift** (`runs/p46-e2-new`): slow lap off by 3.8 m (2.2%, heading 4.5°), race lap 2.5 m (1.5%, heading 3.3°). Distance is unchanged (+3.2% / +4.2%), so heading and distance now matter about equally (slow: 2.4 m vs 1.2 m; race: 1.7 m vs 1.9 m).
+- **Out-lap stand-in, after E2 (2026-11-17):** it now carries 3.5 m/s over jumps, doesn't brake on the way down, steers gently on a jump, and rolls back for a second run if it stalls on a face. Slow laps finished: 60 of 60 at training-range physics, 54 of 60 on validation and 58 of 60 on practice loops at gate range (was 51 of 60).
+  - What still fails: doubles whose two rollers sit close together make a pit. At low grip (about 0.58) and extra weight the car noses into it, stops, and can't climb out: a 31° face needs a grip of 0.6 from a standstill.
+  - Going faster made it worse (4.5 m/s: 31 of 60; 5.5 m/s: 26 of 60): the car lands in the valley and slides.
+  - Open: each failed out-lap is a failed gate run, so about 1 run in 10 is lost before the timed lap starts.
+
 ## Gate check
 
 ## Handoff to next phase

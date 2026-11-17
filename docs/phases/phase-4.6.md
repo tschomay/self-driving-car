@@ -138,6 +138,24 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - Scored on the validation loops at gate range, 3 starts (60 laps), each with its own out-lap map. A run whose out-lap failed races without a map.
   - Seeds 0–1. `bash sdc/phase46/e3_runs.sh`.
 - **Prediction (owner, before the run):** "40" (laps finished of 60; one number, not split by arm).
+- **Result (validation, gate range, 60 laps per seed):** [report](https://claude.ai/artifact/Ruxyg3iBiHdvR6LDKsFAUk).
+
+  | Student | Laps finished, seed 0 / 1 | Off the lane | Rolled / stuck | Jumps landed |
+  |---|---|---|---|---|
+  | A: sensors only | **27 / 40** | 29 / 15 | 4 / 5 | 72% / 77% |
+  | B: + out-lap map | **34 / 39** | 22 / 15 | 4 / 6 | 71% / 76% |
+  | Map-following teacher | 51 | | | |
+  | True-track teacher | 56 | | | |
+  | Phase 4.5 car (E1) | 0 | | | |
+
+  - Every finished lap was within the gate's time limit (about 30 s, the teacher's pace).
+  - The map made no clear difference: 36.5 vs 33.5 laps on average, inside the 13-lap gap between A's two seeds.
+  - B finishes none of the 6 runs whose out-lap failed (raced without a map); A finishes 2 and 4 of them.
+  - Where runs end (not finished, seed 0 / 1): A in a turn 20 / 10, on a jump 7 / 7, on a straight 6 / 3; B in a turn 15 / 9, on a jump 3 / 4, on a straight 8 / 8.
+  - Both arms were still improving at the last round (finished laps on the 20-lap check rose in the last rounds; imitation error still falling).
+  - Sensors only does far better than Phase 4.5's car (0 of 60). What changed: turns in training and the two 45° sensors. The experiment doesn't separate the two.
+  - Bug fixed after the run: the per-round check timed laps against the wrong teacher laps. It changed nothing (every finished lap was well inside the limit); the final scores were always matched correctly.
+  - Prediction vs. result: 40 predicted; 27–40 measured (mean 35).
 
 ## Gate check
 

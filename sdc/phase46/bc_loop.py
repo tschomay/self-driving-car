@@ -26,6 +26,7 @@ from pathlib import Path
 
 import torch
 
+from sdc.jumps.driver import STARTS as dr_starts
 from sdc.phase4 import my_gru
 from sdc.phase4 import train_rnn as trr
 from sdc.phase45 import bc_rnn
@@ -68,7 +69,7 @@ def main():
     net = trr.RecurrentActorCritic(obs_dim=obs_dim)
     teacher = LoopExpert(use_turn_map=a.map, a_brake=2.0 if a.map else 3.0)   # 2.0: brakes earlier, for map error
     ref = pickle.load(open(REF, "rb"))
-    ref1 = ref[:len(cm.VAL_SEEDS)]                      # start 0 only (prun orders by start, then course)
+    ref1 = ref[::len(dr_starts)]                        # start 0 only (prun orders by course, then start)
     val_env = student_env(a.map, val=True)
     L = my_gru.CONFIG["seq_len"]
     data, log = [], []

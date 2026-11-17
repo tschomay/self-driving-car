@@ -137,6 +137,7 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - DAgger copying as in Phase 4.5, 8 rounds of 60k steps, on the 291 practice loops whose out-lap finished, training-range physics. No fine-tuning.
   - Scored on the validation loops at gate range, 3 starts (60 laps), each with its own out-lap map. A run whose out-lap failed races without a map.
   - Seeds 0–1. `bash sdc/phase46/e3_runs.sh`.
+- **Prediction (owner, before the run):** "40" (laps finished of 60; one number, not split by arm).
 
 ## Gate check
 

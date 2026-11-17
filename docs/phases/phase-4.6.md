@@ -184,10 +184,12 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
 
 - **Setup:** E4's sensors-only arm with a more cautious teacher: corner grip budget 2.5 m/s² instead of 3.5 (about 15% slower through turns) and braking 2.5 m/s² instead of 3.0. Everything else as E4 (16 rounds of 60k steps), seeds 0–2 (E4 had 0–1). Laps still timed against the standard true-state teacher. `bash sdc/phase46/e5_runs.sh`, about 2.2 h.
 - **The cautious teacher itself (gate range, validation):** 55 / 60 laps, median 32.5 s (standard teacher: 56 / 60, 30.1 s; limit 1.5× = about 45 s).
+- **Prediction (owner, before the run):** "47" (laps finished of 60).
 
 ### E6 — Average the students
 
 - **Setup:** no training. Two cars driven by the average of two E4 students' throttle and steering, each student keeping its own memory: sensors-only seeds 0 + 1, and map seeds 0 + 1. Same 60 validation runs as E4. `python -m sdc.phase46.ensemble`, about 20 min each, run beside E5.
+- **Prediction (owner, before the run):** "No, I don't think driving strategies can be averaged at a step by step basis. But maybe if it isn't planning ahead much or if the styles don't conflict" (the average won't beat the better student).
 
 ## Gate check
 

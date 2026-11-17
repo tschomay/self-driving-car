@@ -123,6 +123,21 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - Going faster made it worse (4.5 m/s: 31 of 60; 5.5 m/s: 26 of 60): the car lands in the valley and slides.
   - Open: each failed out-lap is a failed gate run, so about 1 run in 10 is lost before the timed lap starts.
 
+### E3 — Copy the teacher on loops, with and without the map
+
+- **Built for it (2026-11-17):**
+  - `sdc/phase46/maps.py`: one out-lap per run (the stand-in drives, the car records), turned by your dead reckoning into a map: the track's curvature every 0.25 m along the car's own odometer, plus the odometer reading at each kicker.
+  - Env option `turn_map`: your dead reckoning runs during the timed lap as the car's odometer, and the policy gets 9 more inputs: the mapped curvature 0, 1, 2, 3, 4.5, 6, 8, 10 and 13 m ahead.
+  - **Odometer error comes from the jumps** (from the E2 logs): of about 6–7 m gained per lap, 5 m is in the air and the half second after landing; flat ground and turns read about 1% long. Two fixes:
+    - In your dead reckoning (agent's detail, flagged to the owner): in the air, distance uses the pitch at takeoff, not the current pitch. The car keeps the horizontal speed it left the lip with.
+    - Re-sync at kickers: when the filter's pitch climbs through 12° on the ground, the odometer snaps to the nearest mapped kicker within 8 m.
+  - **The teacher with the map** (plans corner speeds and steering feed-forward from the car's own map, not the true track; validation, gate range, 60 laps): 44 finished with the teacher's 3 m/s² braking, **51 with 2 m/s²** (brakes earlier, which forgives map error). Six runs have no map because their out-lap failed; 51 of the 54 mapped runs finished. With the true track the teacher finishes 56.
+- **Setup:**
+  - Student: your GRU and filter inputs, parts-list sensors plus the two angled range sensors. Arm A: sensors only, copying the true-track teacher. Arm B: plus the 9 map inputs, copying the map-following teacher (2 m/s² braking).
+  - DAgger copying as in Phase 4.5, 8 rounds of 60k steps, on the 291 practice loops whose out-lap finished, training-range physics. No fine-tuning.
+  - Scored on the validation loops at gate range, 3 starts (60 laps), each with its own out-lap map. A run whose out-lap failed races without a map.
+  - Seeds 0–1. `bash sdc/phase46/e3_runs.sh`.
+
 ## Gate check
 
 ## Handoff to next phase

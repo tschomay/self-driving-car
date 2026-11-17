@@ -44,6 +44,7 @@ VARIANTS = {
 
 
 WALK_SCALE = 1.0
+WALK_DEG = 0.01     # °/s per sqrt(s): sdc/jumps/real.py's value (0.05 until 2026-11-17; --walk-scale 5 reproduces it)
 
 
 def _record(args):
@@ -51,7 +52,7 @@ def _record(args):
     import torch
     torch.set_num_threads(1)
     from sdc.jumps import real as rl
-    rl.GYRO_WALK = np.deg2rad(0.05) * WALK_SCALE       # --walk-scale: a follow-up check on the gyro's bias drift
+    rl.GYRO_WALK = np.deg2rad(WALK_DEG) * WALK_SCALE   # --walk-scale: a follow-up check on the gyro's bias drift
     pol = OutLapDriver() if kind == "slow" else LoopExpert()
     return kind, laps.record(pol, course, x0, dr="gate", phys_seed=cm.PHYS_SEED_VAL, max_steps=6000)
 

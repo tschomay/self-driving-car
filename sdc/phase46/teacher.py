@@ -72,19 +72,39 @@ class LoopExpert(dr.ExpertDriver):
 
 class OutLapDriver(LoopExpert):
     """The out-lap (owner, 2026-11-16): a person drives one slow lap by remote while the car records. This
-    stand-in reads the true state, as a person watching the car does: it rolls round at V, keeps to the middle,
-    and gives it more throttle up the ramps so it doesn't stall on a kicker (up to V_RAMP while climbing)."""
+    stand-in reads the true state, as a person watching the car does: it rolls round at V and keeps to the middle.
+    Over a jump (from 3 m before the kicker to its end) it carries V_JUMP and doesn't brake on the way down, so
+    it has the momentum for the next face: at V a heavy car stalls in the valley of a double (E2)."""
 
-    V, V_RAMP = 2.0, 3.0
+    V, V_JUMP, V_RETRY = 2.0, 3.5, 4.5
 
     def __init__(self, **kw):
         super().__init__(v_target=self.V, v_cruise=self.V, **kw)
+        self._st = {}
 
     def act(self, car):
         a = super().act(car)
+        st = self._st.setdefault(id(car), dict(stall=0, back=0, charge=False))
+        if car.t <= 1:
+            st.update(stall=0, back=0, charge=False)
         if car.airborne:
             return a
         s = car.state()
-        target = self.V_RAMP if s["pitch"] > np.deg2rad(6) else self.V
-        a[1] = np.clip(0.8 * (target - s["v_fwd"]) + 0.06 * target + 1.2 * np.sin(s["pitch"]), -1, 1)
+        x = s["x"] % car.course.length
+        on_jump = any(j.start - 3.0 <= x <= j.end for j in car.course.jumps)
+        if not on_jump:
+            st.update(stall=0, back=0, charge=False)
+        # stalled on a face (a heavy car on low grip can't climb from a standstill): roll back and take a run at it,
+        # as a person would
+        st["stall"] = st["stall"] + 1 if (on_jump and s["v_fwd"] < 0.3 and s["pitch"] > np.deg2rad(10)) else 0
+        if st["stall"] >= 15 and st["back"] == 0:
+            st["back"], st["charge"] = 45, True
+        if st["back"] > 0:
+            st["back"] -= 1
+            return np.array([0.0, -0.8], np.float32)
+        target = (self.V_RETRY if st["charge"] else self.V_JUMP) if on_jump else self.V
+        thr = 0.8 * (target - s["v_fwd"]) + 0.06 * target + 1.2 * np.sin(s["pitch"])
+        a[1] = np.clip(thr, -0.1 if on_jump else -1, 1)
+        if on_jump:
+            a[0] = np.clip(a[0], -0.3, 0.3)       # easy on the wheel over a jump: wheels spinning on a face slew the car
         return a

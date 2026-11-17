@@ -5,7 +5,7 @@
 - **Learn:** sim-to-real transfer, state estimation from noisy sensors (your pitch filter), how suspension and weight transfer shape handling, domain randomization vs. fidelity, compute and sensor delay as part of control.
 - **Gate (owner, 2026-11-14):** at least 80% of jumps landed, using Phase 4's definition (airborne at least 0.3 s; within 1 s all four wheels down, no chassis contact, upright and still driving). Measured on fresh test courses 45000–45019, 3 starts each (180 jumps), with the parts-list sensors and physics drawn from a range **wider** than training (as in Phase 3).
 - **Code:** `sdc/jumps/` (sim), `sdc/phase45/` (training, evaluation, reports).
-- **How to reproduce the gate** (CPU, about 3 h; 3D GIFs need `apt-get install -y libosmesa6`):
+- **How to reproduce the gate** (CPU, about 3 h; 3D GIFs need `apt-get install -y libosmesa6`). Since Phase 4.6 lowered the gyro's bias drift (`GYRO_WALK`, 0.05 → 0.01°/s per √s, 2026-11-17), exact numbers need `GYRO_WALK = np.deg2rad(0.05)` in `sdc/jumps/real.py`:
   1. Crawl the practice and validation courses and build their maps: `python -m sdc.phase45.maps --collect` (about 1 h).
   2. Copy the map-following expert into the owner's GRU car: `bash sdc/phase45/e6_runs.sh` (seed 1 is the gate car, about 15 min).
   3. Gate: `python -m sdc.phase45.gate --run runs/p45-e6-s1` (crawls the test courses, builds their maps, drives 180 test jumps; about 30 min).

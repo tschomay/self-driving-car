@@ -111,8 +111,17 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - **Recorder bug found and fixed before any result was reported:** the lap recorder took the standstill gyro calibration after the run had ended and the car had been reset, so two of every three laps (the offset starts) used another run's calibration and drifted up to 85°.
   - The out-lap stand-in failed 9 of 60 slow laps at gate range, on 4 loops: stuck on a kicker (4), off the lane (4), rolled over (1). It needs fixing before E3, since a failed out-lap is a failed gate run.
   - Prediction vs. result: about 20% (slow) and 40% (race) predicted; 5.5% and 2.0% measured. "Distance error will hurt more": no, heading does, and the slow lap is the worse one.
-- **Explanation (owner, after the run):** …
-- **Takeaway:** …
+- **Explanation (owner, after the run):** "I assumed that where you are on the track left to right would have a lot of impact on distance, but it seems that wasn't an issue for it and the gyro drift won out. Error for both is pretty low, but to be useful tolerance is even lower."
+- **Takeaway:** dead reckoning's error grows with time through the heading, not with distance: a slow lap is the hard case. A few percent sounds small, but the car has to brake within about 2 m of the right place, so the map needs landmarks to re-sync on, not just a closed loop.
+- **Owner's decision (2026-11-17):** "Yes check the fact sheet."
+  - Found: no official bias-instability figure for the ICM-42688-P. Zero-rate drift with temperature is quoted as ±0.005 °/s per °C in a TDK comparison table and ±0.06 in distributor copies of the datasheet (they conflict). The BNO086's gyro-only heading is quoted at 0.5° per minute of dynamic drift.
+  - So real heading drift is roughly 0.5–2° per minute, perhaps 9° per minute in the worst case. The sim's 0.05°/s per √s gave about 13° per minute.
+  - Changed: `GYRO_WALK` is now 0.01°/s per √s (about 3° per minute; 5° at the gate range's double noise), for training and the gate alike. Phase 4.5's 12 s runs see about 1° or less either way, but its gate no longer reproduces bit for bit.
+- **E2 again with the lowered drift** (`runs/p46-e2-new`): slow lap off by 3.8 m (2.2%, heading 4.5°), race lap 2.5 m (1.5%, heading 3.3°). Distance is unchanged (+3.2% / +4.2%), so heading and distance now matter about equally (slow: 2.4 m vs 1.2 m; race: 1.7 m vs 1.9 m).
+- **Out-lap stand-in, after E2 (2026-11-17):** it now carries 3.5 m/s over jumps, doesn't brake on the way down, steers gently on a jump, and rolls back for a second run if it stalls on a face. Slow laps finished: 60 of 60 at training-range physics, 54 of 60 on validation and 58 of 60 on practice loops at gate range (was 51 of 60).
+  - What still fails: doubles whose two rollers sit close together make a pit. At low grip (about 0.58) and extra weight the car noses into it, stops, and can't climb out: a 31° face needs a grip of 0.6 from a standstill.
+  - Going faster made it worse (4.5 m/s: 31 of 60; 5.5 m/s: 26 of 60): the car lands in the valley and slides.
+  - Open: each failed out-lap is a failed gate run, so about 1 run in 10 is lost before the timed lap starts.
 
 ## Gate check
 

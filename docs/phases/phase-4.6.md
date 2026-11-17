@@ -178,6 +178,16 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - Prediction vs. result: +2–3 per arm predicted; +9 (A) and +4 (B) measured.
 - **Explanation (owner, after the run):** "Training longer helped. It's a bigger network and harder task, so that seems reasonable. The difference between seeds is a bit concerning. It seems it isn't really converging on a great way to drive."
 - **Takeaway:** more copied data still pays (the gain beat the prediction), but two seeds of the same recipe land 7 laps apart, so the student hasn't settled on one reliable way to drive. Leaving the lane is still the main failure.
+- **Owner's decision (2026-11-17):** a teacher that drives with margin (E5), and averaging the trained students in parallel (E6). Not chosen: training longer again ("the training curves appear to mostly saturate").
+
+### E5 — Teacher with margin
+
+- **Setup:** E4's sensors-only arm with a more cautious teacher: corner grip budget 2.5 m/s² instead of 3.5 (about 15% slower through turns) and braking 2.5 m/s² instead of 3.0. Everything else as E4 (16 rounds of 60k steps), seeds 0–2 (E4 had 0–1). Laps still timed against the standard true-state teacher. `bash sdc/phase46/e5_runs.sh`, about 2.2 h.
+- **The cautious teacher itself (gate range, validation):** 55 / 60 laps, median 32.5 s (standard teacher: 56 / 60, 30.1 s; limit 1.5× = about 45 s).
+
+### E6 — Average the students
+
+- **Setup:** no training. Two cars driven by the average of two E4 students' throttle and steering, each student keeping its own memory: sensors-only seeds 0 + 1, and map seeds 0 + 1. Same 60 validation runs as E4. `python -m sdc.phase46.ensemble`, about 20 min each, run beside E5.
 
 ## Gate check
 

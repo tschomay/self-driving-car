@@ -53,6 +53,8 @@ def main():
     ap.add_argument("--steps", type=int, default=60_000)
     ap.add_argument("--epochs", type=int, default=8)
     ap.add_argument("--procs", type=int, default=1)
+    ap.add_argument("--a-lat", type=float, default=3.5, help="teacher's corner grip budget, m/s² (E5 margin: 2.5)")
+    ap.add_argument("--a-brake", type=float, default=None, help="teacher's braking, m/s² (default 3.0; 2.0 with --map)")
     a = ap.parse_args()
     torch.set_num_threads(1)
     torch.manual_seed(a.seed)
@@ -67,7 +69,8 @@ def main():
     from sdc.jumps import env as je
     obs_dim = je.JumpBatch(1, **env).obs_dim
     net = trr.RecurrentActorCritic(obs_dim=obs_dim)
-    teacher = LoopExpert(use_turn_map=a.map, a_brake=2.0 if a.map else 3.0)   # 2.0: brakes earlier, for map error
+    a_brake = a.a_brake if a.a_brake is not None else (2.0 if a.map else 3.0)   # 2.0 with map: brakes earlier
+    teacher = LoopExpert(use_turn_map=a.map, a_lat=a.a_lat, a_brake=a_brake)
     ref = pickle.load(open(REF, "rb"))
     ref1 = ref[::len(dr_starts)]                        # start 0 only (prun orders by course, then start)
     val_env = student_env(a.map, val=True)
@@ -87,7 +90,7 @@ def main():
     eps = cm.prun(functools.partial(cm.load_student, str(out), obs_dim), cm.VAL_SEEDS, procs=a.procs, **val_env)
     final = cm.lap_score(eps, teacher=ref)
     m = dict(label="GRU copy of the loop teacher" + (" + turn map" if a.map else ""), seed=a.seed, rounds=log,
-             map=a.map, obs_dim=obs_dim, gru=my_gru.CONFIG, env46=val_env, train_env=env, final=final,
+             map=a.map, teacher=dict(a_lat=a.a_lat, a_brake=a_brake), obs_dim=obs_dim, gru=my_gru.CONFIG, env46=val_env, train_env=env, final=final,
              final_episodes=eps, wall_s=round(time.perf_counter() - t0, 1))
     (out / "metrics.json").write_text(json.dumps(m, indent=1, default=float))
     print(f"final: finished {final['finished_n']}/60, in time {final['in_time_n']}/60, landed {final['rate']:.0%}, "

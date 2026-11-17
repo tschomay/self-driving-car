@@ -164,6 +164,18 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
 
 - **Setup:** E3 exactly, with 16 copying rounds of 60k steps instead of 8 (twice the data). Both arms (sensors only; + out-lap map), seeds 0–1. `bash sdc/phase46/e4_runs.sh`, about 2.2 h on 4 cores.
 - **Prediction (owner, before the run):** "I think it helps everything only a little. 2-3 more completions" (each arm finishes 2–3 more of 60 laps than in E3; the gap between the arms barely changes).
+- **Result:** [report](https://claude.ai/artifact/HpNLjh5sHMcUsAWw3t5tv3). Validation loops 10000–10019 × 3 starts, gate-range physics, finished laps of 60 (seed 0 / 1):
+
+  | Arm | E3 (8 rounds) | E4 (16 rounds) | Change (mean) |
+  |---|---|---|---|
+  | A: sensors only | 27 / 40 | **46 / 39** | +9 |
+  | B: + out-lap map | 34 / 39 | **41 / 40** | +4 |
+
+  - Endings in E4 (seed 0 / 1): A off the lane 10 / 15, rolled over 3 / 5, stuck 1 / 1; B off the lane 12 / 14, rolled over 6 / 6, stuck 1 / 0.
+  - Best run 46 / 60; the gate needs 48. Every finished lap was inside the time limit.
+  - The gain is mostly A seed 0 (27 → 46); A seed 1 didn't move (40 → 39). The 20-lap practice check bounced in the last rounds (B: 17 → 13), so seed noise is still large.
+  - The arms swapped order: sensors only is now ahead (42.5 vs 40.5), still inside seed noise.
+  - Prediction vs. result: +2–3 per arm predicted; +9 (A) and +4 (B) measured.
 
 ## Gate check
 

@@ -160,6 +160,11 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
 - **Takeaway:** with sensors that show its heading to the banks, the car reacts well enough to turns without knowing them in advance; an approximate map adds little. Both arms were still improving.
 - **Owner's decision (2026-11-17):** "Let's increase training time." (E4)
 
+### E4 — Train longer
+
+- **Setup:** E3 exactly, with 16 copying rounds of 60k steps instead of 8 (twice the data). Both arms (sensors only; + out-lap map), seeds 0–1. `bash sdc/phase46/e4_runs.sh`, about 2.2 h on 4 cores.
+- **Prediction (owner, before the run):** "I think it helps everything only a little. 2-3 more completions" (each arm finishes 2–3 more of 60 laps than in E3; the gap between the arms barely changes).
+
 ## Gate check
 
 ## Handoff to next phase

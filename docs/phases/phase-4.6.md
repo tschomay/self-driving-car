@@ -217,6 +217,19 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - Prediction vs. result: "won't beat the better student" predicted; it tied the better student in A (46 vs 46) and beat it in B (45 vs 41).
 - **Explanation (owner, after the run):** "It seems to reduce the impact of bad decisions, especially when one of the two made a better decision."
 - **Takeaway:** the two students' mistakes are mostly in different places, so averaging their throttle and steering cancels many of them; it costs a few runs where both were right in different ways. A cheap way to reduce the seed-to-seed variation.
+- **Owner's decision (2026-11-18):** E7, average the three E5 students on validation; then the gate with the better of that average and E5 seed 2 alone.
+
+### E7 — Average the cautious students
+
+- **Setup:** no training. One car driven by the mean throttle and steering of E5 seeds 0, 1 and 2, each with its own memory. Same 60 validation runs. `python -m sdc.phase46.ensemble --runs runs/p46-e5-s0 runs/p46-e5-s1 runs/p46-e5-s2 --out runs/p46-e7.json --procs 4`.
+- **Prediction (owner, before the run):** "I think we could do 49 or 50" (laps finished of 60).
+- **Result:** [report](https://claude.ai/artifact/3HFiNiA65FFQkL7Ra4vkRm). **50 / 60** laps finished (students alone: 43, 47, 49). Endings: 7 off the lane, 3 rolled over. Median lap 32.8 s.
+  - Run by run (students that finished alone → average finished): all 3 → 29 of 33; 2 → 15 of 16; 1 → 4 of 8; none → 2 of 3.
+  - It mostly follows the majority, and still breaks 4 runs every student handled.
+  - Prediction vs. result: 49–50 predicted; 50 measured.
+- **Explanation (owner, after the run):** "They must balance each other."
+- **Takeaway:** students copying one deterministic teacher make mostly different, idiosyncratic mistakes (variance, not different driving styles), so the majority usually outvotes a mistake. The few runs averaging breaks may be places where the students' good lines differ.
+- **Owner's question:** is averaging common practice, is there a standard alternative, or does it point to a design issue such as multiple success modes? (Answered in chat: ensembling is standard; alternatives are distilling the ensemble into one network or averaging one network's weights over training; the evidence points to variance rather than multiple modes.)
 
 ## Gate check
 

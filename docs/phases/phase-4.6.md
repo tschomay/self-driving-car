@@ -243,6 +243,19 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - `python -m sdc.phase46.hard --out runs/p46-e8-hard` and `--out runs/p46-e8-plain --plain`, side by side, about 1–1.5 h.
 - **Restarted (2026-11-18):** the first launch ran out of memory in round 3 (copying MuJoCo's data object leaked about 2 GB per 16k steps). Snapshots now keep MuJoCo's state vector and restore it into reused buffers. A restored car drifts about 2 cm from the original over 4 s (some derived state isn't in the vector), which doesn't matter for branches that add noise anyway.
 - **Prediction (owner, before the run):** "Hard spots 52, control 50" (laps finished of 60 by the average of the three).
+- **Result:** [report](https://claude.ai/artifact/VSxb5G9fmUiKbMoaYaNex8). Validation loops × 3 starts, gate-range physics:
+
+  | Car | Average of 3 | Each alone | Other endings (average) |
+  |---|---|---|---|
+  | E7 (E5 students, no more training) | 50 | 43, 47, 49 | off the lane 7, rolled over 3 |
+  | E8 hard spots | **49** | 45, 39, 44 | off the lane 7, rolled over 3, stuck 1 |
+  | E8 control | **52** | 42, 42, 50 | off the lane 5, stuck 2, rolled over 1 |
+
+  - The hard arm replayed 224 spots (111k of its 360k steps).
+  - The students' disagreement fell at the same pace in both arms (mean 0.11 → 0.07), so the replays didn't make them agree faster.
+  - One run per arm; the students alone moved by up to 6 laps between arms, so the 3-lap gap is within noise.
+  - The control's 52 is the best validation score so far.
+  - Prediction vs. result: hard spots 52, control 50 predicted; hard spots 49, control 52 measured.
 
 ## Gate check
 

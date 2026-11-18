@@ -28,6 +28,7 @@ import pickle
 import time
 from pathlib import Path
 
+import mujoco
 import numpy as np
 import torch
 
@@ -49,11 +50,35 @@ NOISE, BRANCH_NOISE = 0.1, 0.25
 COOLDOWN = 100                         # one hard spot per car per 2 s
 
 
+_FULL = mujoco.mjtState.mjSTATE_FULLPHYSICS | mujoco.mjtState.mjSTATE_WARMSTART | mujoco.mjtState.mjSTATE_CTRL
+_POOL: dict = {}
+
+
 def snapshot(car):
-    """A copy of the car's state that shares its model, course and scratch buffers (unchanged within a lap)."""
+    """The car's state: everything but MuJoCo's data is deep-copied (sharing the model, course and scratch buffers,
+    which don't change within a lap); MuJoCo's data is kept as its state vector. Copying MjData itself leaked memory."""
     memo = {id(car.m): car.m, id(car.course): car.course, id(car._scratch): car._scratch,
-            id(car.courses): car.courses}
-    return copy.deepcopy(car, memo)
+            id(car.courses): car.courses, id(car.d): None}
+    snap = copy.deepcopy(car, memo)
+    state = np.empty(mujoco.mj_stateSize(car.m, _FULL))
+    mujoco.mj_getState(car.m, car.d, state, _FULL)
+    return snap, state
+
+
+def restore(snap, slot):
+    """A drivable car from a snapshot, using a reused MjData buffer (one per branch slot)."""
+    snap_car, state = snap
+    memo = {id(snap_car.m): snap_car.m, id(snap_car.course): snap_car.course,
+            id(snap_car._scratch): snap_car._scratch, id(snap_car.courses): snap_car.courses}
+    car = copy.deepcopy(snap_car, memo)
+    key = (id(car.m), slot)
+    if key not in _POOL:
+        _POOL.clear() if len(_POOL) >= 32 * K else None
+        _POOL[key] = mujoco.MjData(car.m)
+    car.d = _POOL[key]
+    mujoco.mj_setState(car.m, car.d, state, _FULL)
+    mujoco.mj_forward(car.m, car.d)
+    return car
 
 
 class Recorder:
@@ -142,7 +167,7 @@ def collect(nets, teacher, n_steps, seed, hard, thresh, rec):
                 ring[i].append((snapshot(c), [h[:, i:i + 1].clone() for h in hs]))
             if hard and branch_steps < budget and d[i] > thresh and cool[i] <= 0 and len(ring[i]) == SNAP_KEEP:
                 snap, h0 = ring[i][0]
-                cars = [snapshot(snap) for _ in range(K)]
+                cars = [restore(snap, j) for j in range(K)]
                 hb = [h.repeat(1, K, 1) for h in h0]
                 bo, ba, bs, bh = branch(cars, hb, teacher, nets, rng, BRANCH_LEN)
                 rec.add(bo, ba, bs, bh)

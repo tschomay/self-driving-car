@@ -241,6 +241,7 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - 6 rounds of 60k steps, each student refitted on all new data (4 epochs, lower learning rate 3e-4). Round 1 is ordinary driving in both arms (it sets the threshold). Practice loops, training-range physics.
   - Scored on validation as E7: the average of the three (E7: 50 / 60), and each alone (E5: 43, 47, 49).
   - `python -m sdc.phase46.hard --out runs/p46-e8-hard` and `--out runs/p46-e8-plain --plain`, side by side, about 1–1.5 h.
+- **Restarted (2026-11-18):** the first launch ran out of memory in round 3 (copying MuJoCo's data object leaked about 2 GB per 16k steps). Snapshots now keep MuJoCo's state vector and restore it into reused buffers. A restored car drifts about 2 cm from the original over 4 s (some derived state isn't in the vector), which doesn't matter for branches that add noise anyway.
 - **Prediction (owner, before the run):** "Hard spots 52, control 50" (laps finished of 60 by the average of the three).
 
 ## Gate check

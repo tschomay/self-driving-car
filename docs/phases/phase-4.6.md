@@ -197,6 +197,8 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - Seed 2 reaches 49 / 60 on validation, above the gate's 48; the gate is judged on the test loops.
   - Seeds still spread 6 laps (43–49); the 20-lap check per round was still noisy at the end.
   - Prediction vs. result: 47 predicted; 43–49 measured (mean 46.3).
+- **Explanation (owner, after the run):** "It seems cautious is good. Better to complete than crash"
+- **Takeaway:** a student copies its teacher imperfectly, so a teacher at the grip limit leaves no room for the student's errors. Copying a teacher with margin trades about 2.5 s of lap time for fewer crashes, and the time limit has plenty of room for it.
 
 ### E6 — Average the students
 

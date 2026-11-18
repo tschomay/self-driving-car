@@ -258,6 +258,32 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - Prediction vs. result: hard spots 52, control 50 predicted; hard spots 49, control 52 measured.
 - **Explanation (owner, after the run):** "It seems that the car is still learning to drive in general and not just specific scenarios."
 - **Takeaway:** at this stage more ordinary copying helps as much as targeted replays; the students' errors are spread over all driving, not concentrated where they disagree.
+- **Owner's decision (2026-11-18):** improve the teacher next, by trying a few settings and stitching the best together (owner's idea). Reinforcement learning on top of copying is a follow-up the owner wants to try afterwards.
+
+### E9 — A better teacher
+
+- **Diagnosis (cautious teacher, 200 practice loops, gate range):** 183 / 200 finished. 15 of the 17 failures are at jumps: stuck in a double 6, rolled over off a drop 5, off the lane at a jump 3, rolled over on a double 1; 2 off the lane in turns. It drives into every jump at one target speed (7.4 m/s).
+- **Sweep (one jump speed for every jump, same 200 loops):** laps finished 158 / 183 / 169 / 159 at 6.0 / 7.4 / 8.5 / 9.5 m/s. Per kind, jumps passed cleanly: tables best at 7.4 (184 / 189), doubles best at 7.4 (167 / 187), drops best at 6.0 (191 / 224). Faster rolls over more; slower gets stuck in doubles.
+- **Stitching:** a speed per jump kind around those best values, tried on the same 200 practice loops; the best goes to validation against the cautious teacher (55 / 60). `python -m sdc.phase46.e9_sweep`, `python -m sdc.phase46.e9_stitch`.
+- **Stitched teachers (same 200 practice loops):** drops 6.0: 190; drops 6.7: 186; drops 6.0 + doubles 7.9: **191**; drops 6.0 + doubles 7.0: 184 (one speed, 7.4: 183). Chosen: drops 6.0, doubles 7.9, tables 7.4 (the top two differ by one lap).
+- **Stitched teacher on validation (60 runs, gate range):** **57 / 60** (cautious: 55; standard: 56). Endings: 2 off the lane, 1 rolled over. Median lap 32.7 s.
+- **Copying setup:** as E8's control (E5's three students, 6 more rounds of 60k ordinary steps, average driving), with the stitched teacher. Two runs (seeds 0, 1), and a second run of E8's control with the old teacher (seed 1) to measure run-to-run noise. `python -m sdc.phase46.hard --plain --jump-v '{"drop": 6.0, "double": 7.9}'`.
+- **Prediction (owner, before the run):** "52" (laps finished of 60 by the averaged car copying the stitched teacher).
+- **Result:** [report](https://claude.ai/artifact/4TkaHHEN1mnoy6Uo3jCYw7). Validation loops × 3 starts, gate-range physics, averaged car:
+
+  | Students copying | Seed 0 | Seed 1 | Each alone (seed 0 / seed 1) | Stuck in a double (seed 0 / 1) |
+  |---|---|---|---|---|
+  | Cautious teacher (E8 control and its repeat) | 52 | 50 | 42, 42, 50 / 51, 45, 48 | 2 / 1 |
+  | **Stitched teacher** | **49** | **46** | 39, 38, 41 / 39, 46, 42 | 4 / 6 |
+
+  - Takeoff speed (m/s, table / double / drop): stitched teacher 5.4 / 6.1 / 4.3; cautious teacher 5.4 / 5.8 / 5.2; stitched-teacher students about 5.1 / 5.0 / 5.0; cautious-teacher students about 5.5 / 5.5 / 5.3.
+  - The students don't follow the teacher's per-kind speeds: they take every jump at about the same speed, slower than before, too slow for doubles.
+  - Agent's reading: the teacher picks its speed from the jump kind, known from the track well before the jump; the students' sensors see a jump only about 2.7 m ahead, too late to tell a double from a drop and change speed. Copying a choice made from knowledge the student doesn't have averages the two answers (mode averaging).
+  - Run-to-run noise (E8 control repeated): 52 vs 50.
+  - Prediction vs. result: 52 predicted; 49 and 46 measured.
+- **Explanation (owner, after the run):** "I think you just explained it."
+- **Takeaway:** a better teacher only helps if the student can see what the teacher's choices depend on. Here the teacher chose jump speeds from the track's layout, which the student can't sense in time.
+- **Owner's reflection (2026-11-18), summarised:** the student averages its way round instead of working the car the way a driver does (brake-steer-throttle to rotate into a slide, throttle and brake to level the car in the air), and it doesn't know what jump is coming. Asked for a physics review against a 1/8 truggy (Traxxas Revo or Losi 8IGHT-T) to make sure the car can do those things; suggested practice drills on fundamentals; asked how the car could know the track (aerial or driver's-stand photo, a CAD layout, better out-laps, labels after an out-lap); and offered the agent a research pause to come back with better ideas.
 
 ## Gate check
 

@@ -19,7 +19,8 @@ WHEELBASE = 0.30
 
 
 class LoopExpert(dr.ExpertDriver):
-    def __init__(self, a_lat=3.5, a_brake=3.0, v_cruise=None, look=0.15, k_ff=1.0, use_turn_map=False, **kw):
+    def __init__(self, a_lat=3.5, a_brake=3.0, v_cruise=None, look=0.15, k_ff=1.0, use_turn_map=False, jump_v=None,
+                 **kw):
         kw.setdefault("plan", False)
         kw.setdefault("v_target", 7.4)
         kw.setdefault("kd", 1.0)
@@ -31,6 +32,8 @@ class LoopExpert(dr.ExpertDriver):
         self._mplans = {}
         self.v_cruise = v_cruise if v_cruise is not None else self.v_target
         self._plans = {}
+        # E9 (owner's idea: try settings, stitch the best): approach speed per jump kind, e.g. {"double": 8.0}
+        self.jump_v = dict(jump_v or {})
 
     def corner_speed(self, course):
         """Per centreline point: the speed limit from the corners at and ahead of it."""
@@ -66,6 +69,11 @@ class LoopExpert(dr.ExpertDriver):
         """The speed to carry into the next jump (as ExpertDriver: steady, the course plan, or the car's map)."""
         if self.use_map and getattr(car, "map_next_speed", None):
             return car.map_next_speed + self.plan_offset
+        if self.jump_v:
+            x = s["x"] % car.course.length
+            nxt = [j for j in car.course.jumps if j.end >= x]
+            j = nxt[0] if nxt else car.course.jumps[0]
+            return self.jump_v.get(j.kind, self.v_target)
         if self.plan:
             x = s["x"] % car.course.length
             nxt = [j for j in car.course.jumps if j.lip > x]

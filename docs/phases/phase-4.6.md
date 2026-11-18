@@ -301,6 +301,7 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - the odometer overcounts by about 10% over a lap, so notes should be indexed by kicker count, re-synced at each kicker, not by metres.
 - **Truggy physics** (`real="truggy"`: "all" plus the review's ESC brake, limited-slip diffs, stronger motor and heavier wheels; opt-in, old runs unchanged, tests pass): full brake now stops without reversing (old physics: 157° spin and rolling backwards); 0–6 m/s in 0.9 s instead of 1.5. The cautious teacher, untuned, finishes 16 / 20 validation laps at gate range (old physics 18 / 20) and laps 1.7 s faster.
 - **Drills with residual reinforcement learning:** not probed. They should be built on the corrected physics, after the teacher is re-tuned there.
+- **Owner's decisions (2026-11-18):** the rest of Phase 4.6, gate retry included, runs on the truggy physics (`real="truggy"`). The plan: (1) re-tune the teacher on the new physics and re-baseline; (2) jump notes as inputs, first perfect notes, then the car's own from the out-lap; (3) drills with residual reinforcement learning (Modal); (4) gate retry on test loops 46000–46019. Also asked for a second sim review: traction, friction and weight transfer.
 
 ## Gate check
 

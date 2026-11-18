@@ -432,6 +432,16 @@ class JumpCar:
         u = float(self.applied[1])
         if "battery" in self.real:
             u *= self.phys.charge * (1.0 - self.phys.sag * abs(u))
+        if "esc" in self.real:   # physics review: a hobby ESC's brake, not reverse torque (one motor: "drive")
+            raw = float(self.applied[1])
+            w = float(self.d.qvel[self.spin_dof].mean()) * cr.WHEEL_R / cr.motor(self.real)[1]   # motor speed / top
+            if raw > 0.05:
+                u = u - w                                    # drive: torque falls with back-EMF, as the damper did
+            elif raw < -0.05:
+                u = -abs(u) * float(np.tanh(w * cr.motor(self.real)[1] / 0.3))   # opposes rotation, 0 at standstill
+            else:
+                u = -0.1 * w                                 # neutral: coast with a light drag brake
+            u = float(np.clip(u, -1.0, 1.0))
         self.d.ctrl[:self.n_motor] = u
         self.d.ctrl[self.n_motor:self.n_motor + 2] = self.servo_set
 

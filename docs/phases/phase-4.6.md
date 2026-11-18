@@ -178,6 +178,31 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - Prediction vs. result: +2–3 per arm predicted; +9 (A) and +4 (B) measured.
 - **Explanation (owner, after the run):** "Training longer helped. It's a bigger network and harder task, so that seems reasonable. The difference between seeds is a bit concerning. It seems it isn't really converging on a great way to drive."
 - **Takeaway:** more copied data still pays (the gain beat the prediction), but two seeds of the same recipe land 7 laps apart, so the student hasn't settled on one reliable way to drive. Leaving the lane is still the main failure.
+- **Owner's decision (2026-11-17):** a teacher that drives with margin (E5), and averaging the trained students in parallel (E6). Not chosen: training longer again ("the training curves appear to mostly saturate").
+
+### E5 — Teacher with margin
+
+- **Setup:** E4's sensors-only arm with a more cautious teacher: corner grip budget 2.5 m/s² instead of 3.5 (about 15% slower through turns) and braking 2.5 m/s² instead of 3.0. Everything else as E4 (16 rounds of 60k steps), seeds 0–2 (E4 had 0–1). Laps still timed against the standard true-state teacher. `bash sdc/phase46/e5_runs.sh`, about 2.2 h. (A container restart killed the first launch at round 3; restarted from scratch 2026-11-18.)
+- **The cautious teacher itself (gate range, validation):** 55 / 60 laps, median 32.5 s (standard teacher: 56 / 60, 30.1 s; limit 1.5× = about 45 s).
+- **Prediction (owner, before the run):** "47" (laps finished of 60).
+
+### E6 — Average the students
+
+- **Setup:** no training. Two cars driven by the average of two E4 students' throttle and steering, each student keeping its own memory: sensors-only seeds 0 + 1, and map seeds 0 + 1. Same 60 validation runs as E4. `python -m sdc.phase46.ensemble`, about 20 min each, run beside E5.
+- **Prediction (owner, before the run):** "No, I don't think driving strategies can be averaged at a step by step basis. But maybe if it isn't planning ahead much or if the styles don't conflict" (the average won't beat the better student).
+- **Result:** [report](https://claude.ai/artifact/GafL33A8bLyYhYvaZ4iRwp). Laps finished of 60, validation loops, gate-range physics:
+
+  | Arm | Seed 0 alone | Seed 1 alone | Average of the two |
+  |---|---|---|---|
+  | A: sensors only | 46 | 39 | **46** |
+  | B: + out-lap map | 41 | 40 | **45** |
+
+  - Run by run, sensors only: the average finished 1 of the 7 runs both students failed and 18 of 19 runs only one student finished, but failed 5 of 34 runs both students finished. Map arm: 5 of 13, 8 of 9, and failed 2 of 38.
+  - So averaging rescues most runs where the students disagree, but sometimes breaks a run both students handled: two good lines averaged can be a bad one.
+  - Median lap 30.2–30.5 s, the same as the students alone.
+  - Prediction vs. result: "won't beat the better student" predicted; it tied the better student in A (46 vs 46) and beat it in B (45 vs 41).
+- **Explanation (owner, after the run):** "It seems to reduce the impact of bad decisions, especially when one of the two made a better decision."
+- **Takeaway:** the two students' mistakes are mostly in different places, so averaging their throttle and steering cancels many of them; it costs a few runs where both were right in different ways. A cheap way to reduce the seed-to-seed variation.
 
 ## Gate check
 

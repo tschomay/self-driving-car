@@ -308,6 +308,11 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
 - **Re-tuning the teacher** (100 practice loops, gate range): the cautious teacher, unchanged, finishes 75. Traction control (cut throttle when the wheels spin more than 0.5 m/s faster than the car) → 88; jumps at 6.8 m/s → 91; more yaw-rate damping in its steering (landings fish-tailed on sliding grip) → 92; firmer air control → **94**. Saved as `teacher.TRUGGY`.
 - **The re-tuned teacher on validation (60 runs, gate range):** **55 / 60**, 97% of jumps landed, median lap 31.4 s. These laps are the new time reference (`runs/p46-teacher-val-gate-truggy.pkl`).
 - **Steering expo (owner's suggestion, 2026-11-18):** added as a car option: command a → (1 − e)·a + e·a³ at the servo, full lock unchanged, finer near centre. The teacher inverts the curve, so its driving is unchanged (expo 0.4: 18 / 20 against 19 / 20, within noise).
+### E10 — Copy the truggy teacher, with and without expo
+
+- **Setup:** E5's recipe (DAgger, 16 rounds of 60k steps, sensors only, no jump notes) on the truggy physics with the re-tuned teacher (`teacher.TRUGGY`). Arm A no expo, arm B steering expo 0.4; seeds 0–1 each; each arm's two students averaged into one car (as E6). Scored on validation at gate range, timed against the re-tuned teacher (55 / 60). `bash sdc/phase46/e10_runs.sh`, about 1.5 h.
+- **Jump notes** are built (perfect notes, `jump_notes="true"`) but left out here: this teacher takes every jump at one speed, so notes would tell the student nothing it needs to copy. They come next, with a teacher that varies its speed by jump kind (plan step 2).
+- **Prediction (owner, before the run):** "52 without and 53 with" (laps finished of 60 by the averaged car).
 
 ## Gate check
 

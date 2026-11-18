@@ -72,12 +72,21 @@ def _site_zaxis(direction):
 #   tires: wide tires (a 3 cm tread with rounded shoulders: a capsule along the axle) instead of spheres
 #   susp:  soft suspension (about 30% sag, about critically damped) and a higher centre of mass (battery on top)
 #   drive: one motor through open differentials (equal torque to the wheels; back-EMF on the mean wheel speed)
-MODEL_SWITCHES = ("tires", "susp", "drive")
+MODEL_SWITCHES = ("tires", "susp", "drive", "esc", "lsd", "power", "heavy")
 TIRE_W = 0.03         # m, flat part of the tread (capsule segment)
 SOFT_K = 185.0          # N/m per corner: 4.4 N static load per corner / 2.4 cm sag (30% of 8 cm travel)
 SOFT_C = 18.0           # N·s/m per corner: about critically damped with the 0.45 kg corner load. At 0.4 the springs
                         # rebounded off the kicker lips (a pogo kick) and the expert landed 51%.
 BATTERY_M, BATTERY_Z = 0.4, 0.05   # moved from the chassis box to a pack on top (centre of mass about 1 cm higher)
+
+
+def motor(real=()):
+    """(torque per wheel N·m, no-load top speed m/s): Phase 4's motor, or the physics review's "power" motor."""
+    return (0.6, 16.0) if "power" in set(real) else (TAU_MAX, TOP_SPEED)
+
+
+LSD = dict(centre=0.03, front=0.002, rear=0.001)   # limited-slip diff damping, N·m·s/rad (physics review)
+WHEEL_ARMATURE = 1.5e-4                            # "heavy": extra spin inertia per wheel, kg·m²
 
 
 def model_xml(real=(), terrain=None) -> str:
@@ -112,7 +121,9 @@ def model_xml(real=(), terrain=None) -> str:
         tire = (f'<geom name="{{w}}_tire" type="sphere" group="1" contype="1" conaffinity="0" size="{WHEEL_R}" mass="0.12" '
                 f'friction="1.0 0.005 0.0001"\n                rgba=".15 .15 .15 1"/>')
     # back-EMF drag: per wheel (one motor each), or on the single motor's speed (the mean wheel speed, via a tendon)
-    spin_damp = 1e-5 if "drive" in real else TAU_MAX / (TOP_SPEED / WHEEL_R)
+    tau_max, top_speed = motor(real)
+    spin_damp = 1e-5 if "drive" in real else tau_max / (top_speed / WHEEL_R)
+    arm = f' armature="{WHEEL_ARMATURE}"' if "heavy" in real else ""
     for w in WHEELS:
         cx, cy = CORNER[w]
         steer = (f'<joint name="{w}_steer" type="hinge" axis="0 0 1" range="-{STEER_MAX} {STEER_MAX}" '
@@ -123,19 +134,31 @@ def model_xml(real=(), terrain=None) -> str:
         {susp.format(w=w)}
         {steer}
         <body name="{w}_wheel">
-          <joint name="{w}_spin" type="hinge" axis="0 1 0" damping="{spin_damp:.6f}"/>
+          <joint name="{w}_spin" type="hinge" axis="0 1 0" damping="{spin_damp:.6f}"{arm}/>
           {tire.format(w=w)}
         </body>
       </body>''')
     sensors = ['<accelerometer name="accel" site="imu"/>', '<gyro name="gyro" site="imu"/>']
     sensors += [f'<jointvel name="{w}_w" joint="{w}_spin"/>' for w in WHEELS]
-    motors = "\n    ".join(f'<motor name="{w}_motor" joint="{w}_spin" gear="{TAU_MAX}" ctrlrange="-1 1"/>'
+    motors = "\n    ".join(f'<motor name="{w}_motor" joint="{w}_spin" gear="{tau_max}" ctrlrange="-1 1"/>'
                            for w in WHEELS)
     tendon = ""
     if "drive" in real:   # one motor: equal torque to every wheel (open diffs), drag on the mean wheel speed
-        motors = f'<motor name="motor" tendon="drive" gear="{4 * TAU_MAX}" ctrlrange="-1 1"/>'
-        tendon = ('\n  <tendon><fixed name="drive" damping="' + f"{4 * TAU_MAX / (TOP_SPEED / WHEEL_R):.6f}" + '">'
-                  + "".join(f'<joint joint="{w}_spin" coef="0.25"/>' for w in WHEELS) + '</fixed></tendon>')
+        motors = f'<motor name="motor" tendon="drive" gear="{4 * tau_max}" ctrlrange="-1 1"/>'
+        # "esc": back-EMF is computed with the brake in env.JumpCar._actuate instead of this tendon damper
+        emf = 0.0 if "esc" in real else 4 * tau_max / (top_speed / WHEEL_R)
+        diffs = ""
+        if "lsd" in real:
+            diffs = (f'<fixed name="dfront" damping="{LSD["front"]}"><joint joint="fl_spin" coef="1"/>'
+                     f'<joint joint="fr_spin" coef="-1"/></fixed>'
+                     f'<fixed name="drear" damping="{LSD["rear"]}"><joint joint="rl_spin" coef="1"/>'
+                     f'<joint joint="rr_spin" coef="-1"/></fixed>'
+                     f'<fixed name="dcentre" damping="{LSD["centre"]}"><joint joint="fl_spin" coef="0.5"/>'
+                     f'<joint joint="fr_spin" coef="0.5"/><joint joint="rl_spin" coef="-0.5"/>'
+                     f'<joint joint="rr_spin" coef="-0.5"/></fixed>')
+        tendon = ('\n  <tendon><fixed name="drive" damping="' + f"{emf:.6f}" + '">'
+                  + "".join(f'<joint joint="{w}_spin" coef="0.25"/>' for w in WHEELS) + '</fixed>' + diffs
+                  + '</tendon>')
     if "susp" in real:
         chassis_m, battery = 1.8 - BATTERY_M, (f'\n      <geom name="battery" type="box" group="1" contype="0" conaffinity="0" '
                                                f'pos="0 0 {BATTERY_Z}" size="0.07 0.035 0.015" mass="{BATTERY_M}" rgba=".2 .2 .2 1"/>')

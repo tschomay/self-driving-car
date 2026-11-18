@@ -33,13 +33,22 @@ import numpy as np
 
 G = 9.81
 PHYS_SWITCHES = ("tires", "susp", "drive", "servo", "battery", "delay")
+# Phase 4.6 physics review (docs/research/physics-review-phase46.md), opt-in, not part of "all":
+#   esc    the brake opposes wheel spin and fades out at standstill (no reverse); neutral is a light drag brake
+#   lsd    limited-slip differentials (damped tendons between front, rear, and the two axles)
+#   power  a stronger motor (0.6 N·m per wheel, 16 m/s) that can spin the wheels on dirt
+#   heavy  wheel and drivetrain spin inertia about 2x (armature on each wheel's spin joint)
+# "truggy" = "all" plus these four.
+TRUGGY_SWITCHES = ("esc", "lsd", "power", "heavy")
 
 
 def switches(real):
     if real in ("all", ("all",), ["all"]):
         return frozenset(PHYS_SWITCHES)
+    if real in ("truggy", ("truggy",), ["truggy"]):
+        return frozenset(PHYS_SWITCHES + TRUGGY_SWITCHES)
     real = frozenset([real] if isinstance(real, str) else (real or ()))
-    bad = real - set(PHYS_SWITCHES)
+    bad = real - set(PHYS_SWITCHES + TRUGGY_SWITCHES)
     assert not bad, f"unknown physics switches {bad}"
     return real
 

@@ -233,4 +233,16 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
 
 ## Gate check
 
+- **Run (2026-11-18):** `python -m sdc.phase46.gate`, then `python -m sdc.phase46.gate_report`. [Report](https://claude.ai/artifact/EooxqvSc7QgK56VHJy1M8g).
+- **Car:** E7's average of the three E5 students (owner's decision: the better of that and E5 seed 2 on validation, 50 vs 49).
+- **Leakage review:** test loops 46000–46019 and physics seed 46 appear only in the seed lists and in `tests/test_loop.py`, which builds loop 46001 to check the generator's geometry rules (no driving, no selection). Nothing was trained, tuned or chosen on them.
+- **Compute:** three GRU networks of about 83k parameters each (actor and critic; the car only needs the actor), roughly 0.5 million multiply-adds per step at 50 steps a second. Small for any Raspberry Pi–class board.
+- **Result:** **39 / 60 finished (needs 48). Gate failed.**
+  - Timed lap only: 40 / 60. One out-lap stuck (loop 46012, start +0.3) on a run the car then finished.
+  - Endings: 9 off the lane, 7 stuck, 4 rolled over. Every finished lap within the time limit (median 32.9 s).
+  - All 7 stuck runs stop just past the lip of a double, short of the landing. This car had none stuck on validation.
+  - The test loops were harder for the teacher too: 48 / 60 here against 56 on validation (same mix of jumps: 25 doubles, 20 drops, 15 tables vs 27 / 18 / 15). The car finished 36 of the teacher's 48 (75%; validation 89%) and 4 the teacher failed.
+  - The test set wasn't used to dig further, so it stays fresh for a retry.
+- **Verdict:** gate failed. Phase 4.6 stays in progress.
+
 ## Handoff to next phase

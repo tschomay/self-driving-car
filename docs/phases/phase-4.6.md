@@ -227,6 +227,9 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - Run by run (students that finished alone → average finished): all 3 → 29 of 33; 2 → 15 of 16; 1 → 4 of 8; none → 2 of 3.
   - It mostly follows the majority, and still breaks 4 runs every student handled.
   - Prediction vs. result: 49–50 predicted; 50 measured.
+- **Explanation (owner, after the run):** "They must balance each other."
+- **Takeaway:** students copying one deterministic teacher make mostly different, idiosyncratic mistakes (variance, not different driving styles), so the majority usually outvotes a mistake. The few runs averaging breaks may be places where the students' good lines differ.
+- **Owner's question:** is averaging common practice, is there a standard alternative, or does it point to a design issue such as multiple success modes? (Answered in chat: ensembling is standard; alternatives are distilling the ensemble into one network or averaging one network's weights over training; the evidence points to variance rather than multiple modes.)
 
 ## Gate check
 

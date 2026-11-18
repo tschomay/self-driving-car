@@ -223,6 +223,10 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
 
 - **Setup:** no training. One car driven by the mean throttle and steering of E5 seeds 0, 1 and 2, each with its own memory. Same 60 validation runs. `python -m sdc.phase46.ensemble --runs runs/p46-e5-s0 runs/p46-e5-s1 runs/p46-e5-s2 --out runs/p46-e7.json --procs 4`.
 - **Prediction (owner, before the run):** "I think we could do 49 or 50" (laps finished of 60).
+- **Result:** [report](https://claude.ai/artifact/3HFiNiA65FFQkL7Ra4vkRm). **50 / 60** laps finished (students alone: 43, 47, 49). Endings: 7 off the lane, 3 rolled over. Median lap 32.8 s.
+  - Run by run (students that finished alone → average finished): all 3 → 29 of 33; 2 → 15 of 16; 1 → 4 of 8; none → 2 of 3.
+  - It mostly follows the majority, and still breaks 4 runs every student handled.
+  - Prediction vs. result: 49–50 predicted; 50 measured.
 
 ## Gate check
 

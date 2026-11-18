@@ -49,6 +49,8 @@ from sdc.jumps import real as rl
 
 OBS_DIM = 20
 PARTS_DIM = 6 + 1 + 1 + 64 + 2 + 2   # sensors="parts": IMU, motor speed, TFmini, 8x8 ToF, side ToF x2, last action
+NOTE_KINDS, NOTE_JUMPS = ("table", "double", "drop"), 2
+NOTE_DIM = NOTE_JUMPS * (len(NOTE_KINDS) + 2)
 TURN_LOOK = (0.0, 1.0, 2.0, 3.0, 4.5, 6.0, 8.0, 10.0, 13.0)   # m ahead of the car's odometer (turn_map inputs)
 TURN_SCALE = 3.0                     # mapped curvature x 3: a 3 m radius reads 1.0
 TOF_NORM = 4.0                       # m: 8x8 zones are reported / 4 m (1.0 = no valid return)
@@ -81,8 +83,15 @@ class JumpCar:
 
     def __init__(self, seed_rng, courses="random", size=1.0, kinds=crs.KINDS, fan=False, servo=False,
                  real=(), sensors="ideal", dr=None, phys_seed=0, attitude=False, track_map=None, loop=False,
-                 angled=False, turn_map=None):
+                 angled=False, turn_map=None, jump_notes=None):
         self.real = rl.switches(real)
+        # Phase 4.6 plan step 2 (owner, 2026-11-18): course notes about the jumps ahead, like a driver's after a
+        # look at the track. "true" = perfect notes (the course's own jumps, distance from the true position): an
+        # upper bound on what notes are worth. NOTE_DIM inputs appended last: for each of the next NOTE_JUMPS jumps,
+        # its kind (one-hot table/double/drop), kicker height / 0.6 m, distance to its kicker / 20 m (capped at 1).
+        assert jump_notes in (None, "true"), jump_notes
+        assert jump_notes is None or loop, "jump notes are for loop courses"
+        self.jump_notes = jump_notes
         # Phase 4.6 E3: the out-lap's map of the turns, {"course|x0": {"ds": m, "kappa": [...]}} (or a JSON path):
         # the curvature the owner's dead reckoning drew along its own odometer. Adds len(TURN_LOOK) inputs, appended
         # last: the mapped curvature at those distances ahead of the car's own odometer (same estimator, running).
@@ -125,6 +134,7 @@ class JumpCar:
         if sensors == "parts":
             self.obs_dim = PARTS_DIM + (2 if attitude else 0) + (2 if self.track_map is not None else 0) + (2 if angled else 0)
             self.obs_dim += len(TURN_LOOK) if self.turn_map is not None else 0
+            self.obs_dim += NOTE_DIM if self.jump_notes else 0
         m = self.m   # nominal values, for per-episode randomization in place
         self._base = dict(body_mass=m.body_mass.copy(), body_inertia=m.body_inertia.copy(),
                           geom_friction=m.geom_friction.copy(), jnt_stiffness=m.jnt_stiffness.copy(),
@@ -373,8 +383,20 @@ class JumpCar:
             c45 = np.cos(np.pi / 4)
             ang = [rl.ranges(rng, self._cast((0.2, y, 0.02), np.array([[c45, sy * c45, 0.0]]), rl.SIDE_MAX),
                              rl.SIDE_MAX, k)[0] / rl.SIDE_MAX for y, sy in ((0.08, 1.0), (-0.08, -1.0))]
+        notes = self._notes() if self.jump_notes else []
         return np.concatenate([acc / 9.81, gyro / 5.0, [spd], tf / rl.TFMINI_MAX, self.tof / TOF_NORM,
-                               side / rl.SIDE_MAX, self.last_act, att, mp, ang, tm]).astype(np.float32)
+                               side / rl.SIDE_MAX, self.last_act, att, mp, ang, tm, notes]).astype(np.float32)
+
+    def _notes(self):
+        """Perfect jump notes: the next NOTE_JUMPS jumps (wrapping round the loop) whose end is still ahead."""
+        c = self.course
+        x = float(self.state()["x"]) % c.length
+        order = sorted(c.jumps, key=lambda j: (j.end < x, j.start))
+        out = []
+        for j in order[:NOTE_JUMPS]:
+            d = (j.start - x) % c.length if j.end < x or j.start >= x else 0.0
+            out += [float(j.kind == k) for k in NOTE_KINDS] + [j.height / 0.6, min(d, 20.0) / 20.0]
+        return out
 
     def _resync(self, pitch, acc):
         """Re-sync the odometer at a kicker: the same landmark the out-lap mapped (maps.kickers): the filter's pitch
@@ -567,10 +589,12 @@ class JumpCar:
 class JumpBatch:
     def __init__(self, n, seed=0, courses="random", max_steps=1500, jump_bonus=10.0, size=1.0, kinds=crs.KINDS,
                  fan=False, servo=False, steer_cost=0.0, finish_bonus=0.0, real=(), sensors="ideal", dr=None,
-                 phys_seed=0, attitude=False, track_map=None, loop=False, angled=False, turn_map=None):
+                 phys_seed=0, attitude=False, track_map=None, loop=False, angled=False, turn_map=None,
+                 jump_notes=None):
         rng = np.random.default_rng(seed)
         self.cars = [JumpCar(np.random.default_rng(rng.integers(2**63)), courses, size, kinds, fan, servo,
-                             real, sensors, dr, phys_seed, attitude, track_map, loop, angled, turn_map) for _ in range(n)]
+                             real, sensors, dr, phys_seed, attitude, track_map, loop, angled, turn_map, jump_notes)
+                     for _ in range(n)]
         self.steer_cost, self.finish_bonus = steer_cost, finish_bonus
         if courses != "random":   # spread a fixed course list across the cars
             for i, c in enumerate(self.cars):

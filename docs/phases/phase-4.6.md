@@ -230,6 +230,17 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
 - **Explanation (owner, after the run):** "They must balance each other."
 - **Takeaway:** students copying one deterministic teacher make mostly different, idiosyncratic mistakes (variance, not different driving styles), so the majority usually outvotes a mistake. The few runs averaging breaks may be places where the students' good lines differ.
 - **Owner's question:** is averaging common practice, is there a standard alternative, or does it point to a design issue such as multiple success modes? (Answered in chat: ensembling is standard; alternatives are distilling the ensemble into one network or averaging one network's weights over training; the evidence points to variance rather than multiple modes.)
+- **Owner's decision (2026-11-18, after the gate):** E8, the owner's idea: copy more where the students disagree, restarting there with extra noise.
+
+### E8 — Copy more where the students disagree
+
+- **Idea (owner):** where the students disagree, re-drive that short stretch several times with random noise and train on it, so the car learns more where it is unsure. Known versions: ensemble DAgger / hard-state replay, and noise injection (DART). E3–E5's copying already added a little noise (0.1) to every step.
+- **Setup:** start from E5's three students and keep copying the cautious teacher, with the three students' average driving (as the gate car does). At each step the disagreement is the larger spread (standard deviation) of the three students' steering or throttle.
+  - **Hard arm:** when the disagreement passes the top 5% of round 1's ordinary driving, copy the car as it was 1.2 s earlier (physics, sensors, filter, each student's memory) and re-drive the next 2.6 s four times with stronger noise (0.25). Up to half of each round's 60k steps come from these branches.
+  - **Control arm:** the same rounds and steps, ordinary laps only (so any gain from simply training more shows up here too).
+  - 6 rounds of 60k steps, each student refitted on all new data (4 epochs, lower learning rate 3e-4). Round 1 is ordinary driving in both arms (it sets the threshold). Practice loops, training-range physics.
+  - Scored on validation as E7: the average of the three (E7: 50 / 60), and each alone (E5: 43, 47, 49).
+  - `python -m sdc.phase46.hard --out runs/p46-e8-hard` and `--out runs/p46-e8-plain --plain`, side by side, about 1–1.5 h.
 
 ## Gate check
 

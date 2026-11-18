@@ -230,6 +230,34 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
 - **Explanation (owner, after the run):** "They must balance each other."
 - **Takeaway:** students copying one deterministic teacher make mostly different, idiosyncratic mistakes (variance, not different driving styles), so the majority usually outvotes a mistake. The few runs averaging breaks may be places where the students' good lines differ.
 - **Owner's question:** is averaging common practice, is there a standard alternative, or does it point to a design issue such as multiple success modes? (Answered in chat: ensembling is standard; alternatives are distilling the ensemble into one network or averaging one network's weights over training; the evidence points to variance rather than multiple modes.)
+- **Owner's decision (2026-11-18, after the gate):** E8, the owner's idea: copy more where the students disagree, restarting there with extra noise.
+
+### E8 — Copy more where the students disagree
+
+- **Idea (owner):** where the students disagree, re-drive that short stretch several times with random noise and train on it, so the car learns more where it is unsure. Known versions: ensemble DAgger / hard-state replay, and noise injection (DART). E3–E5's copying already added a little noise (0.1) to every step.
+- **Setup:** start from E5's three students and keep copying the cautious teacher, with the three students' average driving (as the gate car does). At each step the disagreement is the larger spread (standard deviation) of the three students' steering or throttle.
+  - **Hard arm:** when the disagreement passes the top 5% of round 1's ordinary driving, copy the car as it was 1.2 s earlier (physics, sensors, filter, each student's memory) and re-drive the next 2.6 s four times with stronger noise (0.25). Up to half of each round's 60k steps come from these branches.
+  - **Control arm:** the same rounds and steps, ordinary laps only (so any gain from simply training more shows up here too).
+  - 6 rounds of 60k steps, each student refitted on all new data (4 epochs, lower learning rate 3e-4). Round 1 is ordinary driving in both arms (it sets the threshold). Practice loops, training-range physics.
+  - Scored on validation as E7: the average of the three (E7: 50 / 60), and each alone (E5: 43, 47, 49).
+  - `python -m sdc.phase46.hard --out runs/p46-e8-hard` and `--out runs/p46-e8-plain --plain`, side by side, about 1–1.5 h.
+- **Restarted (2026-11-18):** the first launch ran out of memory in round 3 (copying MuJoCo's data object leaked about 2 GB per 16k steps). Snapshots now keep MuJoCo's state vector and restore it into reused buffers. A restored car drifts about 2 cm from the original over 4 s (some derived state isn't in the vector), which doesn't matter for branches that add noise anyway.
+- **Prediction (owner, before the run):** "Hard spots 52, control 50" (laps finished of 60 by the average of the three).
+- **Result:** [report](https://claude.ai/artifact/VSxb5G9fmUiKbMoaYaNex8). Validation loops × 3 starts, gate-range physics:
+
+  | Car | Average of 3 | Each alone | Other endings (average) |
+  |---|---|---|---|
+  | E7 (E5 students, no more training) | 50 | 43, 47, 49 | off the lane 7, rolled over 3 |
+  | E8 hard spots | **49** | 45, 39, 44 | off the lane 7, rolled over 3, stuck 1 |
+  | E8 control | **52** | 42, 42, 50 | off the lane 5, stuck 2, rolled over 1 |
+
+  - The hard arm replayed 224 spots (111k of its 360k steps).
+  - The students' disagreement fell at the same pace in both arms (mean 0.11 → 0.07), so the replays didn't make them agree faster.
+  - One run per arm; the students alone moved by up to 6 laps between arms, so the 3-lap gap is within noise.
+  - The control's 52 is the best validation score so far.
+  - Prediction vs. result: hard spots 52, control 50 predicted; hard spots 49, control 52 measured.
+- **Explanation (owner, after the run):** "It seems that the car is still learning to drive in general and not just specific scenarios."
+- **Takeaway:** at this stage more ordinary copying helps as much as targeted replays; the students' errors are spread over all driving, not concentrated where they disagree.
 
 ## Gate check
 

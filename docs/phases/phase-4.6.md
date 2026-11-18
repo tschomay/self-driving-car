@@ -258,6 +258,13 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - Prediction vs. result: hard spots 52, control 50 predicted; hard spots 49, control 52 measured.
 - **Explanation (owner, after the run):** "It seems that the car is still learning to drive in general and not just specific scenarios."
 - **Takeaway:** at this stage more ordinary copying helps as much as targeted replays; the students' errors are spread over all driving, not concentrated where they disagree.
+- **Owner's decision (2026-11-18):** improve the teacher next, by trying a few settings and stitching the best together (owner's idea). Reinforcement learning on top of copying is a follow-up the owner wants to try afterwards.
+
+### E9 — A better teacher
+
+- **Diagnosis (cautious teacher, 200 practice loops, gate range):** 183 / 200 finished. 15 of the 17 failures are at jumps: stuck in a double 6, rolled over off a drop 5, off the lane at a jump 3, rolled over on a double 1; 2 off the lane in turns. It drives into every jump at one target speed (7.4 m/s).
+- **Sweep (one jump speed for every jump, same 200 loops):** laps finished 158 / 183 / 169 / 159 at 6.0 / 7.4 / 8.5 / 9.5 m/s. Per kind, jumps passed cleanly: tables best at 7.4 (184 / 189), doubles best at 7.4 (167 / 187), drops best at 6.0 (191 / 224). Faster rolls over more; slower gets stuck in doubles.
+- **Stitching:** a speed per jump kind around those best values, tried on the same 200 practice loops; the best goes to validation against the cautious teacher (55 / 60). `python -m sdc.phase46.e9_sweep`, `python -m sdc.phase46.e9_stitch`.
 
 ## Gate check
 

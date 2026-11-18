@@ -265,6 +265,9 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
 - **Diagnosis (cautious teacher, 200 practice loops, gate range):** 183 / 200 finished. 15 of the 17 failures are at jumps: stuck in a double 6, rolled over off a drop 5, off the lane at a jump 3, rolled over on a double 1; 2 off the lane in turns. It drives into every jump at one target speed (7.4 m/s).
 - **Sweep (one jump speed for every jump, same 200 loops):** laps finished 158 / 183 / 169 / 159 at 6.0 / 7.4 / 8.5 / 9.5 m/s. Per kind, jumps passed cleanly: tables best at 7.4 (184 / 189), doubles best at 7.4 (167 / 187), drops best at 6.0 (191 / 224). Faster rolls over more; slower gets stuck in doubles.
 - **Stitching:** a speed per jump kind around those best values, tried on the same 200 practice loops; the best goes to validation against the cautious teacher (55 / 60). `python -m sdc.phase46.e9_sweep`, `python -m sdc.phase46.e9_stitch`.
+- **Stitched teachers (same 200 practice loops):** drops 6.0: 190; drops 6.7: 186; drops 6.0 + doubles 7.9: **191**; drops 6.0 + doubles 7.0: 184 (one speed, 7.4: 183). Chosen: drops 6.0, doubles 7.9, tables 7.4 (the top two differ by one lap).
+- **Stitched teacher on validation (60 runs, gate range):** **57 / 60** (cautious: 55; standard: 56). Endings: 2 off the lane, 1 rolled over. Median lap 32.7 s.
+- **Copying setup:** as E8's control (E5's three students, 6 more rounds of 60k ordinary steps, average driving), with the stitched teacher. Two runs (seeds 0, 1), and a second run of E8's control with the old teacher (seed 1) to measure run-to-run noise. `python -m sdc.phase46.hard --plain --jump-v '{"drop": 6.0, "double": 7.9}'`.
 
 ## Gate check
 

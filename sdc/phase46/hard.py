@@ -197,6 +197,7 @@ def main():
     ap.add_argument("--epochs", type=int, default=4)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--procs", type=int, default=2)
+    ap.add_argument("--jump-v", default="{}", help='E9: teacher approach speed per jump kind, JSON, e.g. {"drop": 6.0}')
     a = ap.parse_args()
     torch.set_num_threads(1)
     torch.manual_seed(a.seed)
@@ -218,7 +219,8 @@ def main():
         torch.save(net.state_dict(), dst / "model.pt")
         (dst / "metrics.json").write_text(json.dumps(dict(obs_dim=obs_dim, from_run=src, teacher=m["teacher"])))
         nets.append(net)
-    teacher = LoopExpert(a_lat=2.5, a_brake=2.5)
+    jump_v = json.loads(a.jump_v)
+    teacher = LoopExpert(a_lat=2.5, a_brake=2.5, jump_v=jump_v)
     rec = Recorder(3, my_gru.CONFIG["seq_len"])
     val_env = student_env(False, val=True)
     ref = pickle.load(open(REF, "rb"))
@@ -249,7 +251,7 @@ def main():
         e = cm.prun(functools.partial(cm.load_student, str(runs[k]), obs_dim), cm.VAL_SEEDS, procs=a.procs, **val_env)
         alone.append(cm.lap_score(e, teacher=ref)["in_time_n"])
     m = dict(label="E5 students, more copying" + (" (control)" if a.plain else " at hard spots"), plain=a.plain,
-             rounds=log, final=final, final_episodes=eps, alone=alone, env46=val_env,
+             seed=a.seed, jump_v=jump_v, rounds=log, final=final, final_episodes=eps, alone=alone, env46=val_env,
              wall_s=round(time.perf_counter() - t0, 1))
     (out / "metrics.json").write_text(json.dumps(m, indent=1, default=float))
     print(f"final: average finished {final['finished_n']}/60, in time {final['in_time_n']}/60, landed "

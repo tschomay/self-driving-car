@@ -185,6 +185,18 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
 - **Setup:** E4's sensors-only arm with a more cautious teacher: corner grip budget 2.5 m/s² instead of 3.5 (about 15% slower through turns) and braking 2.5 m/s² instead of 3.0. Everything else as E4 (16 rounds of 60k steps), seeds 0–2 (E4 had 0–1). Laps still timed against the standard true-state teacher. `bash sdc/phase46/e5_runs.sh`, about 2.2 h. (A container restart killed the first launch at round 3; restarted from scratch 2026-11-18.)
 - **The cautious teacher itself (gate range, validation):** 55 / 60 laps, median 32.5 s (standard teacher: 56 / 60, 30.1 s; limit 1.5× = about 45 s).
 - **Prediction (owner, before the run):** "47" (laps finished of 60).
+- **Result:** [report](https://claude.ai/artifact/2voQWyTwR2z6giBGy2NMEW). Laps finished of 60, validation loops, gate-range physics:
+
+  | Teacher | Seed 0 | Seed 1 | Seed 2 | Mean |
+  |---|---|---|---|---|
+  | Standard (E4, sensors only) | 46 | 39 | – | 42.5 |
+  | **With margin (E5)** | **43** | **47** | **49** | **46.3** |
+
+  - Endings (seed 0 / 1 / 2): off the lane 11 / 8 / 8, rolled over 3 / 3 / 0, stuck 2 / 2 / 3, time limit 1 / 0 / 0.
+  - Median lap about 33 s (E4: 30.4 s); every finished lap inside the limit (about 45 s).
+  - Seed 2 reaches 49 / 60 on validation, above the gate's 48; the gate is judged on the test loops.
+  - Seeds still spread 6 laps (43–49); the 20-lap check per round was still noisy at the end.
+  - Prediction vs. result: 47 predicted; 43–49 measured (mean 46.3).
 
 ### E6 — Average the students
 

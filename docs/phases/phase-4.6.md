@@ -182,7 +182,7 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
 
 ### E5 — Teacher with margin
 
-- **Setup:** E4's sensors-only arm with a more cautious teacher: corner grip budget 2.5 m/s² instead of 3.5 (about 15% slower through turns) and braking 2.5 m/s² instead of 3.0. Everything else as E4 (16 rounds of 60k steps), seeds 0–2 (E4 had 0–1). Laps still timed against the standard true-state teacher. `bash sdc/phase46/e5_runs.sh`, about 2.2 h.
+- **Setup:** E4's sensors-only arm with a more cautious teacher: corner grip budget 2.5 m/s² instead of 3.5 (about 15% slower through turns) and braking 2.5 m/s² instead of 3.0. Everything else as E4 (16 rounds of 60k steps), seeds 0–2 (E4 had 0–1). Laps still timed against the standard true-state teacher. `bash sdc/phase46/e5_runs.sh`, about 2.2 h. (A container restart killed the first launch at round 3; restarted from scratch 2026-11-18.)
 - **The cautious teacher itself (gate range, validation):** 55 / 60 laps, median 32.5 s (standard teacher: 56 / 60, 30.1 s; limit 1.5× = about 45 s).
 - **Prediction (owner, before the run):** "47" (laps finished of 60).
 
@@ -201,6 +201,8 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - So averaging rescues most runs where the students disagree, but sometimes breaks a run both students handled: two good lines averaged can be a bad one.
   - Median lap 30.2–30.5 s, the same as the students alone.
   - Prediction vs. result: "won't beat the better student" predicted; it tied the better student in A (46 vs 46) and beat it in B (45 vs 41).
+- **Explanation (owner, after the run):** "It seems to reduce the impact of bad decisions, especially when one of the two made a better decision."
+- **Takeaway:** the two students' mistakes are mostly in different places, so averaging their throttle and steering cancels many of them; it costs a few runs where both were right in different ways. A cheap way to reduce the seed-to-seed variation.
 
 ## Gate check
 

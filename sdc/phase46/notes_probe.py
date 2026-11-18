@@ -55,7 +55,7 @@ def jump_features(log):
     out = []
     for m in marks:
         i = int(np.searchsorted(odo, m))
-        grid = np.arange(m - BACK, m + SPAN, DS)
+        grid = m - BACK + DS * np.arange(int(round((SPAN + BACK) / DS)))
         if grid[-1] > odo[-1]:
             continue
         trace = np.interp(grid, odo, pitch)
@@ -82,6 +82,7 @@ def main():
     jobs = [(c, 0.0, "practice") for c in cm.PRACTICE[:120]] + [(c, x0, "val") for c in cm.VAL_SEEDS for x0 in dr.STARTS]
     with Pool(4) as p:
         laps_ = p.map(_job, jobs, chunksize=1)
+    json.dump(laps_, open("runs/p46-notes-probe-laps.json", "w"))
     train = [j for l in laps_ if l["split"] == "practice" for j in l["jumps"] if j["kind"]]
     val = [j for l in laps_ if l["split"] == "val" for j in l["jumps"]]
     kinds = sorted({j["kind"] for j in train})

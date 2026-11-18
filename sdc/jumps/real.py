@@ -38,8 +38,14 @@ PHYS_SWITCHES = ("tires", "susp", "drive", "servo", "battery", "delay")
 #   lsd    limited-slip differentials (damped tendons between front, rear, and the two axles)
 #   power  a stronger motor (0.6 N·m per wheel, 16 m/s) that can spin the wheels on dirt
 #   heavy  wheel and drivetrain spin inertia about 2x (armature on each wheel's spin joint)
-# "truggy" = "all" plus these four.
-TRUGGY_SWITCHES = ("esc", "lsd", "power", "heavy")
+# Phase 4.6 traction review (docs/research/traction-review-phase46.md):
+#   elliptic  MuJoCo's elliptic friction cone: grip the same in every direction (the default pyramidal cone gave a
+#             tire sliding at 45° to the world axes only 0.71 of its friction)
+#   slide     tires lose up to 25% of their friction as their contact patch slides from 0.3 to 1.5 m/s (a dirt
+#             tire's grip drops once it breaks loose; the 25% and the band are estimates)
+# (esc also caps the brake at 0.65 of the motor's torque: a full brake no longer flips the car on high grip.)
+# "truggy" = "all" plus these six.
+TRUGGY_SWITCHES = ("esc", "lsd", "power", "heavy", "elliptic", "slide")
 
 
 def switches(real):

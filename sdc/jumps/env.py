@@ -49,6 +49,8 @@ from sdc.jumps import real as rl
 
 OBS_DIM = 20
 PARTS_DIM = 6 + 1 + 1 + 64 + 2 + 2   # sensors="parts": IMU, motor speed, TFmini, 8x8 ToF, side ToF x2, last action
+BRAKE_CAP = 0.65                          # esc: full brake = 0.65 of the motor's torque (traction review)
+SLIDE_S0, SLIDE_S1, SLIDE_DROP = 0.3, 1.5, 0.25   # slide: grip falls by up to 25% from 0.3 to 1.5 m/s of slip
 NOTE_KINDS, NOTE_JUMPS = ("table", "double", "drop"), 2
 NOTE_DIM = NOTE_JUMPS * (len(NOTE_KINDS) + 2)
 TURN_LOOK = (0.0, 1.0, 2.0, 3.0, 4.5, 6.0, 8.0, 10.0, 13.0)   # m ahead of the car's odometer (turn_map inputs)
@@ -122,6 +124,9 @@ class JumpCar:
         g = self.m.geom
         self.ground = g("ground").id
         self.tires = np.array([g(f"{w}_tire").id for w in cr.WHEELS])
+        self._wheel_bodies = np.array([self.m.body(f"{w}_wheel").id for w in cr.WHEELS])
+        if "slide" in self.real:   # the tire's own (changing) friction decides the contact, not the max with ground
+            self.m.geom_priority[self.tires] = 1
         self.chassis = g("chassis").id
         self.spin_dof = np.array([self.m.jnt_dofadr[self.m.joint(f"{w}_spin").id] for w in cr.WHEELS])
         s = {self.m.sensor(i).name: (self.m.sensor_adr[i], self.m.sensor_dim[i]) for i in range(self.m.nsensor)}
@@ -163,6 +168,7 @@ class JumpCar:
         m.actuator_gear[:] = b["actuator_gear"]
         m.actuator_gear[:self.n_motor, 0] = b["actuator_gear"][:self.n_motor, 0] * p.motor
         mujoco.mj_setConst(m, self._scratch)   # constants derived from the masses (it overwrites the data it's given)
+        self._mu0 = m.geom_friction[self.tires, 0].copy()   # "slide": each tire's full grip this episode
 
     # ---- episode ---------------------------------------------------------------------
     def reset(self, course_seed=None, x0=0.0):
@@ -460,12 +466,24 @@ class JumpCar:
             if raw > 0.05:
                 u = u - w                                    # drive: torque falls with back-EMF, as the damper did
             elif raw < -0.05:
-                u = -abs(u) * float(np.tanh(w * cr.motor(self.real)[1] / 0.3))   # opposes rotation, 0 at standstill
+                u = -BRAKE_CAP * abs(u) * float(np.tanh(w * cr.motor(self.real)[1] / 0.3))   # opposes rotation
             else:
                 u = -0.1 * w                                 # neutral: coast with a light drag brake
             u = float(np.clip(u, -1.0, 1.0))
+        if "slide" in self.real:   # traction review: grip drops once a tire's contact patch slides
+            f = np.clip((self._slip_speeds() - SLIDE_S0) / (SLIDE_S1 - SLIDE_S0), 0.0, 1.0)
+            self.m.geom_friction[self.tires, 0] = self._mu0 * (1.0 - SLIDE_DROP * f)
         self.d.ctrl[:self.n_motor] = u
         self.d.ctrl[self.n_motor:self.n_motor + 2] = self.servo_set
+
+    def _slip_speeds(self):
+        """Per tire: how fast its contact patch (the wheel's bottom point) slides over the ground, m/s."""
+        out, res = np.zeros(len(self._wheel_bodies)), np.zeros(6)
+        for k, bid in enumerate(self._wheel_bodies):
+            mujoco.mj_objectVelocity(self.m, self.d, mujoco.mjtObj.mjOBJ_BODY, int(bid), res, 0)
+            vp = res[3:6] + np.cross(res[0:3], np.array([0.0, 0.0, -cr.WHEEL_R]))
+            out[k] = np.hypot(vp[0], vp[1])
+        return out
 
     def _physics(self, a):
         """One control step of physics with the realistic actuators and the IMU sampled every 2 ms."""

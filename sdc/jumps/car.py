@@ -72,7 +72,7 @@ def _site_zaxis(direction):
 #   tires: wide tires (a 3 cm tread with rounded shoulders: a capsule along the axle) instead of spheres
 #   susp:  soft suspension (about 30% sag, about critically damped) and a higher centre of mass (battery on top)
 #   drive: one motor through open differentials (equal torque to the wheels; back-EMF on the mean wheel speed)
-MODEL_SWITCHES = ("tires", "susp", "drive", "esc", "lsd", "power", "heavy")
+MODEL_SWITCHES = ("tires", "susp", "drive", "esc", "lsd", "power", "heavy", "elliptic")
 TIRE_W = 0.03         # m, flat part of the tread (capsule segment)
 SOFT_K = 185.0          # N/m per corner: 4.4 N static load per corner / 2.4 cm sag (30% of 8 cm travel)
 SOFT_C = 18.0           # N·s/m per corner: about critically damped with the 0.45 kg corner load. At 0.4 the springs
@@ -166,7 +166,7 @@ def model_xml(real=(), terrain=None) -> str:
         chassis_m, battery = 1.8, ""
     return f'''<mujoco model="rc-buggy">
   <compiler angle="radian"/>
-  <option timestep="{TIMESTEP}" integrator="implicitfast"/>
+  <option timestep="{TIMESTEP}" integrator="implicitfast"{' cone="elliptic"' if "elliptic" in real else ""}/>
   <visual><global offwidth="640" offheight="360"/><quality shadowsize="2048"/>
     <headlight ambient="0.35 0.35 0.35" diffuse="0.5 0.5 0.5" specular="0 0 0"/></visual>
   <asset>

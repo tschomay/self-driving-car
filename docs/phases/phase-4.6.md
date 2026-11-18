@@ -269,6 +269,18 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
 - **Stitched teacher on validation (60 runs, gate range):** **57 / 60** (cautious: 55; standard: 56). Endings: 2 off the lane, 1 rolled over. Median lap 32.7 s.
 - **Copying setup:** as E8's control (E5's three students, 6 more rounds of 60k ordinary steps, average driving), with the stitched teacher. Two runs (seeds 0, 1), and a second run of E8's control with the old teacher (seed 1) to measure run-to-run noise. `python -m sdc.phase46.hard --plain --jump-v '{"drop": 6.0, "double": 7.9}'`.
 - **Prediction (owner, before the run):** "52" (laps finished of 60 by the averaged car copying the stitched teacher).
+- **Result:** [report](https://claude.ai/artifact/4TkaHHEN1mnoy6Uo3jCYw7). Validation loops × 3 starts, gate-range physics, averaged car:
+
+  | Students copying | Seed 0 | Seed 1 | Each alone (seed 0 / seed 1) | Stuck in a double (seed 0 / 1) |
+  |---|---|---|---|---|
+  | Cautious teacher (E8 control and its repeat) | 52 | 50 | 42, 42, 50 / 51, 45, 48 | 2 / 1 |
+  | **Stitched teacher** | **49** | **46** | 39, 38, 41 / 39, 46, 42 | 4 / 6 |
+
+  - Takeoff speed (m/s, table / double / drop): stitched teacher 5.4 / 6.1 / 4.3; cautious teacher 5.4 / 5.8 / 5.2; stitched-teacher students about 5.1 / 5.0 / 5.0; cautious-teacher students about 5.5 / 5.5 / 5.3.
+  - The students don't follow the teacher's per-kind speeds: they take every jump at about the same speed, slower than before, too slow for doubles.
+  - Agent's reading: the teacher picks its speed from the jump kind, known from the track well before the jump; the students' sensors see a jump only about 2.7 m ahead, too late to tell a double from a drop and change speed. Copying a choice made from knowledge the student doesn't have averages the two answers (mode averaging).
+  - Run-to-run noise (E8 control repeated): 52 vs 50.
+  - Prediction vs. result: 52 predicted; 49 and 46 measured.
 
 ## Gate check
 

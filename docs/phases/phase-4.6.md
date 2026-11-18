@@ -256,6 +256,8 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - One run per arm; the students alone moved by up to 6 laps between arms, so the 3-lap gap is within noise.
   - The control's 52 is the best validation score so far.
   - Prediction vs. result: hard spots 52, control 50 predicted; hard spots 49, control 52 measured.
+- **Explanation (owner, after the run):** "It seems that the car is still learning to drive in general and not just specific scenarios."
+- **Takeaway:** at this stage more ordinary copying helps as much as targeted replays; the students' errors are spread over all driving, not concentrated where they disagree.
 
 ## Gate check
 

@@ -49,6 +49,17 @@ from sdc.jumps import real as rl
 
 OBS_DIM = 20
 PARTS_DIM = 6 + 1 + 1 + 64 + 2 + 2   # sensors="parts": IMU, motor speed, TFmini, 8x8 ToF, side ToF x2, last action
+def expo_inverse(s, expo):
+    """The command a whose expo-curved steering (1 - e) a + e a^3 equals s (monotonic for e <= 0.5)."""
+    if not expo:
+        return s
+    a = float(s)
+    for _ in range(20):   # Newton
+        f = (1 - expo) * a + expo * a ** 3 - s
+        a -= f / ((1 - expo) + 3 * expo * a * a)
+    return float(np.clip(a, -1.0, 1.0))
+
+
 BRAKE_CAP = 0.65                          # esc: full brake = 0.65 of the motor's torque (traction review)
 SLIDE_S0, SLIDE_S1, SLIDE_DROP = 0.3, 1.5, 0.25   # slide: grip falls by up to 25% from 0.3 to 1.5 m/s of slip
 NOTE_KINDS, NOTE_JUMPS = ("table", "double", "drop"), 2
@@ -85,8 +96,12 @@ class JumpCar:
 
     def __init__(self, seed_rng, courses="random", size=1.0, kinds=crs.KINDS, fan=False, servo=False,
                  real=(), sensors="ideal", dr=None, phys_seed=0, attitude=False, track_map=None, loop=False,
-                 angled=False, turn_map=None, jump_notes=None):
+                 angled=False, turn_map=None, jump_notes=None, expo=0.0):
         self.real = rl.switches(real)
+        # Phase 4.6 (owner, 2026-11-18): transmitter-style steering expo. The command a in [-1, 1] maps to the servo
+        # as (1 - expo) * a + expo * a**3: the same full lock, but finer near centre (0.3 expo halves the steering a
+        # small command gives at 0). The teacher inverts it (expo_inverse) so its steering angles are unchanged.
+        self.expo = float(expo)
         # Phase 4.6 plan step 2 (owner, 2026-11-18): course notes about the jumps ahead, like a driver's after a
         # look at the track. "true" = perfect notes (the course's own jumps, distance from the true position): an
         # upper bound on what notes are worth. NOTE_DIM inputs appended last: for each of the next NOTE_JUMPS jumps,
@@ -449,7 +464,10 @@ class JumpCar:
         """Set the controls for one physics step from the latest command that has arrived."""
         while self.queue and self.queue[0][0] <= self.sub:
             self.applied = self.queue.pop(0)[1]
-        target = self.applied[0] * cr.STEER_MAX   # float32, exactly as Phase 4 computes it (chaos amplifies 1e-9)
+        a0 = self.applied[0]
+        if self.expo:
+            a0 = (1.0 - self.expo) * a0 + self.expo * a0 ** 3
+        target = a0 * cr.STEER_MAX   # float32, exactly as Phase 4 computes it (chaos amplifies 1e-9)
         if "servo" in self.real:   # speed-limited, with a deadband
             err = target - self.servo_set
             if abs(err) > self.phys.deadband:
@@ -608,11 +626,11 @@ class JumpBatch:
     def __init__(self, n, seed=0, courses="random", max_steps=1500, jump_bonus=10.0, size=1.0, kinds=crs.KINDS,
                  fan=False, servo=False, steer_cost=0.0, finish_bonus=0.0, real=(), sensors="ideal", dr=None,
                  phys_seed=0, attitude=False, track_map=None, loop=False, angled=False, turn_map=None,
-                 jump_notes=None):
+                 jump_notes=None, expo=0.0):
         rng = np.random.default_rng(seed)
         self.cars = [JumpCar(np.random.default_rng(rng.integers(2**63)), courses, size, kinds, fan, servo,
-                             real, sensors, dr, phys_seed, attitude, track_map, loop, angled, turn_map, jump_notes)
-                     for _ in range(n)]
+                             real, sensors, dr, phys_seed, attitude, track_map, loop, angled, turn_map, jump_notes,
+                             expo) for _ in range(n)]
         self.steer_cost, self.finish_bonus = steer_cost, finish_bonus
         if courses != "random":   # spread a fixed course list across the cars
             for i, c in enumerate(self.cars):

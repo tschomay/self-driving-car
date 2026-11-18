@@ -31,16 +31,25 @@ from sdc.phase4 import my_gru
 from sdc.phase4 import train_rnn as trr
 from sdc.phase45 import bc_rnn
 from sdc.phase46 import common as cm
-from sdc.phase46.teacher import LoopExpert
+from sdc.phase46.teacher import TRUGGY, LoopExpert
 
 TRAIN_MAP, VAL_MAP = "runs/p46-maps-train.json", "runs/p46-maps-val.json"
 REF = Path("runs/p46-teacher-val-gate.pkl")     # the true-state teacher's validation laps (for the time limit)
 
 
-def student_env(use_map, val=False):
+REF_TRUGGY = Path("runs/p46-teacher-val-gate-truggy.pkl")   # the re-tuned teacher's laps on the truggy physics
+
+
+def student_env(use_map, val=False, real="all", expo=0.0, notes=None):
     env = dict(cm.CAR, angled=True, dr="gate" if val else "train")
     if use_map:
         env["turn_map"] = VAL_MAP if val else TRAIN_MAP
+    if real != "all":
+        env["real"] = real
+    if expo:
+        env["expo"] = expo
+    if notes:
+        env["jump_notes"] = notes
     return env
 
 
@@ -55,6 +64,9 @@ def main():
     ap.add_argument("--procs", type=int, default=1)
     ap.add_argument("--a-lat", type=float, default=3.5, help="teacher's corner grip budget, m/s² (E5 margin: 2.5)")
     ap.add_argument("--a-brake", type=float, default=None, help="teacher's braking, m/s² (default 3.0; 2.0 with --map)")
+    ap.add_argument("--truggy", action="store_true", help="truggy physics and its re-tuned teacher (teacher.TRUGGY)")
+    ap.add_argument("--expo", type=float, default=0.0, help="steering expo (env.JumpCar)")
+    ap.add_argument("--notes", default=None, help='jump notes inputs: "true" (perfect)')
     a = ap.parse_args()
     torch.set_num_threads(1)
     torch.manual_seed(a.seed)
@@ -63,17 +75,19 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     maps = json.loads(Path(TRAIN_MAP).read_text())
     courses = [c for c in cm.PRACTICE if maps[f"{c}|0.00"]["kappa"]]
-    env = student_env(a.map)
+    real = "truggy" if a.truggy else "all"
+    env = student_env(a.map, real=real, expo=a.expo, notes=a.notes)
     bc_rnn.ENV.clear()
     bc_rnn.ENV.update(env, steer_cost=0.03, jump_bonus=10.0, courses=courses)
     from sdc.jumps import env as je
     obs_dim = je.JumpBatch(1, **env).obs_dim
     net = trr.RecurrentActorCritic(obs_dim=obs_dim)
     a_brake = a.a_brake if a.a_brake is not None else (2.0 if a.map else 3.0)   # 2.0 with map: brakes earlier
-    teacher = LoopExpert(use_turn_map=a.map, a_lat=a.a_lat, a_brake=a_brake)
-    ref = pickle.load(open(REF, "rb"))
+    tkw = dict(TRUGGY) if a.truggy else dict(a_lat=a.a_lat, a_brake=a_brake)
+    teacher = LoopExpert(use_turn_map=a.map, **tkw)
+    ref = pickle.load(open(REF_TRUGGY if a.truggy else REF, "rb"))
     ref1 = ref[::len(dr_starts)]                        # start 0 only (prun orders by course, then start)
-    val_env = student_env(a.map, val=True)
+    val_env = student_env(a.map, val=True, real=real, expo=a.expo, notes=a.notes)
     L = my_gru.CONFIG["seq_len"]
     data, log = [], []
     for r in range(a.rounds):
@@ -90,7 +104,7 @@ def main():
     eps = cm.prun(functools.partial(cm.load_student, str(out), obs_dim), cm.VAL_SEEDS, procs=a.procs, **val_env)
     final = cm.lap_score(eps, teacher=ref)
     m = dict(label="GRU copy of the loop teacher" + (" + turn map" if a.map else ""), seed=a.seed, rounds=log,
-             map=a.map, teacher=dict(a_lat=a.a_lat, a_brake=a_brake), obs_dim=obs_dim, gru=my_gru.CONFIG, env46=val_env, train_env=env, final=final,
+             map=a.map, teacher=tkw, obs_dim=obs_dim, gru=my_gru.CONFIG, env46=val_env, train_env=env, final=final,
              final_episodes=eps, wall_s=round(time.perf_counter() - t0, 1))
     (out / "metrics.json").write_text(json.dumps(m, indent=1, default=float))
     print(f"final: finished {final['finished_n']}/60, in time {final['in_time_n']}/60, landed {final['rate']:.0%}, "

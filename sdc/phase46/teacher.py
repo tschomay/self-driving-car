@@ -14,13 +14,14 @@ import numpy as np
 
 from sdc.jumps import car as cr
 from sdc.jumps import driver as dr
+from sdc.jumps import env as je
 
 WHEELBASE = 0.30
 
 
 class LoopExpert(dr.ExpertDriver):
     def __init__(self, a_lat=3.5, a_brake=3.0, v_cruise=None, look=0.15, k_ff=1.0, use_turn_map=False, jump_v=None,
-                 **kw):
+                 kv=0.8, kv_ff=0.06, tc=None, k_rate=0.15, **kw):
         kw.setdefault("plan", False)
         kw.setdefault("v_target", 7.4)
         kw.setdefault("kd", 1.0)
@@ -34,6 +35,10 @@ class LoopExpert(dr.ExpertDriver):
         self._plans = {}
         # E9 (owner's idea: try settings, stitch the best): approach speed per jump kind, e.g. {"double": 8.0}
         self.jump_v = dict(jump_v or {})
+        # truggy physics (stronger motor): speed-loop gain and feed-forward, and optional traction control: throttle
+        # cut back when the driven wheels spin faster than the car moves by more than tc m/s (a driver's feel)
+        self.kv, self.kv_ff, self.tc = kv, kv_ff, tc
+        self.k_rate = k_rate            # yaw-rate damping in the steering (more stops landing fish-tails on low grip)
 
     def corner_speed(self, course):
         """Per centreline point: the speed limit from the corners at and ahead of it."""
@@ -89,15 +94,25 @@ class LoopExpert(dr.ExpertDriver):
         v = max(s["v_fwd"], 0.5)
         kap = car.map_kappa(self.look * v) if self.use_turn_map else float(c.curvature(s["x"] + self.look * v))
         ff = self.k_ff * np.arctan(WHEELBASE * kap) / cr.STEER_MAX
-        steer = np.clip(ff - 1.0 * s["y"] - 1.5 * s["yaw"] - 0.15 * s["yaw_rate"], -1, 1)
+        steer = np.clip(ff - 1.0 * s["y"] - 1.5 * s["yaw"] - self.k_rate * s["yaw_rate"], -1, 1)
         i = int((s["x"] % c.length) / c.ds) % len(c.center)
         x = s["x"] % c.length
         near_jump = any(j.start - 6.0 <= x <= j.end for j in c.jumps)
         target = self.jump_speed(car, s) if near_jump else self.v_cruise
         target = min(target, self.map_speed(car) if self.use_turn_map else float(self.corner_speed(c)[i]))
         e = target - s["v_fwd"]
-        throttle = 0.8 * e + 0.06 * target
+        throttle = self.kv * e + self.kv_ff * target
+        if self.tc is not None and throttle > 0:
+            spin = float(car.d.qvel[car.spin_dof].mean()) * cr.WHEEL_R - s["v_fwd"]
+            throttle *= float(np.clip(1.0 - (spin - self.tc) / self.tc, 0.0, 1.0)) if spin > self.tc else 1.0
+        if getattr(car, "expo", 0.0):   # the same steering angle through the car's expo curve
+            steer = je.expo_inverse(float(steer), car.expo)
         return np.array([steer, np.clip(throttle, -1, 1)], np.float32)
+
+
+# The teacher re-tuned for the truggy physics (2026-11-18, 100 practice loops at gate range, 75 -> 94 laps):
+# cautious corners, traction control, more yaw-rate damping (landing fish-tails on sliding grip), firmer air control.
+TRUGGY = dict(a_lat=2.5, a_brake=2.5, tc=0.5, v_target=6.8, v_cruise=7.4, k_rate=0.3, kp=6.0)
 
 
 class OutLapDriver(LoopExpert):

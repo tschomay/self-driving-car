@@ -287,6 +287,11 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
 - **Owner's question (2026-11-18):** reinforcement learning hasn't paid off yet (only copying has); once the car has the foundations it should be able to learn to get better. How could it be made to work?
 - **Owner's decision (2026-11-18):** research mode. The agent runs quick probes (labelled probes, not experiments, so no prediction needed) on jump notes from the out-lap (owner agrees with this one), a drill with residual reinforcement learning, and the physics review's findings; then comes back with a short ranked plan. Every real experiment from it still gets the owner's prediction first. Modal setup checklist for the owner: [Modal setup](https://claude.ai/artifact/H2dCAtoE5HEzeC4uJ2hDhh).
 - **Physics review:** launched as a background agent (Revo / 8IGHT-T truggy as reference); report to `docs/research/physics-review-phase46.md`.
+- **Physics review findings (2026-11-18):** [report](../research/physics-review-phase46.md). The sim car is a 1/10 truggy (wheelbase 0.30 m, 2.5 kg), about 0.8× a Revo / 8IGHT-T. Cornering grip is realistic (0.75–0.8 g, understeer at the limit) and in-air pitch control works. Not realistic:
+  - **Braking is a reverse torque:** full brake spins the wheels backwards and the car swaps ends on a straight stop (agent's check: 147° of yaw within 1.2 s braking from 6 m/s); lifting off (throttle 0) also brakes fully.
+  - **Too little power** (about 63 W against about 900 W scaled): no wheelspin, so no power oversteer; brake-steer-throttle entries bog down.
+  - Open differentials front, centre and rear; light wheels (half the real spin inertia); 1.5 m flat landings pogo; "rolled over" also fires mid-air past 78° pitch.
+  - Top fixes (tested in scratch, not applied): a brake that opposes wheel spin and stops at standstill, with a light drag brake at neutral; limited-slip diffs; motor torque 0.25 → 0.6 N·m. Together: a brake-steer-throttle entry holds 24° of slip and exits at 8.3 m/s instead of 4.1. Every teacher and student so far was built on the old physics, so these need a re-baseline.
 
 ## Gate check
 

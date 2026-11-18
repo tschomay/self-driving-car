@@ -268,6 +268,7 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
 - **Stitched teachers (same 200 practice loops):** drops 6.0: 190; drops 6.7: 186; drops 6.0 + doubles 7.9: **191**; drops 6.0 + doubles 7.0: 184 (one speed, 7.4: 183). Chosen: drops 6.0, doubles 7.9, tables 7.4 (the top two differ by one lap).
 - **Stitched teacher on validation (60 runs, gate range):** **57 / 60** (cautious: 55; standard: 56). Endings: 2 off the lane, 1 rolled over. Median lap 32.7 s.
 - **Copying setup:** as E8's control (E5's three students, 6 more rounds of 60k ordinary steps, average driving), with the stitched teacher. Two runs (seeds 0, 1), and a second run of E8's control with the old teacher (seed 1) to measure run-to-run noise. `python -m sdc.phase46.hard --plain --jump-v '{"drop": 6.0, "double": 7.9}'`.
+- **Prediction (owner, before the run):** "52" (laps finished of 60 by the averaged car copying the stitched teacher).
 
 ## Gate check
 

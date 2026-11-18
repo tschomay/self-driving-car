@@ -284,6 +284,8 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
 - **Explanation (owner, after the run):** "I think you just explained it."
 - **Takeaway:** a better teacher only helps if the student can see what the teacher's choices depend on. Here the teacher chose jump speeds from the track's layout, which the student can't sense in time.
 - **Owner's reflection (2026-11-18), summarised:** the student averages its way round instead of working the car the way a driver does (brake-steer-throttle to rotate into a slide, throttle and brake to level the car in the air), and it doesn't know what jump is coming. Asked for a physics review against a 1/8 truggy (Traxxas Revo or Losi 8IGHT-T) to make sure the car can do those things; suggested practice drills on fundamentals; asked how the car could know the track (aerial or driver's-stand photo, a CAD layout, better out-laps, labels after an out-lap); and offered the agent a research pause to come back with better ideas.
+- **Owner's question (2026-11-18):** reinforcement learning hasn't paid off yet (only copying has); once the car has the foundations it should be able to learn to get better. How could it be made to work?
+- **Physics review:** launched as a background agent (Revo / 8IGHT-T truggy as reference); report to `docs/research/physics-review-phase46.md`.
 
 ## Gate check
 

@@ -292,6 +292,15 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - **Too little power** (about 63 W against about 900 W scaled): no wheelspin, so no power oversteer; brake-steer-throttle entries bog down.
   - Open differentials front, centre and rear; light wheels (half the real spin inertia); 1.5 m flat landings pogo; "rolled over" also fires mid-air past 78° pitch.
   - Top fixes (tested in scratch, not applied): a brake that opposes wheel spin and stops at standstill, with a light drag brake at neutral; limited-slip diffs; motor torque 0.25 → 0.6 N·m. Together: a brake-steer-throttle entry holds 24° of slip and exits at 8.3 m/s instead of 4.1. Every teacher and student so far was built on the old physics, so these need a re-baseline.
+### Research probes (2026-11-18, research mode)
+
+- **Jump notes from the out-lap** (`python -m sdc.phase46.notes_probe`): the out-lap stand-in crawled 120 practice loops and the 60 validation runs (gate range); 116 and 54 out-laps finished. From the sensor log alone (dead-reckoned odometer, kicker detector, the pitch trace over the next 9 m):
+  - every one of the 162 jumps on the finished validation out-laps was marked; 15 extra marks where there was no jump (13 called drops);
+  - jump kind right 86% of the time with a simple nearest-average classifier fit on practice (doubles 57 / 71, drops 43 / 48, tables 40 / 43);
+  - kicker height within 6 cm (median; heights are 0.4–0.6 m);
+  - the odometer overcounts by about 10% over a lap, so notes should be indexed by kicker count, re-synced at each kicker, not by metres.
+- **Truggy physics** (`real="truggy"`: "all" plus the review's ESC brake, limited-slip diffs, stronger motor and heavier wheels; opt-in, old runs unchanged, tests pass): full brake now stops without reversing (old physics: 157° spin and rolling backwards); 0–6 m/s in 0.9 s instead of 1.5. The cautious teacher, untuned, finishes 16 / 20 validation laps at gate range (old physics 18 / 20) and laps 1.7 s faster.
+- **Drills with residual reinforcement learning:** not probed. They should be built on the corrected physics, after the teacher is re-tuned there.
 
 ## Gate check
 

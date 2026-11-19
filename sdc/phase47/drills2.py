@@ -95,6 +95,7 @@ def harvest(base_runs, courses, env_kw, seed=0, n=8, max_steps=2500, noise=HARVE
 def draw(pool, kind, amp, rng):
     """One Start of `kind` at strength `amp` (amp is ignored for crash drills)."""
     src = pool["ground"] if kind in ("edge", "slide") else pool[kind]
+    assert src, f"no harvested starts for {kind} drills"
     d = src[rng.integers(len(src))]
     u = rng.uniform(0.5, 1.0)
     sgn = float(rng.choice([-1.0, 1.0]))

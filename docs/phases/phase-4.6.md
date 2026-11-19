@@ -326,6 +326,8 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - Every finished lap inside the time limit; median laps 30.7 s (A) and 31.4 s (B).
   - The run took 2.5 h, not 1.5 h: the truggy physics (sliding grip, elliptic cone) is slower to simulate.
   - Prediction vs. result: 52 without and 53 with predicted; 51 and 52 measured.
+- **Explanation (owner, after the run):** "The physics are predicable now and the car is much more capable. I think it helped."
+- **Takeaway:** on the corrected physics the copies come within 3 laps of their teacher, and expo makes small steering easier to copy. Expo stays on from here. The teacher is the ceiling again, so the next lever is a teacher that varies its jump speed by kind, with notes so the student can follow.
 
 ## Gate check
 

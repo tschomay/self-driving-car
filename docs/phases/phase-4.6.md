@@ -328,6 +328,13 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - Prediction vs. result: 52 without and 53 with predicted; 51 and 52 measured.
 - **Explanation (owner, after the run):** "The physics are predicable now and the car is much more capable. I think it helped."
 - **Takeaway:** on the corrected physics the copies come within 3 laps of their teacher, and expo makes small steering easier to copy. Expo stays on from here. The teacher is the ceiling again, so the next lever is a teacher that varies its jump speed by kind, with notes so the student can follow.
+### Plan step 2 prep — a jump speed per kind on the truggy physics (2026-11-19)
+
+- **Sweep** (`python -m sdc.phase46.e11_sweep`; re-tuned teacher, expo 0.4, 100 practice loops, gate range), one jump speed for every jump: 6.0 / 6.8 / 7.6 / 8.4 m/s → 94 / 94 / 89 / 63 laps. Per kind, jumps passed cleanly: tables best at 6.8 (99 / 100), doubles best at 7.6 (93 / 97), drops best at 6.0 (98 / 103).
+- **Stitched** (tables 6.8, doubles 7.6, drops 6.0): 93 / 100 on practice; on validation 53 / 60 against the plain teacher's 54. No gain: on the corrected physics one jump speed already suits every kind, so a per-kind teacher (and so notes about jump kinds) has little to teach. Unlike the old physics (E9: 183 → 191 on practice).
+- **Each jump's own length** (owner's question: doubles and tables differ in length, and you must clear the landing or second roller). Every jump is built for its own design speed, 6.0–7.5 m/s: kicker 0.3–0.6 m high at 24–38°, landing placed for that speed (lip to landing 1.4–3.5 m on tables and doubles). A teacher told each jump's design speed (perfect measurement) finishes 94 / 100 practice laps, the same as one speed for all; +0.5 m/s: 80; −0.5 m/s: 92. The design speeds sit in a narrow band, the kicker scrubs the car to about 5–5.5 m/s at takeoff whatever the approach, and the long, rounded landings forgive a metre either way, so measuring each jump buys nothing on these tracks. Jumps sit on the longest straights (corners near jumps are the planned stretch); the teacher's corner plan already slows it for a turn after a landing.
+- **Owner's decision (2026-11-19):** retry the gate now with E10's expo car (averaged pair); drills and residual reinforcement learning follow either way.
+- **Out-lap stand-in on the truggy physics** (validation, gate range): 50 / 60 out-laps as tuned for the old physics. Its roll-back retry used reverse, which the ESC no longer has; it now coasts back down the face, with traction control → 54; carrying 4.0 m/s over jumps → **55** (4.5: 50). Saved as `teacher.OUTLAP_TRUGGY`.
 
 ## Gate check
 
@@ -342,5 +349,17 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - The test loops were harder for the teacher too: 48 / 60 here against 56 on validation (same mix of jumps: 25 doubles, 20 drops, 15 tables vs 27 / 18 / 15). The car finished 36 of the teacher's 48 (75%; validation 89%) and 4 the teacher failed.
   - The test set wasn't used to dig further, so it stays fresh for a retry.
 - **Verdict:** gate failed. Phase 4.6 stays in progress.
+
+### Gate retry (2026-11-19, truggy physics)
+
+- **Run:** `python -m sdc.phase46.gate --runs runs/p46-e10-b-s0 runs/p46-e10-b-s1 --out runs/p46-gate2`, then `python -m sdc.phase46.gate_report --gate runs/p46-gate2 --out reports/phase46-gate2.html`. [Report](https://claude.ai/artifact/VSofTBQxUueDquLVawFNFP).
+- **Car:** E10 arm B (expo 0.4), its two students averaged; chosen on validation (52 / 60). Same test loops 46000–46019 × 3 starts, physics seed 46, gate range, truggy physics. Time reference: the re-tuned teacher on the same runs.
+- **Leakage review:** since the first gate nothing was trained, tuned or chosen on the test loops; the first gate's test results were not used beyond the published summary (its stuck-on-doubles finding was not tuned for).
+- **Result:** **47 / 60 with the out-lap counted (needs 48). Gate failed under the written rule.**
+  - Timed lap only: **50 / 60**. Three out-laps failed (2 rolled over, 1 stuck), all on runs where the car then finished its timed lap. This car uses no map, so the out-lap only counts through the gate's definition ("a run is a crawl out-lap plus one timed lap").
+  - Endings: 7 off the lane, 3 rolled over. Median lap 31.1 s; 81% of jumps landed.
+  - The re-tuned teacher finished 52 / 60 here (validation: 55). The car finished 43 of the teacher's 52, and 7 the teacher failed.
+  - Agent's note: whether a car that doesn't use the out-lap should be charged for it should have been settled before this run; it wasn't (flagged at the first gate, where it didn't decide the verdict). Changing the rule now, after seeing the result, is the owner's call and would be recorded as made after the run.
+- **Verdict:** failed (47 / 60). README unchanged ("In progress, gate failed").
 
 ## Handoff to next phase

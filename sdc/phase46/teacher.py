@@ -115,6 +115,11 @@ class LoopExpert(dr.ExpertDriver):
 TRUGGY = dict(a_lat=2.5, a_brake=2.5, tc=0.5, v_target=6.8, v_cruise=7.4, k_rate=0.3, kp=6.0)
 
 
+# validation, gate range: 50 / 60 out-laps as tuned for the old physics; 54 with traction control and a coasting
+# roll-back (the ESC has no reverse); 55 carrying 4.0 m/s over jumps (4.5: 50)
+OUTLAP_TRUGGY = dict(tc=0.5, k_rate=0.3, kp=6.0, v_jump=4.0)   # the out-lap stand-in's settings on the truggy physics
+
+
 class OutLapDriver(LoopExpert):
     """The out-lap (owner, 2026-11-16): a person drives one slow lap by remote while the car records. This
     stand-in reads the true state, as a person watching the car does: it rolls round at V and keeps to the middle.
@@ -123,8 +128,10 @@ class OutLapDriver(LoopExpert):
 
     V, V_JUMP, V_RETRY = 2.0, 3.5, 4.5
 
-    def __init__(self, **kw):
+    def __init__(self, v_jump=None, **kw):
         super().__init__(v_target=self.V, v_cruise=self.V, **kw)
+        if v_jump is not None:
+            self.V_JUMP, self.V_RETRY = v_jump, v_jump + 1.0
         self._st = {}
 
     def act(self, car):
@@ -146,9 +153,13 @@ class OutLapDriver(LoopExpert):
             st["back"], st["charge"] = 45, True
         if st["back"] > 0:
             st["back"] -= 1
-            return np.array([0.0, -0.8], np.float32)
+            # an ESC brake has no reverse (truggy physics): coast and let the face roll the car back
+            return np.array([0.0, 0.0 if "esc" in car.real else -0.8], np.float32)
         target = (self.V_RETRY if st["charge"] else self.V_JUMP) if on_jump else self.V
-        thr = 0.8 * (target - s["v_fwd"]) + 0.06 * target + 1.2 * np.sin(s["pitch"])
+        thr = self.kv * (target - s["v_fwd"]) + self.kv_ff * target + 1.2 * np.sin(s["pitch"])
+        if self.tc is not None and thr > 0:   # traction control, as the race teacher (truggy physics)
+            spin = float(car.d.qvel[car.spin_dof].mean()) * cr.WHEEL_R - s["v_fwd"]
+            thr *= float(np.clip(1.0 - (spin - self.tc) / self.tc, 0.0, 1.0)) if spin > self.tc else 1.0
         a[1] = np.clip(thr, -0.1 if on_jump else -1, 1)
         if on_jump:
             a[0] = np.clip(a[0], -0.3, 0.3)       # easy on the wheel over a jump: wheels spinning on a face slew the car

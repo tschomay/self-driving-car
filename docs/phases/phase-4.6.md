@@ -350,4 +350,16 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - The test set wasn't used to dig further, so it stays fresh for a retry.
 - **Verdict:** gate failed. Phase 4.6 stays in progress.
 
+### Gate retry (2026-11-19, truggy physics)
+
+- **Run:** `python -m sdc.phase46.gate --runs runs/p46-e10-b-s0 runs/p46-e10-b-s1 --out runs/p46-gate2`, then `python -m sdc.phase46.gate_report --gate runs/p46-gate2 --out reports/phase46-gate2.html`. [Report](https://claude.ai/artifact/VSofTBQxUueDquLVawFNFP).
+- **Car:** E10 arm B (expo 0.4), its two students averaged; chosen on validation (52 / 60). Same test loops 46000–46019 × 3 starts, physics seed 46, gate range, truggy physics. Time reference: the re-tuned teacher on the same runs.
+- **Leakage review:** since the first gate nothing was trained, tuned or chosen on the test loops; the first gate's test results were not used beyond the published summary (its stuck-on-doubles finding was not tuned for).
+- **Result:** **47 / 60 with the out-lap counted (needs 48). Gate failed under the written rule.**
+  - Timed lap only: **50 / 60**. Three out-laps failed (2 rolled over, 1 stuck), all on runs where the car then finished its timed lap. This car uses no map, so the out-lap only counts through the gate's definition ("a run is a crawl out-lap plus one timed lap").
+  - Endings: 7 off the lane, 3 rolled over. Median lap 31.1 s; 81% of jumps landed.
+  - The re-tuned teacher finished 52 / 60 here (validation: 55). The car finished 43 of the teacher's 52, and 7 the teacher failed.
+  - Agent's note: whether a car that doesn't use the out-lap should be charged for it should have been settled before this run; it wasn't (flagged at the first gate, where it didn't decide the verdict). Changing the rule now, after seeing the result, is the owner's call and would be recorded as made after the run.
+- **Verdict:** failed (47 / 60). README unchanged ("In progress, gate failed").
+
 ## Handoff to next phase

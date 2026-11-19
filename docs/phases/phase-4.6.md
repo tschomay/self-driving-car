@@ -301,6 +301,33 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - the odometer overcounts by about 10% over a lap, so notes should be indexed by kicker count, re-synced at each kicker, not by metres.
 - **Truggy physics** (`real="truggy"`: "all" plus the review's ESC brake, limited-slip diffs, stronger motor and heavier wheels; opt-in, old runs unchanged, tests pass): full brake now stops without reversing (old physics: 157° spin and rolling backwards); 0–6 m/s in 0.9 s instead of 1.5. The cautious teacher, untuned, finishes 16 / 20 validation laps at gate range (old physics 18 / 20) and laps 1.7 s faster.
 - **Drills with residual reinforcement learning:** not probed. They should be built on the corrected physics, after the teacher is re-tuned there.
+- **Owner's decisions (2026-11-18):** the rest of Phase 4.6, gate retry included, runs on the truggy physics (`real="truggy"`). The plan: (1) re-tune the teacher on the new physics and re-baseline; (2) jump notes as inputs, first perfect notes, then the car's own from the out-lap; (3) drills with residual reinforcement learning (Modal); (4) gate retry on test loops 46000–46019. Also asked for a second sim review: traction, friction and weight transfer.
+### Plan step 1 — the teacher on the truggy physics (2026-11-18)
+
+- **Traction review:** [report](../research/traction-review-phase46.md). Weight transfer is right (braking at 1 g moves 10.2 N to the front axle; m·a·h/L predicts 8.6) and trail-braking rotates the car. Fixed and added to `real="truggy"`: grip depended on the car's compass heading (MuJoCo's default pyramidal friction cone gave 0.71 of the grip at 45°; now the elliptic cone); tires lose up to 25% of their grip once sliding (estimate); the ESC brake is capped at 0.65 of the motor's torque (a full brake flipped the car on high grip). A held drift is now possible but hard.
+- **Re-tuning the teacher** (100 practice loops, gate range): the cautious teacher, unchanged, finishes 75. Traction control (cut throttle when the wheels spin more than 0.5 m/s faster than the car) → 88; jumps at 6.8 m/s → 91; more yaw-rate damping in its steering (landings fish-tailed on sliding grip) → 92; firmer air control → **94**. Saved as `teacher.TRUGGY`.
+- **The re-tuned teacher on validation (60 runs, gate range):** **55 / 60**, 97% of jumps landed, median lap 31.4 s. These laps are the new time reference (`runs/p46-teacher-val-gate-truggy.pkl`).
+- **Steering expo (owner's suggestion, 2026-11-18):** added as a car option: command a → (1 − e)·a + e·a³ at the servo, full lock unchanged, finer near centre. The teacher inverts the curve, so its driving is unchanged (expo 0.4: 18 / 20 against 19 / 20, within noise).
+### E10 — Copy the truggy teacher, with and without expo
+
+- **Setup:** E5's recipe (DAgger, 16 rounds of 60k steps, sensors only, no jump notes) on the truggy physics with the re-tuned teacher (`teacher.TRUGGY`). Arm A no expo, arm B steering expo 0.4; seeds 0–1 each; each arm's two students averaged into one car (as E6). Scored on validation at gate range, timed against the re-tuned teacher (55 / 60). `bash sdc/phase46/e10_runs.sh`, about 1.5 h.
+- **Jump notes** are built (perfect notes, `jump_notes="true"`) but left out here: this teacher takes every jump at one speed, so notes would tell the student nothing it needs to copy. They come next, with a teacher that varies its speed by jump kind (plan step 2).
+- **Prediction (owner, before the run):** "52 without and 53 with" (laps finished of 60 by the averaged car).
+- **Result:** [report](https://claude.ai/artifact/QfuFKhizw6BMduWs1mk7ZM). Validation loops × 3 starts, truggy physics, gate range:
+
+  | Arm | Seed 0 | Seed 1 | Average of 2 | Jumps landed (average) |
+  |---|---|---|---|---|
+  | A: no expo | 49 | 48 | **51** | 88% |
+  | B: expo 0.4 | 52 | 52 | **52** | 93% |
+  | Re-tuned teacher | | | 55 | 97% |
+
+  - Endings (averaged cars): A off the lane 7 (6 after doubles), rolled over 2; B off the lane 5, rolled over 3.
+  - Expo helped each student alone by 3–4 laps and raised the landing rate; averaging added little to the expo pair.
+  - Every finished lap inside the time limit; median laps 30.7 s (A) and 31.4 s (B).
+  - The run took 2.5 h, not 1.5 h: the truggy physics (sliding grip, elliptic cone) is slower to simulate.
+  - Prediction vs. result: 52 without and 53 with predicted; 51 and 52 measured.
+- **Explanation (owner, after the run):** "The physics are predicable now and the car is much more capable. I think it helped."
+- **Takeaway:** on the corrected physics the copies come within 3 laps of their teacher, and expo makes small steering easier to copy. Expo stays on from here. The teacher is the ceiling again, so the next lever is a teacher that varies its jump speed by kind, with notes so the student can follow.
 
 ## Gate check
 

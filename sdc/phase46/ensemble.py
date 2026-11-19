@@ -16,7 +16,7 @@ import numpy as np
 import torch
 
 from sdc.phase46 import common as cm
-from sdc.phase46.bc_loop import REF, student_env
+from sdc.phase46.bc_loop import REF, REF_TRUGGY, student_env
 
 
 class Ensemble:
@@ -43,8 +43,11 @@ def main():
     ap.add_argument("--map", action="store_true")
     ap.add_argument("--procs", type=int, default=1)
     a = ap.parse_args()
-    eps = cm.prun(functools.partial(make, tuple(a.runs)), cm.VAL_SEEDS, procs=a.procs, **student_env(a.map, val=True))
-    sc = cm.lap_score(eps, teacher=pickle.load(open(REF, "rb")))
+    m0 = json.loads((Path(a.runs[0]) / "metrics.json").read_text())
+    env = m0.get("env46") or student_env(a.map, val=True)          # the students' own scoring setup
+    truggy = env.get("real") == "truggy"
+    eps = cm.prun(functools.partial(make, tuple(a.runs)), cm.VAL_SEEDS, procs=a.procs, **env)
+    sc = cm.lap_score(eps, teacher=pickle.load(open(REF_TRUGGY if truggy else REF, "rb")))
     Path(a.out).write_text(json.dumps(dict(runs=a.runs, map=a.map, final=sc, final_episodes=eps), indent=1,
                                       default=float))
     print(f"final: finished {sc['finished_n']}/60, in time {sc['in_time_n']}/60, landed {sc['rate']:.0%}, "

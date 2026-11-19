@@ -52,4 +52,5 @@ Every experiment gets the owner's prediction before it runs.
   - What holds on both sets: laps 0.4–0.9 s faster, more jumps landed (fresh: 85% → 86–89%), more runs off the lane.
   - Drills taught little: corner drills crashed 2–4% even at the start (the base car already copes with 10–40% too fast); crash drills came from only 11–14 real crashes. Drill crash rates fell slightly (takeoff 11–15% → 9–11%), partly because exploration noise shrinks.
   - Prediction vs. result: 54 and a little slower predicted; 54 on validation (not confirmed on fresh loops), a little faster.
-- **Explanation (owner, after the run):** pending.
+- **Explanation (owner, after the run):** "It seems like the drills weren't hard enough, but the extra training and variation helped it find a faster line or just faster technique." Wants to see more learning.
+- **Takeaway:** a frozen base plus a capped residual is safe (no collapse, unlike Phases 4–4.5), but drills this easy give little to learn; 60 validation runs can't tell 52 from 54.

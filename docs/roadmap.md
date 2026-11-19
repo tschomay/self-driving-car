@@ -105,5 +105,10 @@ Each phase has a goal, the concepts it teaches, and a **gate**: a measurable ben
 - **Learner-owned candidate:** a pitch/attitude estimator from the noisy IMU (complementary or Kalman filter).
 - **Gate (provisional):** ≥ X% of full courses (turns and jumps) finished on fresh test courses, with randomized physics and the parts-list sensors. Numbers set at entry. **Set at entry (2026-11-14):** split in two. 4.5: ≥ 80% of jumps landed on test courses 45000–45019 (180 jumps) with parts-list sensors and gate-range physics. 4.6 (course with turns): ≥ 80% of full courses finished, same sensors and randomization.
 
+### Phase 4.7 — Beyond the teacher (CPU) — added at the Phase 4.6 exit
+- **Goal:** the car improves on the teacher it was copied from, by learning from outcomes. The copy stays frozen; the owner's PPO learns a small residual correction, first in drills (short episodes from hard states: too-fast corner entries, bad takeoffs, slides), then on full laps.
+- **Learn:** residual reinforcement learning, curricula and start-state distributions, why fine-tuning a copy drifts and how a frozen base prevents it.
+- **Gate (set at entry, 2026-11-19):** on the test loops, beat the re-tuned teacher on the same runs, either by finishing more laps (median lap no slower) or by finishing as many with a faster median lap.
+
 ### Phase 5 — Real car (future, not planned in this map)
 Hardware bill of materials (1/10 off-road chassis, onboard compute like a Raspberry Pi 5 or Jetson, camera, IMU), deployment, and real-world fine-tuning. Sketched here so the earlier phases keep sim-to-real in mind, for example by keeping camera resolution and control rate realistic.

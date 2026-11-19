@@ -364,6 +364,14 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
 - **Owner's decision (2026-11-19, after the run):** "Change it. Really we shouldn't drive an out lap if you aren't using it." A car that doesn't use the out-lap's map skips the out-lap, so its runs are judged on the timed lap alone. Made after seeing this result; recorded as such.
 - **Verdict under the changed rule: passed, 50 / 60 (83%).** README: "Gate passed".
 
+### Gate rerun (2026-11-19, rule set before the run)
+
+- **Why:** the owner asked for a clean rerun, with the out-lap rule decided beforehand (a car that doesn't use the out-lap's map is judged on its timed lap alone), at the start of Phase 4.7.
+- **Run:** in a fresh container the car was rebuilt (`bash sdc/phase46/rebuild.sh`: maps, teacher reference laps, E10 arm B seeds 0–1; validation 52 / 60 for each and for the averaged pair, as before). Then `python -m sdc.phase46.gate --runs runs/p46-e10-b-s0 runs/p46-e10-b-s1 --out runs/p46-gate3` and `gate_report`. [Report](https://claude.ai/artifact/Do48uuJiPBtYipP64p2XkJ).
+- **Leakage review:** nothing trained, tuned or chosen on the test loops since the retry; the car is a retrain of the same recipe and seeds.
+- **Result:** **50 / 60 timed laps (needs 48). Passed.** Endings: 7 off the lane, 3 rolled over; 81% of jumps landed; median lap 31.1 s. Teacher on the same runs: 52 / 60, 31.0 s. (With the out-lap counted, the old rule: 47 / 60.) The same numbers as the retry: the rebuilt car drives identically.
+- **Verdict:** gate passed under a rule fixed before the run. README unchanged ("Gate passed").
+
 ## Handoff to next phase
 
 - **What passed the gate:** two copies of the re-tuned teacher (owner's GRU and filter, parts-list sensors plus two 45° range sensors, steering expo 0.4), averaged into one car, on the truggy physics: 50 / 60 test laps (teacher 52). No map, no jump notes, no fine-tuning.

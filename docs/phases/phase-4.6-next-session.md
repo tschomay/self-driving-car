@@ -5,9 +5,8 @@ Pick-up notes for a new Claude session, written at the end of a long session. Re
 
 ## Where things stand
 
-- Gate retry on the truggy physics: **47 / 60 with the out-lap counted, 50 / 60 timed laps alone** (needs 48).
-  Failed under the written rule; three out-lap failures decided it. Whether a car that doesn't use the out-lap is
-  charged for it is an open owner decision (see the log's "Gate retry" section).
+- **Gate passed** (2026-11-19): 50 / 60 timed laps on the truggy physics. The owner changed the rule after the run:
+  a car that doesn't use the out-lap's map skips the out-lap (with it counted: 47 / 60).
 - Best car: E10 arm B, `runs/p46-e10-b-s0` + `runs/p46-e10-b-s1` averaged (`sdc/phase46/ensemble.py`). `runs/` is
   gitignored, so a new container won't have it: retrain with `bash sdc/phase46/e10_runs.sh` (arm B only:
   `python -m sdc.phase46.bc_loop --truggy --rounds 16 --expo 0.4 --seed S --out runs/p46-e10-b-sS`, about 2.5 h
@@ -31,8 +30,8 @@ Pick-up notes for a new Claude session, written at the end of a long session. Re
    2–3 s; then full laps with a progress reward and a crash penalty; keep a copying (anchor) loss; pick checkpoints on
    many runs (60+), not 20. Snapshot/restore for drill starts exists in `sdc/phase46/hard.py` (`snapshot`,
    `restore`: keep MuJoCo's state vector, not MjData copies, which leaked memory).
-4. Gate again, after the owner decides the out-lap question, on test loops 46000–46019 (physics seed 46).
-   Every experiment still needs the owner's prediction before it runs.
+4. The gate is passed; RL and drills are the owner's follow-up interest (Phase 4.6 stretch or the next phase:
+   ask). Every experiment still needs the owner's prediction before it runs.
 
 ## Modal
 

@@ -1,11 +1,11 @@
 # Phase 4.6 — A 3D course with turns
 
-- **Status:** in progress
+- **Status:** gate passed (2026-11-19, retry: 50 / 60 timed laps on the truggy physics)
 - **Goal:** a 3D course with turns, jumps, and rough ground, driven with Phase 4.5's realistic car: parts-list sensors, randomized physics, the owner's GRU and filter, and a map the car builds itself on an out-lap.
 - **Learn:** steering and pitch control at the same time, lateral load and body roll in turns, a teacher the student can follow on a harder course, mapping a course that turns.
-- **Gate (owner, 2026-11-16):** at least 80% of runs finished (48 of 60) on fresh test loops 46000–46019, 3 starts each, with parts-list sensors and gate-range physics. A run is a crawl out-lap plus one timed lap. It is finished if the timed lap is completed (no rollover, off the lane, or stuck) within 1.5× the teacher's time. The jump landing rate is reported, not gated.
+- **Gate (owner, 2026-11-16):** at least 80% of runs finished (48 of 60) on fresh test loops 46000–46019, 3 starts each, with parts-list sensors and gate-range physics. A run is a crawl out-lap plus one timed lap (owner, 2026-11-19: only for a car that uses the out-lap's map; a car that doesn't skips the out-lap). It is finished if the timed lap is completed (no rollover, off the lane, or stuck) within 1.5× the teacher's time. The jump landing rate is reported, not gated.
 - **Code:** `sdc/jumps/` (sim), `sdc/phase46/` (training, evaluation, reports).
-- **How to reproduce the gate:** to be filled in at the gate.
+- **How to reproduce the gate:** train E10 arm B (`python -m sdc.phase46.bc_loop --truggy --rounds 16 --expo 0.4 --seed S --out runs/p46-e10-b-sS`, S = 0, 1; needs `runs/p46-teacher-val-gate-truggy.pkl` and `runs/p46-maps-train.json`, see `docs/phases/phase-4.6-next-session.md`), then `python -m sdc.phase46.gate --runs runs/p46-e10-b-s0 runs/p46-e10-b-s1 --out runs/p46-gate2`. Score `timed_lap_only` in `runs/p46-gate2/gate.json`.
 
 ## Phase-entry decisions
 
@@ -361,5 +361,14 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - The re-tuned teacher finished 52 / 60 here (validation: 55). The car finished 43 of the teacher's 52, and 7 the teacher failed.
   - Agent's note: whether a car that doesn't use the out-lap should be charged for it should have been settled before this run; it wasn't (flagged at the first gate, where it didn't decide the verdict). Changing the rule now, after seeing the result, is the owner's call and would be recorded as made after the run.
 - **Verdict:** failed (47 / 60). README unchanged ("In progress, gate failed").
+- **Owner's decision (2026-11-19, after the run):** "Change it. Really we shouldn't drive an out lap if you aren't using it." A car that doesn't use the out-lap's map skips the out-lap, so its runs are judged on the timed lap alone. Made after seeing this result; recorded as such.
+- **Verdict under the changed rule: passed, 50 / 60 (83%).** README: "Gate passed".
 
 ## Handoff to next phase
+
+- **What passed the gate:** two copies of the re-tuned teacher (owner's GRU and filter, parts-list sensors plus two 45° range sensors, steering expo 0.4), averaged into one car, on the truggy physics: 50 / 60 test laps (teacher 52). No map, no jump notes, no fine-tuning.
+- **Physics changed mid-phase** (owner's decision): `real="truggy"` adds an ESC brake (no reverse), limited-slip diffs, a stronger motor, heavier wheels, the elliptic friction cone and a sliding grip drop, after two reviews (`docs/research/physics-review-phase46.md`, `traction-review-phase46.md`). Before it, braking was reverse torque and grip depended on compass heading. Use it from here; old-physics numbers aren't comparable.
+- **Lessons:** a student copies only what it can sense: a teacher using knowledge the student lacks (jump kind well ahead, E9) makes worse students. Cautious teachers make better students (E5). Averaging several students cancels their separate mistakes (E6, E7). Replaying moments of disagreement didn't beat ordinary extra copying (E8). The out-lap map of turns added little once the car had 45° sensors (E3). Steering expo helps copying (E10).
+- **Surprises:** two physics bugs found by the owner's hunches (braking, heading-dependent grip). On the corrected physics one jump speed suits every jump, so measuring jumps gains nothing on these tracks.
+- **Gate rule changed after the result:** the out-lap is only driven by cars that use its map.
+- **Open, owner's interest:** reinforcement learning that improves on the teacher: drills (too-fast corner entry, slides, bad takeoffs) with residual RL on top of the frozen copy, on Modal (token in another environment). Notes in `docs/phases/phase-4.6-next-session.md`. Stretch: jumps near corners and off-camber turns, where measuring the track should start to matter.

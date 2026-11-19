@@ -66,3 +66,6 @@ Every experiment gets the owner's prediction before it runs.
   - **Checkpoint picks** on 150 practice-loop runs (50 loops × 3 starts, gate range) instead of 60 validation runs; the fresh loops (47000–47033, 102 runs) stay the final check.
   - 1M steps, seeds 0–1.
 - **Prediction (owner, before the run):** "25%. 90" (drill-exam crash rate at the end; fresh runs finished of 102: base 84, teacher 95).
+- **Prep** (`python -m sdc.phase47.e2_prep`; practice loops split 181 train / 50 selection / 30 calibration / 30 exam): teacher on the 150 selection runs 141 finished. Calibration harvest (noisy base, 30 loops): 13 crashes, 36 crash starts. Strengths at about 40% base crashes: corner 0.64 (speed up to ×2), takeoff 0.58, edge 0.84 (push up to 5.9 m/s), slide 0.50 (yaw burst up to 8 rad/s).
+- **Base car on the exam: 31% crashed, not 40%** (corner 33%, takeoff 53%, edge 38%, slide 25%, crash drills 7%). The crash drills aren't calibrated: their starts came from the noisy car's crashes, and the base car without noise recovers from most of them. The owner's 25% prediction was made against an expected 40%.
+

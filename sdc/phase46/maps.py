@@ -22,7 +22,7 @@ from sdc.jumps import driver as dr
 from sdc.phase46 import common as cm
 from sdc.phase46 import laps
 from sdc.phase46 import my_deadreckoning as mdr
-from sdc.phase46.teacher import OutLapDriver
+from sdc.phase46.teacher import OUTLAP_TRUGGY, OutLapDriver
 
 DS = 0.25
 
@@ -69,16 +69,17 @@ def kickers(pitch, acc_g, odo, gap=8.0):
 
 
 def _job(args):
-    course, x0, d, phys_seed = args
+    course, x0, d, phys_seed, real = (*args, "all")[:5] if len(args) == 4 else args
     import torch
     torch.set_num_threads(1)
-    log = laps.record(OutLapDriver(), course, x0, dr=d, phys_seed=phys_seed, max_steps=6000)
+    drv = OutLapDriver(**(OUTLAP_TRUGGY if real == "truggy" else {}))
+    log = laps.record(drv, course, x0, dr=d, phys_seed=phys_seed, max_steps=6000, real=real)
     return f"{course}|{x0:.2f}", make_map(log)
 
 
-def collect(courses, starts, d, phys_seed=0, procs=4):
+def collect(courses, starts, d, phys_seed=0, procs=4, real="all"):
     with Pool(procs) as p:
-        return dict(p.map(_job, [(c, x0, d, phys_seed) for c in courses for x0 in starts], chunksize=1))
+        return dict(p.map(_job, [(c, x0, d, phys_seed, real) for c in courses for x0 in starts], chunksize=1))
 
 
 def main():

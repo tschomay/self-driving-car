@@ -85,3 +85,29 @@ Every experiment gets the owner's prediction before it runs.
   - **E1's faster laps didn't come back:** seed 0 was 0.4 s faster on the fresh loops, and seed 1 was 0.5 s slower.
   - **Prediction vs. result:** predicted 25% and 90; got 29–31% and 83–86. Both are within noise of the base car.
 - **Explanation (owner):** _pending_
+
+### After E2 — Can these crashes be recovered at all? (agent, owner's request)
+
+- **Question (owner):** is it possible to recover from these drills? If the check isn't a slam dunk, research before the next step.
+- **Recoverability** (`python -m sdc.phase47.recoverable`, E2's 300 exam drills): the teacher, reading the true state, crashed 29% (base car 31%). The base car plus one fixed full-strength correction (9 options: steer and throttle each −0.3/0/+0.3, held 1 s): every option crashed 31–41% overall, but some option avoided the crash on 62 of the base car's 94 crashed drills, each option saving different drills and crashing others.
+- **Chaos on drills** (`python -m sdc.phase47.chaos`): the base car drove each exam drill 5 times with tiny action noise (std 0.02, about 1% of full range):
+
+  | Outcome over 5 runs | Drills |
+  |---|---|
+  | Never crashed | 178 (59%) |
+  | Sometimes crashed | 65 (22%) |
+  | Always crashed | 57 (19%) |
+
+  39% of the base car's exam crashes disappear with a 1% wiggle. Of the 57 always-crash drills, 24 were saved by neither the teacher nor any fixed correction. Takeoff drills are the most chaotic (38% mixed).
+- **Chaos on full laps** (`python -m sdc.phase47.lap_chaos`, 150 selection runs × 3 noisy repeats):
+
+  | Driver | Finished per repeat | Always finished | Sometimes | Never |
+  |---|---|---|---|---|
+  | Base car | 130, 126, 128 | 102 | 44 | 4 |
+  | Teacher | 137, 143, 138 | 122 | 27 | 1 |
+
+- **What this means:**
+  - The base car almost never fails a run every time: 4 of its ~22 failures per pass are certain; the rest are runs it finishes on other tries. The teacher's edge is fewer coin-flip runs (27 vs 44), not runs only it can handle.
+  - One pass of 150 runs swings about ±3 laps from chance alone, about the size of every E1 and E2 "effect" (E1 validation 46–54; E2 fresh 81–86 vs base 84). Single-pass scores can't separate cars that close.
+  - A residual trained on single crash/no-crash outcomes gets mostly chance as its signal. The literature names this the "curse of chaos": in systems sensitive to small differences, policy-gradient estimates become very noisy (Parmas et al., PIPPS, arXiv 1902.01240).
+- **Takeaway:** the car doesn't need new recoveries; it needs a lower crash probability at many risky moments, mostly jumps. To see that, scores must be probabilities (repeated noisy runs), not single passes.

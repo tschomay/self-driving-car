@@ -28,20 +28,23 @@ from sdc.phase4 import train as tr
 from sdc.phase46 import common as cm
 from sdc.phase46.bc_loop import REF_TRUGGY, TRAIN_MAP, student_env
 from sdc.phase47 import drills as dl
+from sdc.phase47 import drills2 as d2
 
 BASE = ("runs/p46-e10-b-s0", "runs/p46-e10-b-s1")
 CFG = dict(n_envs=8, n_steps=256, batch_size=256, n_epochs=10, lr=3e-4, gamma=0.99, lam=0.95, clip=0.2, vf_coef=0.5,
-           max_grad_norm=0.5, std=(0.5, 0.17), critic_warmup=50_000, harvest_laps=80)
+           max_grad_norm=0.5, std=(0.5, 0.17), critic_warmup=50_000, harvest_laps=80,
+           drills=1, exam_every=100_000, eval_procs=1)   # drills=2: E2 (drills2.py, e2_prep.py)
 
 
 def env_kw(val=False):
     return student_env(False, val=val, real="truggy", expo=0.4)
 
 
-def validate(base, actor_path, obs_dim, procs=1):
-    eps = cm.prun(functools.partial(dl.load_residual, tuple(base), str(actor_path), obs_dim), cm.VAL_SEEDS,
-                  procs=procs, **env_kw(val=True))
-    sc = cm.lap_score(eps, teacher=pickle.load(open(REF_TRUGGY, "rb")))
+def validate(base, actor_path, obs_dim, procs=1, courses=None, ref=REF_TRUGGY):
+    """Validation loops (E1), or E2's selection loops; 3 starts each, gate range, timed against the teacher."""
+    eps = cm.prun(functools.partial(dl.load_residual, tuple(base), str(actor_path), obs_dim),
+                  courses or cm.VAL_SEEDS, procs=procs, **env_kw(val=True))
+    sc = cm.lap_score(eps, teacher=pickle.load(open(ref, "rb")))
     return sc, eps
 
 
@@ -52,13 +55,26 @@ def train(seed, steps, out, eval_every, base=BASE, procs=1, **over):
     out = Path(out)
     (out / "ckpt").mkdir(parents=True, exist_ok=True)
     t0 = time.perf_counter()
-    maps = json.loads(Path(TRAIN_MAP).read_text())
-    practice = [c for c in cm.PRACTICE if maps[f"{c}|0.00"]["kappa"]]
-    laps = list(np.random.default_rng(seed).choice(practice, cfg["harvest_laps"], replace=False))
-    pool, hv = dl.harvest(base, [int(c) for c in laps], env_kw(), seed=seed)
+    v2 = cfg["drills"] == 2
+    if v2:
+        from sdc.phase47 import e2_prep
+        prep = json.loads(e2_prep.OUT.read_text())
+        practice, select, amps = prep["split"]["train"], prep["split"]["select"], prep["amps"]
+        exam, _ = e2_prep.exam_set(amps)
+        val_kw = dict(courses=select, ref=e2_prep.SELECT_REF)
+    else:
+        maps = json.loads(Path(TRAIN_MAP).read_text())
+        practice = [c for c in cm.PRACTICE if maps[f"{c}|0.00"]["kappa"]]
+        val_kw = {}
+    laps = [int(c) for c in np.random.default_rng(seed).choice(practice, cfg["harvest_laps"], replace=False)]
+    pool, hv = (d2 if v2 else dl).harvest(base, laps, env_kw(), seed=seed)
     hv["wall_s"] = round(time.perf_counter() - t0)
     print("harvest", hv, flush=True)
-    env = dl.DrillEnv(pool, base, cfg["n_envs"], env_kw(), seed=seed)
+    if v2:
+        env = d2.DrillEnv2(pool, amps, base, cfg["n_envs"], env_kw(), seed=seed)
+    else:
+        env = dl.DrillEnv(pool, base, cfg["n_envs"], env_kw(), seed=seed)
+    exams, next_exam = [], 0
     net = tr.ActorCritic(obs_dim=env.obs_dim)
     with torch.no_grad():   # zero correction at the start: the base car exactly
         net.actor[-1].weight.zero_()
@@ -72,6 +88,7 @@ def train(seed, steps, out, eval_every, base=BASE, procs=1, **over):
         net.load_state_dict(r["net"])
         opt.load_state_dict(r["opt"])
         done_steps, next_eval, evals, drills = r["steps"], r["next_eval"], r["evals"], r["drills"]
+        exams, next_exam = r.get("exams", []), r.get("next_exam", 0)
         t0 -= r["wall"]
         torch.manual_seed(seed + done_steps)
         env.rng = np.random.default_rng(seed + done_steps)
@@ -80,7 +97,7 @@ def train(seed, steps, out, eval_every, base=BASE, procs=1, **over):
         nonlocal next_eval
         p = out / "ckpt" / f"{done_steps}.pt"
         torch.save(net.state_dict(), p)
-        sc, _ = validate(base, p, env.obs_dim, procs)
+        sc, _ = validate(base, p, env.obs_dim, max(procs, cfg["eval_procs"]), **val_kw)
         recent = drills[-2000:]
         crash = {k: round(float(np.mean([r["reason"] in dl.CRASHES for r in recent if r["kind"] == k])), 3)
                  for k in env.kinds if any(r["kind"] == k for r in recent)}
@@ -90,11 +107,21 @@ def train(seed, steps, out, eval_every, base=BASE, procs=1, **over):
         print(evals[-1], flush=True)
         next_eval = done_steps + eval_every
         torch.save(dict(net=net.state_dict(), opt=opt.state_dict(), steps=done_steps, next_eval=next_eval,
-                        evals=evals, drills=drills, wall=time.perf_counter() - t0), out / "resume.pt")
+                        evals=evals, drills=drills, exams=exams, next_exam=next_exam, wall=time.perf_counter() - t0),
+                   out / "resume.pt")
+
+    def run_exam():
+        nonlocal next_exam
+        crashed = d2.run_starts(exam, base, env_kw(), actor=net.actor)
+        exams.append(dict(steps=done_steps, **d2.exam_score(exam, crashed)))
+        print("exam", exams[-1], flush=True)
+        next_exam = done_steps + cfg["exam_every"]
 
     obs = torch.as_tensor(env.reset())
     B = cfg["n_envs"]
     while done_steps < steps:
+        if v2 and done_steps >= next_exam:
+            run_exam()
         if done_steps >= next_eval:
             evaluate()
         frac = min(done_steps / steps, 1.0)
@@ -148,6 +175,8 @@ def train(seed, steps, out, eval_every, base=BASE, procs=1, **over):
                 loss.backward()
                 nn.utils.clip_grad_norm_(net.parameters(), cfg["max_grad_norm"])
                 opt.step()
+    if v2 and (not exams or exams[-1]["steps"] != done_steps):
+        run_exam()
     if not evals or evals[-1]["steps"] != done_steps:
         evaluate()
     # step 0 (the base car, zero correction) is a candidate: a residual is kept only if it beats it
@@ -156,7 +185,8 @@ def train(seed, steps, out, eval_every, base=BASE, procs=1, **over):
     torch.save(torch.load(sel), out / "model.pt")
     m = dict(label="residual PPO on drills", seed=seed, cfg=cfg, base=list(base), harvest=hv, obs_dim=env.obs_dim,
              scale=dl.DrillEnv.SCALE, crash_pen=dl.DrillEnv.CRASH_PEN, res_cost=dl.DrillEnv.RES_COST,
-             mix=dl.DrillEnv.MIX, evals=evals, chosen=best, drills=drills, wall_s=round(time.perf_counter() - t0))
+             mix=dl.DrillEnv.MIX if not v2 else "equal", evals=evals, exams=exams,
+             amps=amps if v2 else None, chosen=best, drills=drills, wall_s=round(time.perf_counter() - t0))
     (out / "metrics.json").write_text(json.dumps(m, indent=1, default=float))
     print("chosen", best, flush=True)
 

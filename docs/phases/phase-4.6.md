@@ -328,6 +328,10 @@ Code: `sdc/jumps/loop.py` (courses), `sdc/jumps/render_loop.py` (GIFs), `sdc/pha
   - Prediction vs. result: 52 without and 53 with predicted; 51 and 52 measured.
 - **Explanation (owner, after the run):** "The physics are predicable now and the car is much more capable. I think it helped."
 - **Takeaway:** on the corrected physics the copies come within 3 laps of their teacher, and expo makes small steering easier to copy. Expo stays on from here. The teacher is the ceiling again, so the next lever is a teacher that varies its jump speed by kind, with notes so the student can follow.
+### Plan step 2 prep — a jump speed per kind on the truggy physics (2026-11-19)
+
+- **Sweep** (`python -m sdc.phase46.e11_sweep`; re-tuned teacher, expo 0.4, 100 practice loops, gate range), one jump speed for every jump: 6.0 / 6.8 / 7.6 / 8.4 m/s → 94 / 94 / 89 / 63 laps. Per kind, jumps passed cleanly: tables best at 6.8 (99 / 100), doubles best at 7.6 (93 / 97), drops best at 6.0 (98 / 103).
+- **Stitched** (tables 6.8, doubles 7.6, drops 6.0): 93 / 100 on practice; on validation 53 / 60 against the plain teacher's 54. No gain: on the corrected physics one jump speed already suits every kind, so a per-kind teacher (and so notes about jump kinds) has little to teach. Unlike the old physics (E9: 183 → 191 on practice).
 
 ## Gate check
 

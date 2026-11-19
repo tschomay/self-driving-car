@@ -66,7 +66,7 @@ def train(seed, steps, out, eval_every, base=BASE, procs=1, **over):
         net.log_std.fill_(float(np.log(cfg["std"][0])))
     opt = torch.optim.Adam(net.parameters(), lr=cfg["lr"], eps=1e-5)
     owner.POLICY_LOSS_VARIANT = "textbook"
-    n_steps, evals, drills, done_steps, next_eval = cfg["n_steps"], [], [], 0, eval_every
+    n_steps, evals, drills, done_steps, next_eval = cfg["n_steps"], [], [], 0, 0   # step 0 = the base car itself
     if (out / "resume.pt").exists():
         r = torch.load(out / "resume.pt", weights_only=False)
         net.load_state_dict(r["net"])
@@ -76,9 +76,27 @@ def train(seed, steps, out, eval_every, base=BASE, procs=1, **over):
         torch.manual_seed(seed + done_steps)
         env.rng = np.random.default_rng(seed + done_steps)
         print(f"resumed at {done_steps}", flush=True)
+    def evaluate():
+        nonlocal next_eval
+        p = out / "ckpt" / f"{done_steps}.pt"
+        torch.save(net.state_dict(), p)
+        sc, _ = validate(base, p, env.obs_dim, procs)
+        recent = drills[-2000:]
+        crash = {k: round(float(np.mean([r["reason"] in dl.CRASHES for r in recent if r["kind"] == k])), 3)
+                 for k in env.kinds if any(r["kind"] == k for r in recent)}
+        evals.append(dict(steps=done_steps, wall_s=round(time.perf_counter() - t0), finished=sc["finished_n"],
+                          in_time=sc["in_time_n"], lap_s=sc["lap_s"], landed=sc["rate"], reasons=sc["reasons"],
+                          drill_crash=crash, std=round(float(net.log_std.exp().mean()), 3)))
+        print(evals[-1], flush=True)
+        next_eval = done_steps + eval_every
+        torch.save(dict(net=net.state_dict(), opt=opt.state_dict(), steps=done_steps, next_eval=next_eval,
+                        evals=evals, drills=drills, wall=time.perf_counter() - t0), out / "resume.pt")
+
     obs = torch.as_tensor(env.reset())
     B = cfg["n_envs"]
     while done_steps < steps:
+        if done_steps >= next_eval:
+            evaluate()
         frac = min(done_steps / steps, 1.0)
         cap = cfg["std"][0] + (cfg["std"][1] - cfg["std"][0]) * frac
         with torch.no_grad():
@@ -130,21 +148,10 @@ def train(seed, steps, out, eval_every, base=BASE, procs=1, **over):
                 loss.backward()
                 nn.utils.clip_grad_norm_(net.parameters(), cfg["max_grad_norm"])
                 opt.step()
-        if done_steps >= next_eval or done_steps >= steps:
-            p = out / "ckpt" / f"{done_steps}.pt"
-            torch.save(net.state_dict(), p)
-            sc, _ = validate(base, p, env.obs_dim, procs)
-            recent = drills[-2000:]
-            crash = {k: round(np.mean([r["reason"] in dl.CRASHES for r in recent if r["kind"] == k]), 3)
-                     for k in env.kinds if any(r["kind"] == k for r in recent)}
-            evals.append(dict(steps=done_steps, wall_s=round(time.perf_counter() - t0), finished=sc["finished_n"],
-                              in_time=sc["in_time_n"], lap_s=sc["lap_s"], landed=sc["rate"], reasons=sc["reasons"],
-                              drill_crash=crash, std=round(float(net.log_std.exp().mean()), 3)))
-            print(evals[-1], flush=True)
-            next_eval += eval_every
-            torch.save(dict(net=net.state_dict(), opt=opt.state_dict(), steps=done_steps, next_eval=next_eval,
-                            evals=evals, drills=drills, wall=time.perf_counter() - t0), out / "resume.pt")
-    best = max(evals, key=lambda e: (e["in_time"], -e["lap_s"], e["steps"]))
+    if not evals or evals[-1]["steps"] != done_steps:
+        evaluate()
+    # step 0 (the base car, zero correction) is a candidate: a residual is kept only if it beats it
+    best = max(evals, key=lambda e: (e["in_time"], -e["lap_s"], e["steps"] == 0, e["steps"]))   # ties: the base car
     sel = out / "ckpt" / f"{best['steps']}.pt"
     torch.save(torch.load(sel), out / "model.pt")
     m = dict(label="residual PPO on drills", seed=seed, cfg=cfg, base=list(base), harvest=hv, obs_dim=env.obs_dim,

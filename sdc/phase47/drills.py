@@ -8,10 +8,14 @@ student's memory, as Phase 4.6's hard.py does). Saved states become drill starts
             ahead; the drill raises its speed 10-40% (every joint's velocity scaled together, wheels included).
   takeoff   a kicker's lip is 4-9 m ahead; the drill changes speed by -25%..+25%, and at the first moment the car
             is airborne it adds a pitch-rate kick of 0.5-2 rad/s, nose up or down.
-  crash     1, 2 or 3 s before a place where the base car crashed (off the lane, rolled over, stuck); speed x0.95-1.05.
+  crash     1, 2 or 3 s before a place where the base car went off the lane or rolled over; speed x0.95-1.05.
 
 A drill runs DRILL_STEPS (3 s). The env (DrillEnv) drives n cars, each restarted from a random drill when its drill
 ends. The policy being trained only adds a correction to the base car's action; the base car's memory runs along.
+
+Known limits (code review, 2026-11-19): a restored state is not a bit-exact replay (about 0.5 mm after one step, as
+with hard.py), so a crash drill need not reproduce its crash; after a speed change the first step's sensors still
+show the old speed.
 """
 
 from __future__ import annotations
@@ -32,7 +36,8 @@ from sdc.phase46.hard import _FULL, snapshot
 SNAP_EVERY = 25          # 0.5 s
 DRILL_STEPS = 150        # 3 s
 KINDS = ("corner", "takeoff", "crash")
-CRASHES = ("off the lane", "rolled over", "stuck")
+CRASHES = ("off the lane", "rolled over", "stuck")   # endings that count as a crash (penalised)
+DRILL_CRASHES = ("off the lane", "rolled over")    # crash drills: a stuck car 1-2 s out is already stopped
 
 
 @dataclass
@@ -83,18 +88,23 @@ def _features(car):
 
 
 def harvest(base_runs, courses, env_kw, seed=0, n=8, max_steps=2500):
-    """Drive the base car on `courses` (each once); return {kind: [Drill]} and a summary."""
+    """Drive the base car on `courses` (each exactly once: car i drives courses[i::n]); return {kind: [Drill]}
+    and a summary."""
     rng = np.random.default_rng(seed)
     b = je.JumpBatch(n, seed=seed, courses=list(courses), **{**env_kw, "max_steps": max_steps, "jump_bonus": 0.0})
     base = Base(base_runs, n)
     obs = b.reset()
     pool = {k: [] for k in KINDS}
     ring = [collections.deque(maxlen=7) for _ in range(n)]     # (t, Drill) every 0.5 s, the last 3.5 s
-    done_courses, endings = 0, collections.Counter()
-    while done_courses < len(courses):
+    quota = [len(list(courses)[i::n]) for i in range(n)]
+    done_n = [0] * n
+    endings = collections.Counter()
+    while any(d < q for d, q in zip(done_n, quota)):
         hs = [base.get(i) for i in range(n)]
         a = base.act(obs)
         for i, car in enumerate(b.cars):
+            if done_n[i] >= quota[i]:      # this car has driven its courses; it now repeats them, unharvested
+                continue
             if car.t % SNAP_EVERY == 0 and car.t > 50:
                 snap_car, state = snapshot(car)
                 d = Drill("?", snap_car, state, hs[i])
@@ -107,9 +117,10 @@ def harvest(base_runs, courses, env_kw, seed=0, n=8, max_steps=2500):
         obs, _, term, trunc, infos = b.step(a)
         for i in np.flatnonzero(term | trunc):
             ep = infos[i]["episode"]
-            endings[ep["reason"]] += 1
-            done_courses += 1
-            if ep["reason"] in CRASHES:
+            if done_n[i] < quota[i]:
+                endings[ep["reason"]] += 1
+            done_n[i] += 1
+            if done_n[i] <= quota[i] and ep["reason"] in DRILL_CRASHES:
                 t_end = ep["l"]
                 for t, d in ring[i]:
                     if any(abs((t_end - t) - back) <= SNAP_EVERY / 2 for back in (50, 100, 150)):
@@ -117,7 +128,7 @@ def harvest(base_runs, courses, env_kw, seed=0, n=8, max_steps=2500):
             ring[i].clear()
             base.set(i, [torch.zeros_like(h) for h in hs[i]], started=True)
     rng.shuffle(pool["corner"]), rng.shuffle(pool["takeoff"])
-    return pool, dict(laps=done_courses, endings=dict(endings), **{k: len(v) for k, v in pool.items()})
+    return pool, dict(laps=sum(quota), endings=dict(endings), **{k: len(v) for k, v in pool.items()})
 
 
 class Slot:
@@ -199,7 +210,7 @@ class DrillEnv:
         for i, car in enumerate(self.cars):
             r, t, tc, reason = car.step(a[i], 0.0, int(self.end_t[i]), 0.0, 0.0)
             r -= self.RES_COST * float(delta[i] @ delta[i])
-            if self.kick[i] and car.airborne:
+            if self.kick[i] and car.airborne and car.course.jump_at(car.takeoff[1]) is not None:   # off a kicker
                 car.d.qvel[4] += self.kick[i]
                 self.kick[i] = 0.0
             if reason in CRASHES:

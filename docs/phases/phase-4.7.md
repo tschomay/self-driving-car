@@ -36,3 +36,20 @@ Every experiment gets the owner's prediction before it runs.
 
 - **Prediction (owner, before the run):** "54 and a little slower" (validation laps finished of 60; base car 52, teacher 55).
 - **Setup:** frozen base car (E10 arm B pair, averaged); residual = the owner's Phase 1 network (two 64-unit layers) on sensors + the base car's action, output capped ±0.3, starting at zero; owner's PPO core. Drills only (3 s; +1 per metre along the lane, −50 for a crash, small cost on the residual): too-fast corner entries, bad takeoffs, and starts 1–3 s before the base car's own crashes, on practice loops at training-range physics. 1M steps, seeds 0–1; checkpoint kept by 60 validation runs (gate range) every 100k steps.
+- **Run:** 2026-11-19, `bash sdc/phase47/e1_runs.sh` (after `sdc/phase46/rebuild.sh`; base car rebuilt at 52 / 60 on validation, as before), about 2 h per seed on one core. Harvest per seed: 80 practice laps, 75 finished; drill starts: about 1,050 corners, 310 takeoffs, 11–14 crashes. Then `python -m sdc.phase47.check` (fresh loops 47000–47033 × 3 starts, 102 runs, never used before) and `python -m sdc.phase47.e1_report`.
+- **Result:** [report](https://claude.ai/artifact/Ef5njcHVMDfGpWyw3zjxNU).
+
+  | Car | Validation (60) | Fresh loops (102) | Median lap (fresh) |
+  |---|---|---|---|
+  | Teacher | 55 | 95 | 31.2 s |
+  | Base car (step 0) | 52 | 84 | 31.5 s |
+  | Seed 0, kept (400k) | 54 | 85 | 30.8 s |
+  | Seed 1, kept (800k) | 54 | 78 | 31.1 s |
+  | Seed 0, end (1M) | 53 | 82 | 30.6 s |
+  | Seed 1, end (1M) | 46 | 81 | 31.1 s |
+
+  - Validation jumped 46–54 between checkpoints with no trend; the kept checkpoint is the best of six, so its 54 is mostly selection luck. The fresh loops show no reliable gain in finishes.
+  - What holds on both sets: laps 0.4–0.9 s faster, more jumps landed (fresh: 85% → 86–89%), more runs off the lane.
+  - Drills taught little: corner drills crashed 2–4% even at the start (the base car already copes with 10–40% too fast); crash drills came from only 11–14 real crashes. Drill crash rates fell slightly (takeoff 11–15% → 9–11%), partly because exploration noise shrinks.
+  - Prediction vs. result: 54 and a little slower predicted; 54 on validation (not confirmed on fresh loops), a little faster.
+- **Explanation (owner, after the run):** pending.

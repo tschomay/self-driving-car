@@ -25,6 +25,7 @@ from sdc.phase47 import drills2 as d2
 from sdc.phase47.train_residual import BASE, env_kw
 
 OUT = Path("runs/p47-e2-prep.json")
+CALIB = Path("runs/p47-e2-calib.json")
 SELECT_REF = Path("runs/p47-e2-select-teacher.pkl")   # the teacher on the selection runs (time limit)
 EXAM_SEED = 4701
 
@@ -55,15 +56,20 @@ def main():
     sp = split()
     print({k: len(v) for k, v in sp.items()}, flush=True)
     env = {k: v for k, v in env_kw(val=True).items() if k != "expo"}
-    ref = cm.prun(functools.partial(LoopExpert, **TRUGGY), sp["select"], procs=4, **env)
-    pickle.dump(ref, open(SELECT_REF, "wb"))
+    ref = pickle.load(open(SELECT_REF, "rb")) if SELECT_REF.exists() else cm.prun(functools.partial(LoopExpert, **TRUGGY), sp["select"], procs=4, **env)
+    if not SELECT_REF.exists():
+        pickle.dump(ref, open(SELECT_REF, "wb"))
     print("teacher on selection runs", sum(e["finished"] for e in ref), "/", len(ref), flush=True)
-    pool, hv = d2.harvest(BASE, sp["calib"], env_kw(), seed=4700)
-    print("calib harvest", hv, flush=True)
-    global _POOL
-    _POOL = pool
-    with mp.get_context("fork").Pool(len(d2.TUNED)) as p:    # one kind per process (the pool is inherited)
-        cal = dict(p.map(_calibrate, d2.TUNED))
+    if CALIB.exists():   # a finished calibration (e.g. before a crash later in prep)
+        cal, hv = json.loads(CALIB.read_text()), None
+    else:
+        pool, hv = d2.harvest(BASE, sp["calib"], env_kw(), seed=4700)
+        print("calib harvest", hv, flush=True)
+        global _POOL
+        _POOL = pool
+        with mp.get_context("fork").Pool(len(d2.TUNED)) as p:    # one kind per process (the pool is inherited)
+            cal = dict(p.map(_calibrate, d2.TUNED))
+        CALIB.write_text(json.dumps(cal, indent=1))
     amps = {k: v["amp"] for k, v in cal.items()}
     starts, ehv = exam_set(amps)
     print("exam harvest", ehv, flush=True)

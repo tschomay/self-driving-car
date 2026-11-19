@@ -227,7 +227,7 @@ def exam_score(starts, crashed):
     by = collections.defaultdict(list)
     for s, c in zip(starts, crashed):
         by[s.kind].append(c)
-    return dict(crash=round(float(np.mean(crashed)), 3), **{k: round(float(np.mean(v)), 3) for k, v in by.items()})
+    return dict(all=round(float(np.mean(crashed)), 3), **{k: round(float(np.mean(v)), 3) for k, v in by.items()})
 
 
 class DrillEnv2:

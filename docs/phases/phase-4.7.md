@@ -52,4 +52,36 @@ Every experiment gets the owner's prediction before it runs.
   - What holds on both sets: laps 0.4–0.9 s faster, more jumps landed (fresh: 85% → 86–89%), more runs off the lane.
   - Drills taught little: corner drills crashed 2–4% even at the start (the base car already copes with 10–40% too fast); crash drills came from only 11–14 real crashes. Drill crash rates fell slightly (takeoff 11–15% → 9–11%), partly because exploration noise shrinks.
   - Prediction vs. result: 54 and a little slower predicted; 54 on validation (not confirmed on fresh loops), a little faster.
-- **Explanation (owner, after the run):** pending.
+- **Explanation (owner, after the run):** "It seems like the drills weren't hard enough, but the extra training and variation helped it find a faster line or just faster technique." Wants to see more learning.
+- **Takeaway:** a frozen base plus a capped residual is safe (no collapse, unlike Phases 4–4.5), but drills this easy give little to learn; 60 validation runs can't tell 52 from 54.
+
+### E2 — Harder drills, and a drill exam
+
+- **Why (owner, after E1):** the drills weren't hard enough and it didn't learn much; wants to see more learning. Full laps (the old E2) move to E3.
+- **Setup:** E1's residual recipe (frozen base, residual capped ±0.3 from zero, owner's PPO core), with:
+  - **Difficulty calibrated per drill kind** so the base car alone crashes about 40% of the time (binary search on a strength setting over 100 drills).
+  - **New kinds:** *edge* (a sideways push toward the nearer bank) and *slide* (a yaw-rate burst), alongside *corner* (too fast) and *takeoff* (wrong speed and a pitch kick off the lip).
+  - **More crash starts:** harvest with noise on the base car's actions, so it crashes far more often (1–3 s before each crash).
+  - **Drill exam:** 300 drills from loops never used for training, fixed perturbations, driven with no noise every 100k steps: the crash rate shows learning directly. Base car about 40% by construction.
+  - **Checkpoint picks** on 150 practice-loop runs (50 loops × 3 starts, gate range) instead of 60 validation runs; the fresh loops (47000–47033, 102 runs) stay the final check.
+  - 1M steps, seeds 0–1.
+- **Prediction (owner, before the run):** "25%. 90" (drill-exam crash rate at the end; fresh runs finished of 102: base 84, teacher 95).
+- **Prep** (`python -m sdc.phase47.e2_prep`; practice loops split 181 train / 50 selection / 30 calibration / 30 exam): teacher on the 150 selection runs 141 finished. Calibration harvest (noisy base, 30 loops): 13 crashes, 36 crash starts. Strengths at about 40% base crashes: corner 0.64 (speed up to ×2), takeoff 0.58, edge 0.84 (push up to 5.9 m/s), slide 0.50 (yaw burst up to 8 rad/s).
+- **Base car on the exam: 31% crashed, not 40%** (corner 33%, takeoff 53%, edge 38%, slide 25%, crash drills 7%). The crash drills aren't calibrated: their starts came from the noisy car's crashes, and the base car without noise recovers from most of them. The owner's 25% prediction was made against an expected 40%.
+
+- **Result** (report: `reports/phase47-e2.html`; `bash sdc/phase47/e2_runs.sh`, then `python -m sdc.phase47.e2_report`):
+
+  | Car | Exam crashed (300) | Selection (150) | Fresh loops (102) | Median lap (fresh) |
+  |---|---|---|---|---|
+  | Teacher | — | 141 | 95 | 31.2 s |
+  | Base car (step 0) | 31% | 124 | 84 | 31.5 s |
+  | Seed 0, kept (600k) | 31% | 133 | 83 | 31.0 s |
+  | Seed 1, kept (400k) | 29% | 135 | 86 | 32.0 s |
+  | Seed 0, end (1M) | 31% | 129 | 81 | 31.3 s |
+  | Seed 1, end (1M) | 30% | 128 | 81 | 32.0 s |
+
+  - **The exam stayed flat:** 29–34% at every checkpoint on both seeds, against 31% for the base car. One standard error on 300 drills is about 2.7 points, and on 60 drills of one kind about 6 points. No drill kind trended down on both seeds.
+  - **Selection gains didn't carry over:** the kept checkpoints scored 133 and 135 of 150 against the base car's 124, but 83 and 86 of 102 on the fresh loops against its 84. As in E1, best-of-six picking flatters the kept checkpoint.
+  - **E1's faster laps didn't come back:** seed 0 was 0.4 s faster on the fresh loops, and seed 1 was 0.5 s slower.
+  - **Prediction vs. result:** predicted 25% and 90; got 29–31% and 83–86. Both are within noise of the base car.
+- **Explanation (owner):** _pending_

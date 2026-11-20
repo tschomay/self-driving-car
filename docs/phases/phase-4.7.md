@@ -314,4 +314,19 @@ The owner asked for research on what would really move the needle toward a good 
   - **Training:** the critic first, then PPO with the owner's GAE and losses on 128 cars across 4 processes, 32k steps per update, 181 practice loops, training-range physics. 9 h.
   - **Scoring:** every 3M steps on the 150 selection runs, 2 noisy passes.
 - **Prediction:** none asked (agent's research step, owner away).
-- **Result:** _running_
+- **Result:** stopped at 9M steps (3.6 h). PPO finds speed the teacher can't, but it spends finishes to get it. The teacher's own trade-off on the same 150 selection runs is measured by making it corner harder (`runs/p47-frontier-select.json`).
+
+  | Driver | Finished per pass | Median lap |
+  |---|---|---|
+  | Teacher, corners 3.5 (the pilot's start) | 136 | 28.0 s |
+  | Teacher, corners 4.0 | 130 | 27.3 s |
+  | Teacher, corners 4.5 | 127.5 | 27.0 s |
+  | Teacher, corners 5.0 | 112.5 | 26.6 s |
+  | RL, copy of the teacher (0 steps) | 132.5 | 28.1 s |
+  | RL, 3M steps | 129 | 27.2 s |
+  | RL, 6M steps | 124.5 | 26.0 s |
+  | RL, 9M steps | 113 | 25.0 s |
+
+  - At 6M steps RL is 0.6 s faster than the teacher at corners 5.0 and finishes 12 more runs per pass. At 9M it finishes as often as that teacher and is 1.6 s faster. No teacher setting gets near 25 s at any finish rate (headroom table above).
+  - So the frontier moved outward. But the reward let RL pick a point on it the goal doesn't want: a crash cost 50 m of progress, about 7 s of driving.
+- **Next (running):** the same driver from the 6M checkpoint with a crash costing 200 (`--set crash_pen=200 --set init=...6029312.pt`). The question: does a higher price on crashes turn the extra speed back into finishes?

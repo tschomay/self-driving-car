@@ -53,7 +53,7 @@ CRASH_PEN, FINISH_BONUS = 50.0, 50.0
 TEACHER = dict(TRUGGY, jump_v={"double": 7.4}, a_lat=3.5, a_brake=3.5)
 CFG = dict(workers=4, cars=32, n_steps=256, batch_size=4096, n_epochs=5, lr=1e-4, gamma=0.995, lam=0.95, clip=0.2,
            vf_coef=0.5, max_grad_norm=0.5, std=0.15, hidden=(256, 256), bc_rounds=4, bc_steps=200_000,
-           bc_epochs=10, critic_warmup=1_000_000, eval_every=3_000_000, eval0=True)
+           bc_epochs=10, critic_warmup=1_000_000, eval_every=3_000_000, eval0=True, crash_pen=CRASH_PEN, init=None)
 
 
 def env_train():
@@ -221,7 +221,9 @@ def score(path, procs=4, passes=2):
 # ---- training ------------------------------------------------------------------------------------------------
 
 def train(out, seed=0, hours=8.0, **over):
+    global CRASH_PEN
     cfg = {**CFG, **over}
+    CRASH_PEN = cfg["crash_pen"]                 # read by the forked workers
     out = Path(out)
     (out / "ckpt").mkdir(parents=True, exist_ok=True)
     torch.set_num_threads(1)
@@ -239,6 +241,10 @@ def train(out, seed=0, hours=8.0, **over):
         log, steps, next_eval, phase = r["log"], r["steps"], r["next_eval"], r["phase"]
         t0 -= r["wall"]
         print("resumed", phase, steps, flush=True)
+    elif cfg["init"]:                            # start PPO from a checkpoint (critic re-warms: rewards changed)
+        net.load_state_dict(torch.load(cfg["init"]))
+        phase = "ppo"
+        print("init", cfg["init"], flush=True)
 
     def save():
         torch.save(dict(net=net.state_dict(), opt=opt.state_dict(), log=log, steps=steps, next_eval=next_eval,

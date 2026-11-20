@@ -84,7 +84,7 @@ Every experiment gets the owner's prediction before it runs.
   - **Selection gains didn't carry over:** the kept checkpoints scored 133 and 135 of 150 against the base car's 124, but 83 and 86 of 102 on the fresh loops against its 84. As in E1, best-of-six picking flatters the kept checkpoint.
   - **E1's faster laps didn't come back:** seed 0 was 0.4 s faster on the fresh loops, and seed 1 was 0.5 s slower.
   - **Prediction vs. result:** predicted 25% and 90; got 29–31% and 83–86. Both are within noise of the base car.
-- **Explanation (owner):** _pending_
+- **Explanation (owner):** "That was my gut reaction too - is it possible to recover? We seem to be in a situation where we're having a number of busts again." (reacting to the flat exam: the drills taught little, which led to the recoverability check below)
 
 ### After E2 — Can these crashes be recovered at all? (agent, owner's request)
 
@@ -163,7 +163,7 @@ Every experiment gets the owner's prediction before it runs.
     - _Corrected after the quick test below:_ this drift is not clearly the cause. Some of it builds up after the car has already left the lane (wheels spinning), and some laps finish with 13–16 m of drift.
   - Lap times differ by under 0.3 s. Medians are over the laps each car finished, so they aren't directly comparable.
   - **Prediction vs. result:** predicted 133 per pass and no time change. Got 106 (99–113) and about the same lap time.
-- **Explanation (owner):** _pending_
+- **Explanation (owner):** "A map only hurts if it's inaccurate."
 
 ### After E3 — Complete and accurate maps: the quick test (owner: "A map only hurts if it's inaccurate. Go ahead with that quick test")
 
@@ -203,7 +203,7 @@ Every experiment gets the owner's prediction before it runs.
   - Retraining on complete maps gained 5 a pass over E3 with complete maps (112 → 117), but the map car is still 13 below the base car.
   - Corner failures fell from 123 (E3) to 80, still more than twice the base car's 35. Doubles also got worse (83% landed against the base car's 92%).
   - On runs both finished, lap times match the base car's (median difference 0.0 s).
-- **Explanation (owner):** _pending_
+- **Explanation (owner):** "I don't know why 3b and 4 aren't helping."
 
 ### E4 — A teacher re-tuned for landings, copied by the base recipe (owner: "Try both in parallel now")
 
@@ -242,4 +242,4 @@ Every experiment gets the owner's prediction before it runs.
   - **Fewer finishes than the base car: 124 a pass against 130.** Not a success: the goal needs more finishes with no slower lap, or the same finishes with a faster lap.
   - **Faster:** on runs both finished, its laps are 0.5 s quicker than the base car's and the teacher's.
   - It lands doubles as often as the teacher (94.4%), but fails more at landings overall (40 against 16), mostly by rolling over (28 against 12), and enters corners faster than the base car (4.75 m/s against 4.59). Corner failures rose from 35 to 47.
-- **Explanation (owner):** _pending_
+- **Explanation (owner):** "I don't know why 3b and 4 aren't helping." The owner asked to step back: research what would really move the needle toward a good racer, rather than chase small gains (see "Stepping back" below).

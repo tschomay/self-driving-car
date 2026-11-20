@@ -185,3 +185,51 @@ Every experiment gets the owner's prediction before it runs.
   - With complete maps, the teacher planning only from what the car can know gets within 4 a pass of the teacher that sees the true track. The map is good enough.
   - The map car is still 18 a pass below the base car with complete maps. Its gap is in the copying, not the map. The teacher reading the map loses 4 a pass on mapped runs; the student loses 17.
 
+
+### E3b — Map students retrained on complete maps (owner: "Try both in parallel now")
+
+- **Setup:** E3's recipe (`bc_loop --truggy --rounds 16 --expo 0.4 --map`, 2 seeds averaged), with every failed mapping lap in the practice and validation loops driven again as in the quick test (5 validation, 23 practice). Scored on the 150 selection runs with complete maps (`python -m sdc.phase47.where e3b`).
+  - Not directly comparable to E3's training: up to 22 practice loops that had no map now take part, and they are among the harder loops. Validation scores during training also differ from E3's for the same reason.
+- **Prediction:** none given (owner asked to run both overnight).
+- **Result:**
+
+  | Driver | Finished per pass (of 150) | Mean | Corner failures (5 passes) | Doubles landed | Median lap |
+  |---|---|---|---|---|---|
+  | Base car | 127, 133, 135, 126, 131 | 130 | 35 | 91.6% | 30.7 s |
+  | Teacher | 139, 136, 141, 127, 142 | 137 | 2 | 94.6% | 30.8 s |
+  | Map car E3, complete maps (not retrained) | 117, 116, 112, 105, 111 | 112 | — | — | — |
+  | **Map car E3b (retrained on complete maps)** | 120, 117, 116, 119, 115 | **117** | 80 | 83.1% | 30.6 s |
+
+  - Retraining on complete maps gained 5 a pass over E3 with complete maps (112 → 117), but the map car is still 13 below the base car.
+  - Corner failures fell from 123 (E3) to 80, still more than twice the base car's 35. Doubles also got worse (83% landed against the base car's 92%).
+  - On runs both finished, lap times match the base car's (median difference 0.0 s).
+- **Explanation (owner):** _pending_
+
+### E4 — A teacher re-tuned for landings, copied by the base recipe (owner: "Try both in parallel now")
+
+- **Step 1, tune the teacher** (`python -m sdc.phase47.e4_tune`): 7 settings, each driven 4 times over 150 practice runs (50 practice loops × 3 starts, never used for scoring). A setting replaces the current teacher only if it beats it by more than 3 a pass.
+
+  | Setting | Finished per pass (of 150) | Mean | Median lap |
+  |---|---|---|---|
+  | Current (doubles at the general 6.8 m/s target) | 129, 130, 135, 136 | 132.5 | 30.8 s |
+  | **Doubles at 7.4 m/s** | 138, 136, 134, 140 | **137.0** | 30.8 s |
+  | Doubles at 8.0 m/s | 128, 135, 125, 129 | 129.3 | 30.7 s |
+  | Doubles at 8.6 m/s | 115, 121, 123, 119 | 119.5 | 30.7 s |
+  | Faster steering response (k_rate 0.5) | 133, 136, 133, 136 | 134.5 | 31.4 s |
+  | Doubles at 8.0 + k_rate 0.5 | 123, 127, 121, 126 | 124.3 | 31.1 s |
+  | Each jump at its design speed | 136, 133, 134, 133 | 134.0 | 31.0 s |
+
+  - Chosen: doubles at 7.4 m/s, a little faster than before. Going faster still loses runs.
+- **Step 2, check it on the selection runs** (`python -m sdc.phase47.where e4teacher`; training only starts if it beats the current teacher):
+
+  | Driver | Finished per pass (of 150) | Mean | Doubles landed | Double take-off vs design speed | Median lap difference on shared runs |
+  |---|---|---|---|---|---|
+  | Base car | 127, 133, 135, 126, 131 | 130 | 91.6% | −1.31 m/s | — |
+  | Teacher | 139, 136, 141, 127, 142 | 137 | 94.6% | −1.14 m/s | — |
+  | **Re-tuned teacher** | 136, 144, 142, 142, 144 | **142** | 97.0% | −0.61 m/s | −0.10 s against the teacher, −0.08 s against the base car |
+
+  - The re-tuned teacher finishes 5 more a pass than the old one and is no slower. Landing failures (rolled over or off the lane) fell from 26 to 20 over 5 passes, and "other" failures from 37 to 19.
+- **Step 3, train the students:** base recipe with the re-tuned teacher (`bc_loop --truggy --rounds 16 --expo 0.4 --teacher-json runs/p47-e4-teacher.json`, 2 seeds). Running; about 2.5 h of training plus scoring.
+- **Prediction:** none given (owner asked to run both overnight).
+- **Result:** _running_
+- **Explanation (owner):** _pending_

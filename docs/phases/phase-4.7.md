@@ -243,3 +243,10 @@ Every experiment gets the owner's prediction before it runs.
   - **Faster:** on runs both finished, its laps are 0.5 s quicker than the base car's and the teacher's.
   - It lands doubles as often as the teacher (94.4%), but fails more at landings overall (40 against 16), mostly by rolling over (28 against 12), and enters corners faster than the base car (4.75 m/s against 4.59). Corner failures rose from 35 to 47.
 - **Explanation (owner):** "I don't know why 3b and 4 aren't helping." The owner asked to step back: research what would really move the needle toward a good racer, rather than chase small gains (see "Stepping back" below).
+
+### After E4 — A lower speed limit for the E4 students (owner: "Sure")
+
+- **Question:** the E4 students are 0.5 s a lap faster than the base car but finish 6 fewer a pass. Does a lower speed limit trade that time back for finishes? If it got back to 130 with a faster median lap, it would meet the goal's second half.
+- **Setup:** the E4 students with forward throttle scaled to 95% and to 90% (braking and steering unchanged), no retraining, scored on the 150 selection runs (`python -m sdc.phase47.where e4cap`).
+- **Prediction (owner):** "I predict it won't help."
+- **Result:** _running_

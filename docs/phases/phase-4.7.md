@@ -249,4 +249,16 @@ Every experiment gets the owner's prediction before it runs.
 - **Question:** the E4 students are 0.5 s a lap faster than the base car but finish 6 fewer a pass. Does a lower speed limit trade that time back for finishes? If it got back to 130 with a faster median lap, it would meet the goal's second half.
 - **Setup:** the E4 students with forward throttle scaled to 95% and to 90% (braking and steering unchanged), no retraining, scored on the 150 selection runs (`python -m sdc.phase47.where e4cap`).
 - **Prediction (owner):** "I predict it won't help."
-- **Result:** _running_
+- **Result:**
+
+  | Driver | Finished per pass (of 150) | Mean | Corner entry speed | Median lap difference vs base car (shared runs) |
+  |---|---|---|---|---|
+  | Base car | 127, 133, 135, 126, 131 | 130 | 4.59 m/s | — |
+  | E4 car | 120, 127, 125, 125, 123 | 124 | 4.75 m/s | −0.50 s |
+  | E4 car, throttle 95% | 113, 118, 125, 127, 127 | 122 | 4.73 m/s | −0.32 s |
+  | E4 car, throttle 90% | 107, 126, 121, 120, 127 | 120 | 4.70 m/s | −0.06 s |
+
+  - It didn't help: less throttle gave back the lap time but no finishes (122 and 120, within noise of 124 or slightly worse).
+  - Corner entry speed barely moved (4.75 → 4.70 m/s): the extra corner speed doesn't come from too much throttle, so a throttle limit can't remove it.
+  - **Prediction vs. result:** predicted it won't help; it didn't.
+- **Explanation (owner):** _pending_

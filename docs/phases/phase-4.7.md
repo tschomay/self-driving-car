@@ -229,7 +229,17 @@ Every experiment gets the owner's prediction before it runs.
   | **Re-tuned teacher** | 136, 144, 142, 142, 144 | **142** | 97.0% | −0.61 m/s | −0.10 s against the teacher, −0.08 s against the base car |
 
   - The re-tuned teacher finishes 5 more a pass than the old one and is no slower. Landing failures (rolled over or off the lane) fell from 26 to 20 over 5 passes, and "other" failures from 37 to 19.
-- **Step 3, train the students:** base recipe with the re-tuned teacher (`bc_loop --truggy --rounds 16 --expo 0.4 --teacher-json runs/p47-e4-teacher.json`, 2 seeds). Running; about 2.5 h of training plus scoring.
+- **Step 3, train the students:** base recipe with the re-tuned teacher (`bc_loop --truggy --rounds 16 --expo 0.4 --teacher-json runs/p47-e4-teacher.json`, 2 seeds averaged). Final validation: 53/60 and 49/60. Scored with `python -m sdc.phase47.where e4`.
 - **Prediction:** none given (owner asked to run both overnight).
-- **Result:** _running_
+- **Result:**
+
+  | Driver | Finished per pass (of 150) | Mean | Failures (5 passes): corner / landing / other | Doubles landed | Corner entry speed | Median lap difference on shared runs |
+  |---|---|---|---|---|---|---|
+  | Base car | 127, 133, 135, 126, 131 | 130 | 35 / 16 / 47 | 91.6% | 4.59 m/s | — |
+  | Teacher | 139, 136, 141, 127, 142 | 137 | 2 / 26 / 37 | 94.6% | 4.12 m/s | — |
+  | **E4 car** | 120, 127, 125, 125, 123 | **124** | 47 / 40 / 43 | 94.4% | 4.75 m/s | −0.50 s against the base car |
+
+  - **Fewer finishes than the base car: 124 a pass against 130.** Not a success: the goal needs more finishes with no slower lap, or the same finishes with a faster lap.
+  - **Faster:** on runs both finished, its laps are 0.5 s quicker than the base car's and the teacher's.
+  - It lands doubles as often as the teacher (94.4%), but fails more at landings overall (40 against 16), mostly by rolling over (28 against 12), and enters corners faster than the base car (4.75 m/s against 4.59). Corner failures rose from 35 to 47.
 - **Explanation (owner):** _pending_

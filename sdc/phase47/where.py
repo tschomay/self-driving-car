@@ -102,8 +102,8 @@ def _job(args):
     return _drive(*args)
 
 
-def collect(whos=("base", "teacher"), out=OUT):
-    courses = json.loads(e2_prep.OUT.read_text())["split"]["select"]
+def collect(whos=("base", "teacher"), out=OUT, courses=None):
+    courses = courses or json.loads(e2_prep.OUT.read_text())["split"]["select"]
     jobs = [(who, r, c) for who in whos for r in range(REPEATS) for c in courses]
     with mp.get_context("fork").Pool(4) as pool:
         runs = [r for chunk in pool.imap_unordered(_job, jobs, chunksize=1) for r in chunk]

@@ -157,11 +157,31 @@ Every experiment gets the owner's prediction before it runs.
   - **The map itself is the problem, not the student:** the teacher planning from the same map drops from 137 to 127 a pass, and its corner failures go from 2 to 71.
   - **10 of the 150 runs have no map** (their out-lap didn't finish). On those the map car finished 8% of the time and the map teacher 28%: with an empty map the car sees a straight road.
   - **On runs with a map:** base car 87%, teacher 91%, map teacher 89%, map car 75%.
-  - **Why the map misleads** (`python -m sdc.phase47.map_align`, map teacher, 12 selection loops, one run each): the map is read at the car's own odometer, which re-syncs only at kickers.
-    - On the 8 laps it finished, the odometer stayed within 1–4 m of the true position, and the mapped curvature lined up with the true one (correlation 0.74–0.97, best shift within 1 m).
-    - On the 3 laps it left the lane, the odometer had drifted 8–15 m by the end (one had no map at all). The map was then pointing at the wrong turns (correlation 0.05 on one).
-    - So a drifted odometer sends the car into turns the map says are straights, and has it steer for turns that aren't there.
+  - **Odometer drift** (`python -m sdc.phase47.map_align`, map teacher, 12 selection loops, one run each): the map is read at the car's own odometer, which re-syncs only at kickers.
+    - On the 8 laps it finished, the mapped curvature lined up with the true one (correlation 0.74–0.97, best shift within 1 m).
+    - On the 3 laps it left the lane, the odometer was 8–15 m off by the end (one had no map at all).
+    - _Corrected after the quick test below:_ this drift is not clearly the cause. Some of it builds up after the car has already left the lane (wheels spinning), and some laps finish with 13–16 m of drift.
   - Lap times differ by under 0.3 s. Medians are over the laps each car finished, so they aren't directly comparable.
   - **Prediction vs. result:** predicted 133 per pass and no time change. Got 106 (99–113) and about the same lap time.
 - **Explanation (owner):** _pending_
+
+### After E3 — Complete and accurate maps: the quick test (owner: "A map only hurts if it's inaccurate. Go ahead with that quick test")
+
+- **Re-sync at turns:** I tried correcting the odometer at turns as well as kickers, by sliding the last 12 m of the car's own curvature along the map. On the 20 loops checked (map teacher, no noise), the match passed the confidence threshold almost nowhere, so the fix never fired. Where the map is wrong, the car's own curvature over 12 m is too noisy to place it. Not kept.
+- **Missing maps:** 10 of the 150 runs had no map because their slow mapping lap failed (7 rolled over, 2 left the lane, 1 got stuck).
+  - Driving the mapping lap again, at a jump speed of 3.5, then 3.0, 4.5, then 5.0 m/s (default 4.0) until it finished, gave all 10 a map.
+  - The map car and the map-reading teacher then drove the 8 affected loops again (5 noisy passes); their other runs keep their E3 results (`python -m sdc.phase47.full_maps`).
+
+  | Driver | Finished per pass (of 150) | Mean | On the 10 re-mapped runs |
+  |---|---|---|---|
+  | Base car | 127, 133, 135, 126, 131 | 130 | — |
+  | Teacher (true track) | 139, 136, 141, 127, 142 | 137 | — |
+  | Teacher reading the map, E3 maps | 126, 126, 129, 128, 125 | 127 | 1–4 of 10 |
+  | **Teacher reading the map, complete maps** | 133, 133, 134, 135, 132 | **133** | 8–10 of 10 |
+  | Map car, E3 maps | 113, 108, 106, 99, 102 | 106 | — |
+  | **Map car, complete maps** (not retrained) | 117, 116, 112, 105, 111 | **112** | 6–9 of 10 |
+
+- **What it shows:**
+  - With complete maps, the teacher planning only from what the car can know gets within 4 a pass of the teacher that sees the true track. The map is good enough.
+  - The map car is still 18 a pass below the base car with complete maps. Its gap is in the copying, not the map. The teacher reading the map loses 4 a pass on mapped runs; the student loses 17.
 

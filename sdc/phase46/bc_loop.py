@@ -69,6 +69,7 @@ def main():
     ap.add_argument("--notes", default=None, help='jump notes inputs: "true" (perfect)')
     ap.add_argument("--train-map", default=TRAIN_MAP, help="out-lap maps of the practice loops (with --map)")
     ap.add_argument("--val-map", default=VAL_MAP, help="out-lap maps of the validation runs (with --map)")
+    ap.add_argument("--teacher-json", default=None, help="JSON file of LoopExpert settings over the teacher's defaults")
     a = ap.parse_args()
     torch.set_num_threads(1)
     torch.manual_seed(a.seed)
@@ -90,6 +91,8 @@ def main():
     net = trr.RecurrentActorCritic(obs_dim=obs_dim)
     a_brake = a.a_brake if a.a_brake is not None else (2.0 if a.map else 3.0)   # 2.0 with map: brakes earlier
     tkw = dict(TRUGGY) if a.truggy else dict(a_lat=a.a_lat, a_brake=a_brake)
+    if a.teacher_json:   # Phase 4.7 E4: the teacher re-tuned for landings
+        tkw.update({k: v for k, v in json.loads(Path(a.teacher_json).read_text()).items() if not k.startswith("_")})
     teacher = LoopExpert(use_turn_map=a.map, **tkw)
     ref = pickle.load(open(REF_TRUGGY if a.truggy else REF, "rb"))
     ref1 = ref[::len(dr_starts)]                        # start 0 only (prun orders by course, then start)

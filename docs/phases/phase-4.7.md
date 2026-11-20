@@ -262,3 +262,56 @@ Every experiment gets the owner's prediction before it runs.
   - Corner entry speed barely moved (4.75 → 4.70 m/s): the extra corner speed doesn't come from too much throttle, so a throttle limit can't remove it.
   - **Prediction vs. result:** predicted it won't help; it didn't.
 - **Explanation (owner):** _pending_
+
+## Stepping back (owner: "Take a step back… Are we putting too many restrictions in place? Are we stuck in a narrow paradigm?")
+
+The owner asked for research on what would really move the needle toward a good racer, instead of chasing small gains. Up to a day of the agent's own work before reporting back.
+
+### What the literature does (`docs/research/beyond-the-teacher-literature.md`)
+
+- Every system in the review that beat its baseline driver (GT Sophy, Swift drone racing, an F1TENTH car that beat expert human drivers, legged robots on rough terrain) trained by RL on a **dense progress reward** with **privileged information** (true state, track ahead).
+  - Where the deployed car had only sensors, that privileged policy was then distilled into it, or trained it through a critic that sees the true state.
+  - None capped itself by copying a hand-written driver. A copied teacher is a ceiling.
+- **Budget:** those runs used about 10^8 steps with 80k–150k steps per update. Every RL run in this project so far: 10^6 steps, 2,048 steps per update, one core.
+
+### Speeding up the sim
+
+- Profiling showed a third of the sim's time went to one small numpy call: the cross product in each tire's slip speed, run 40 times per control step.
+- Written out by hand, it gives bit-identical results and about 1.4× the speed.
+
+### Headroom: how fast can a driver that knows the track go? (`python -m sdc.phase47.headroom`)
+
+- **Setup:** the re-tuned teacher (E4) driven more aggressively on 50 practice loops × 3 starts, gate range, tiny action noise, 2 passes each. Jump approach speeds were left unchanged.
+  - "Corners" = the cornering and braking limit the teacher plans with (default 2.5 m/s²).
+  - "Cruise" = the speed away from jumps (default 7.4 m/s).
+
+  | Setting | Finished per pass (of 150) | Median lap | Lap vs teacher (shared runs) |
+  |---|---|---|---|
+  | Teacher (E4) | 135, 134 | 30.8 s | — |
+  | Cruise 9 | 134, 135 | 30.4 s | −0.4 s |
+  | Cruise 11 | 135, 132 | 30.3 s | −0.4 s |
+  | **Corners 3.5** | 135, 131 | **28.2 s** | **−2.6 s** |
+  | Corners 4.5 | 127, 125 | 26.9 s | −3.9 s |
+  | Corners 6 | 108, 105 | 26.3 s | −4.7 s |
+  | Corners 3.5, cruise 9 | 127, 133 | 27.4 s | −3.4 s |
+  | Corners 4.5, cruise 11 | 94, 92 | 25.7 s | −5.2 s |
+  | Corners 6, cruise 13 | 55, 46 | 24.9 s | −5.4 s |
+
+- **What it shows:**
+  - The teacher, and so every car copied from it, corners far below the tires' limit.
+  - Cornering at 3.5 m/s² is 2.6 s a lap faster (8%) at about the same finishes (133 against 134.5 a pass).
+  - Every car in Phases 4.6–4.7 has lapped in 30.5–31 s. All of them were copying this caution.
+  - Cruise speed matters little: the straights are short.
+- **What follows:** beating this teacher on time is easy for a driver that knows the track. Doing it from sensors alone is the hard part, because sharp corners are where the sensor car already fails (E3 analysis).
+
+### Pilot: an RL racer with privileged information (`python -m sdc.phase47.racer`)
+
+- **Question:** given the true state, the track ahead and the physics, and a reward for progress, does RL find driving better than the best hand-coded teacher?
+- **Setup:**
+  - **Inputs:** true state, curvature and height 30 m ahead, the next jump, grip, mass and motor.
+  - **Reward:** metres of progress, −50 for a crash, +50 for a finish.
+  - **Start:** a copy (4 DAgger rounds) of the teacher with 3.5 m/s² corners.
+  - **Training:** the critic first, then PPO with the owner's GAE and losses on 128 cars across 4 processes, 32k steps per update, 181 practice loops, training-range physics. 9 h.
+  - **Scoring:** every 3M steps on the 150 selection runs, 2 noisy passes.
+- **Prediction:** none asked (agent's research step, owner away).
+- **Result:** _running_

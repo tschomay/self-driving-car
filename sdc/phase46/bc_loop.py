@@ -40,10 +40,10 @@ REF = Path("runs/p46-teacher-val-gate.pkl")     # the true-state teacher's valid
 REF_TRUGGY = Path("runs/p46-teacher-val-gate-truggy.pkl")   # the re-tuned teacher's laps on the truggy physics
 
 
-def student_env(use_map, val=False, real="all", expo=0.0, notes=None):
+def student_env(use_map, val=False, real="all", expo=0.0, notes=None, maps=(TRAIN_MAP, VAL_MAP)):
     env = dict(cm.CAR, angled=True, dr="gate" if val else "train")
     if use_map:
-        env["turn_map"] = VAL_MAP if val else TRAIN_MAP
+        env["turn_map"] = maps[1] if val else maps[0]
     if real != "all":
         env["real"] = real
     if expo:
@@ -67,6 +67,8 @@ def main():
     ap.add_argument("--truggy", action="store_true", help="truggy physics and its re-tuned teacher (teacher.TRUGGY)")
     ap.add_argument("--expo", type=float, default=0.0, help="steering expo (env.JumpCar)")
     ap.add_argument("--notes", default=None, help='jump notes inputs: "true" (perfect)')
+    ap.add_argument("--train-map", default=TRAIN_MAP, help="out-lap maps of the practice loops (with --map)")
+    ap.add_argument("--val-map", default=VAL_MAP, help="out-lap maps of the validation runs (with --map)")
     a = ap.parse_args()
     torch.set_num_threads(1)
     torch.manual_seed(a.seed)
@@ -75,8 +77,12 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     maps = json.loads(Path(TRAIN_MAP).read_text())
     courses = [c for c in cm.PRACTICE if maps[f"{c}|0.00"]["kappa"]]
+    if a.map and a.train_map != TRAIN_MAP:   # only loops whose own out-lap (on these maps) finished
+        own = json.loads(Path(a.train_map).read_text())
+        courses = [c for c in courses if own.get(f"{c}|0.00", {}).get("kappa")]
+    mp = (a.train_map, a.val_map)
     real = "truggy" if a.truggy else "all"
-    env = student_env(a.map, real=real, expo=a.expo, notes=a.notes)
+    env = student_env(a.map, real=real, expo=a.expo, notes=a.notes, maps=mp)
     bc_rnn.ENV.clear()
     bc_rnn.ENV.update(env, steer_cost=0.03, jump_bonus=10.0, courses=courses)
     from sdc.jumps import env as je
@@ -87,7 +93,7 @@ def main():
     teacher = LoopExpert(use_turn_map=a.map, **tkw)
     ref = pickle.load(open(REF_TRUGGY if a.truggy else REF, "rb"))
     ref1 = ref[::len(dr_starts)]                        # start 0 only (prun orders by course, then start)
-    val_env = student_env(a.map, val=True, real=real, expo=a.expo, notes=a.notes)
+    val_env = student_env(a.map, val=True, real=real, expo=a.expo, notes=a.notes, maps=mp)
     L = my_gru.CONFIG["seq_len"]
     data, log = [], []
     for r in range(a.rounds):

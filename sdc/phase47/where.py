@@ -111,6 +111,13 @@ def collect(whos=("base", "teacher"), out=OUT):
     print(len(runs), "runs ->", out)
 
 
+def sharp_turns(c, k=0.15):
+    """Track positions (m) where a turn sharper than k /m starts."""
+    a = np.abs(c.kappa) > k
+    starts = np.flatnonzero(a & ~np.roll(a, 1))
+    return [float(i * c.ds) for i in starts]
+
+
 def place(run, course):
     """landing / corner / other, for a failed run."""
     ep = run["ep"]
@@ -247,8 +254,26 @@ def analyse(src=(OUT,), summary=SUMMARY):
         faster_than_teacher=int(sum(r["v_teacher"] is not None and r["v_max"] > r["v_teacher"] + 0.3 for r in rows_c)),
         yaw_max_median=round(float(np.median([r["yaw_max"] for r in rows_c])), 1) if rows_c else None,
         rows=rows_c)
+    # every driver: speed through sharp turns (|curvature| > 0.15 /m), mean over the 2 m around each turn's start
+    ent = collections.defaultdict(list)
+    for r in runs:
+        c, tr = course(r["course"]), r["trace"]
+        if not len(tr):
+            continue
+        x = tr[:, I["x"]]
+        for s0 in sharp_turns(c):
+            for lap_s in (s0, s0 + c.length):
+                m = (x >= lap_s - 1.0) & (x <= lap_s + 1.0)
+                if m.any():
+                    ent[r["who"]].append((r["course"], r["start"], s0, float(tr[m, I["v"]].mean())))
+                    break
+    out["corner_speed"] = {who: round(float(np.median([e[3] for e in v])), 2) for who, v in ent.items()}
+    if "map" in ent or "mapteacher" in ent:
+        sel = json.loads(Path(SELECT_MAP).read_text())
+        out["select_outlaps_unfinished"] = sum(not m.get("kappa") for m in sel.values())
     summary.write_text(json.dumps(out, indent=1, default=float))
-    print(json.dumps({k: v for k, v in out.items() if k != "corner_other"}, indent=1, default=float))
+    print(json.dumps({k: v for k, v in out.items() if k not in ("corner_other", "at_base_failed_jumps")}, indent=1,
+                     default=float))
     print(json.dumps({k: v for k, v in out["corner_other"].items() if k != "rows"}, default=float))
 
 

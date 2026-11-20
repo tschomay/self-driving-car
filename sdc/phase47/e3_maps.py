@@ -29,7 +29,9 @@ def main():
         if OUT[name].exists():
             continue
         maps = collect(courses, starts, d, procs=4, real="truggy")
-        OUT[name].write_text(json.dumps(maps))
+        tmp = OUT[name].with_suffix(".tmp")
+        tmp.write_text(json.dumps(maps))
+        tmp.replace(OUT[name])          # atomic: e3_runs.sh waits for the train file
         print(name, len(maps), "maps;", sum(m["reason"] == "finished" for m in maps.values()), "out-laps finished",
               flush=True)
 

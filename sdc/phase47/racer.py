@@ -13,7 +13,7 @@ information and a reward for progress, does RL find driving better than the hand
           the physics draw (grip, mass, motor). No sensors, no memory.
   reward  metres of progress along the lane each step; CRASH_PEN on a crash; FINISH_BONUS for a finished lap.
           Progress per step rewards speed; the crash penalty and finish bonus reward finishing.
-  start   behaviour cloning of E4's re-tuned teacher on the same inputs (DAgger: the teacher labels the policy's own
+  start   behaviour cloning of E4's re-tuned teacher, with corners at 3.5 m/s^2 (headroom.py), on the same inputs (DAgger: the teacher labels the policy's own
           states), then the critic learns this policy's values before PPO changes it.
   PPO     the owner's GAE, clipped policy loss and value loss (sdc/phase1/my_ppo.py, unchanged), with far bigger
           batches than before (64 cars x 256 steps per update), on 4 worker processes.
@@ -49,8 +49,9 @@ H_AHEAD = np.concatenate([np.arange(0.5, 12.1, 0.5), np.arange(14.0, 30.1, 2.0)]
 KINDS = ("double", "drop", "table")
 OBS_DIM = 14 + len(KAP_AHEAD) + len(H_AHEAD) + 8 + 3
 CRASH_PEN, FINISH_BONUS = 50.0, 50.0
-TEACHER = dict(TRUGGY, jump_v={"double": 7.4})                           # E4's re-tuned teacher
-CFG = dict(workers=4, cars=16, n_steps=256, batch_size=4096, n_epochs=5, lr=1e-4, gamma=0.995, lam=0.95, clip=0.2,
+# E4's re-tuned teacher with 3.5 m/s^2 corners (headroom.py: 2.6 s a lap faster for about the same finishes)
+TEACHER = dict(TRUGGY, jump_v={"double": 7.4}, a_lat=3.5, a_brake=3.5)
+CFG = dict(workers=4, cars=32, n_steps=256, batch_size=4096, n_epochs=5, lr=1e-4, gamma=0.995, lam=0.95, clip=0.2,
            vf_coef=0.5, max_grad_norm=0.5, std=0.15, hidden=(256, 256), bc_rounds=4, bc_steps=200_000,
            bc_epochs=10, critic_warmup=1_000_000, eval_every=3_000_000, eval0=True)
 
@@ -200,11 +201,18 @@ def _make_driver(path, seed):
     return Noisy(Driver(path), seed * 1000 + os.getpid())
 
 
+def _make_teacher(seed):
+    import os
+    return Noisy(LoopExpert(**TEACHER), seed * 1000 + os.getpid())
+
+
 def score(path, procs=4, passes=2):
+    """path: a checkpoint, or None for the teacher the pilot starts from."""
     courses = json.loads(e2_prep.OUT.read_text())["split"]["select"]
     fin, laps = [], []
     for r in range(passes):
-        eps = cm.prun(functools.partial(_make_driver, str(path), r), courses, procs=procs, **env_eval())
+        make = functools.partial(_make_driver, str(path), r) if path else functools.partial(_make_teacher, r)
+        eps = cm.prun(make, courses, procs=procs, **env_eval())
         fin.append(int(sum(bool(e["finished"]) for e in eps)))
         laps += [e["l"] * 0.02 for e in eps if e["finished"]]
     return dict(finished_per_pass=fin, mean=float(np.mean(fin)), lap_s=round(float(np.median(laps)), 2))
@@ -356,7 +364,14 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--hours", type=float, default=8.0)
     ap.add_argument("--set", action="append", default=[], metavar="KEY=VALUE")
+    ap.add_argument("--score-teacher", action="store_true", help="score the starting teacher on the selection runs")
     a = ap.parse_args()
+    if a.score_teacher:
+        sc = score(None)
+        Path(a.out).mkdir(parents=True, exist_ok=True)
+        (Path(a.out) / "teacher.json").write_text(json.dumps(sc))
+        print("teacher", sc, flush=True)
+        return
     over = {k: json.loads(v) for k, v in (kv.split("=", 1) for kv in a.set)}
     train(a.out, a.seed, a.hours, **over)
 

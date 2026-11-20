@@ -143,3 +143,25 @@ Every experiment gets the owner's prediction before it runs.
   - Scoring: 5 noisy passes (std 0.02) of the 150 selection runs, as above (`python -m sdc.phase47.where e3`). The map-following teacher is scored the same way, as the new ceiling.
   - `bash sdc/phase47/e3_runs.sh`.
 - **Prediction (owner, before the run):** "133 and no time change" (selection runs finished per pass: base car about 130, teacher about 137).
+
+- **Result** (`runs/p47-e3-where.json`; scores pooled with the earlier base/teacher passes):
+
+  | Driver | Finished per pass (of 150) | Mean | Corner failures (5 passes) | Corner entry speed | Median lap |
+  |---|---|---|---|---|---|
+  | Base car | 127, 133, 135, 126, 131 | 130 | 35 | 4.59 m/s | 30.7 s |
+  | Teacher (true track) | 139, 136, 141, 127, 142 | 137 | 2 | 4.12 m/s | 30.8 s |
+  | **Map car (E3)** | 113, 108, 106, 99, 102 | **106** | 123 | 4.17 m/s | 30.5 s |
+  | Teacher reading the map | 126, 126, 129, 128, 125 | 127 | 71 | 4.18 m/s | 30.6 s |
+
+  - **The map car is much worse: 106 a pass, 24 below the base car.** Its corner failures went up from 35 to 123, even though it now slows for corners like the teacher (4.17 m/s at sharp turns, against the base car's 4.59).
+  - **The map itself is the problem, not the student:** the teacher planning from the same map drops from 137 to 127 a pass, and its corner failures go from 2 to 71.
+  - **10 of the 150 runs have no map** (their out-lap didn't finish). On those the map car finished 8% of the time and the map teacher 28%: with an empty map the car sees a straight road.
+  - **On runs with a map:** base car 87%, teacher 91%, map teacher 89%, map car 75%.
+  - **Why the map misleads** (`python -m sdc.phase47.map_align`, map teacher, 12 selection loops, one run each): the map is read at the car's own odometer, which re-syncs only at kickers.
+    - On the 8 laps it finished, the odometer stayed within 1–4 m of the true position, and the mapped curvature lined up with the true one (correlation 0.74–0.97, best shift within 1 m).
+    - On the 3 laps it left the lane, the odometer had drifted 8–15 m by the end (one had no map at all). The map was then pointing at the wrong turns (correlation 0.05 on one).
+    - So a drifted odometer sends the car into turns the map says are straights, and has it steer for turns that aren't there.
+  - Lap times differ by under 0.3 s. Medians are over the laps each car finished, so they aren't directly comparable.
+  - **Prediction vs. result:** predicted 133 per pass and no time change. Got 106 (99–113) and about the same lap time.
+- **Explanation (owner):** _pending_
+

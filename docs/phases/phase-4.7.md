@@ -132,3 +132,14 @@ Every experiment gets the owner's prediction before it runs.
   - Why: the base car (E10 arm B) has sensors only and copies a teacher that plans its braking from the true track. It can't see a sharp turn coming early enough to brake as the teacher does: Phase 4.5's lesson again.
 - **Landings are where the teacher itself fails:** 61 of its 65 failures, mostly rollovers on touchdown and spins 1–3 s after. The base car fails there about as often (50). Its pitch at touchdown is further off the landing slope (doubles: −30° on landings it survived, −41° on failures; teacher −12°), but both cars mostly fail on doubles taken 1.6–2 m/s under design speed.
 - **Takeaway:** two separate problems. Catching up to the teacher is a corner-speed problem (knowledge the student lacks), not a recovery problem. Beating the teacher needs better landings and post-landing stability, the one place the teacher fails.
+
+### E3 — A map of the turns, so the student can brake where the teacher does
+
+- **Why:** the base car's whole gap to the teacher is corners: it can't see a sharp turn coming and carries 0.5 m/s too much into it (see above).
+- **Setup:**
+  - E10 arm B's recipe (DAgger, 16 rounds, truggy physics, expo 0.4, seeds 0–1, averaged) plus the out-lap map of the turns as input (Phase 4.6 E3: 9 mapped curvatures ahead of the car's own odometer).
+  - The teacher plans its corner speeds from the same map (`LoopExpert(use_turn_map=True)`), so it only knows what the student can know.
+  - The maps are rebuilt on the truggy physics (`python -m sdc.phase47.e3_maps`; Phase 4.6's were on the old physics).
+  - Scoring: 5 noisy passes (std 0.02) of the 150 selection runs, as above (`python -m sdc.phase47.where e3`). The map-following teacher is scored the same way, as the new ceiling.
+  - `bash sdc/phase47/e3_runs.sh`.
+- **Prediction (owner, before the run):** "133 and no time change" (selection runs finished per pass: base car about 130, teacher about 137).

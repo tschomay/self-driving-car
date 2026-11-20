@@ -42,15 +42,28 @@ LAND_S, CORNER_M, SHARP = 1.0, 6.0, 0.1
 FIELDS = ("t", "x", "y", "yaw", "v", "pitch", "up_z", "kappa", "air", "steer", "throttle")
 
 
+MAP_CAR = ("runs/p47-e3-s0", "runs/p47-e3-s1")      # E3: the map students (bc_loop --map), averaged
+SELECT_MAP = "runs/p47-maps-select.json"
+
+
+def _driver(who):
+    """(policy, env) for base / teacher / map (E3's map students) / mapteacher (the teacher planning from the map)."""
+    env = env_kw(val=True)
+    if who in ("map", "mapteacher"):
+        env = dict(env, turn_map=SELECT_MAP)
+    if who in ("teacher", "mapteacher"):
+        env = {k: v for k, v in env.items() if k != "expo"}
+        return LoopExpert(use_turn_map=who == "mapteacher", **TRUGGY), env
+    return Ensemble(MAP_CAR if who == "map" else BASE), env
+
+
+WHO_ID = dict(base=0, teacher=1, map=2, mapteacher=3)
+
+
 def _drive(who, rep, course):
     torch.set_num_threads(1)
-    env = env_kw(val=True)
-    if who == "teacher":
-        env = {k: v for k, v in env.items() if k != "expo"}
-        pol = LoopExpert(**TRUGGY)
-    else:
-        pol = Ensemble(BASE)
-    rng = np.random.default_rng([rep, course, 0 if who == "base" else 1])
+    pol, env = _driver(who)
+    rng = np.random.default_rng([rep, course, WHO_ID[who]])
     b = je.JumpBatch(len(STARTS), courses=[course] * len(STARTS), **env)
     b._obs = np.zeros((len(STARTS), b.obs_dim), np.float32)
     for i, c in enumerate(b.cars):
@@ -89,13 +102,13 @@ def _job(args):
     return _drive(*args)
 
 
-def collect():
+def collect(whos=("base", "teacher"), out=OUT):
     courses = json.loads(e2_prep.OUT.read_text())["split"]["select"]
-    jobs = [(who, r, c) for who in ("base", "teacher") for r in range(REPEATS) for c in courses]
+    jobs = [(who, r, c) for who in whos for r in range(REPEATS) for c in courses]
     with mp.get_context("fork").Pool(4) as pool:
         runs = [r for chunk in pool.imap_unordered(_job, jobs, chunksize=1) for r in chunk]
-    OUT.write_bytes(pickle.dumps(runs))
-    print(len(runs), "runs ->", OUT)
+    Path(out).write_bytes(pickle.dumps(runs))
+    print(len(runs), "runs ->", out)
 
 
 def place(run, course):
@@ -115,9 +128,10 @@ def place(run, course):
     return "other"
 
 
-def analyse():
+def analyse(src=(OUT,), summary=SUMMARY):
     from sdc.jumps import loop as lp
-    runs = pickle.loads(OUT.read_bytes())
+    runs = [r for f in src for r in pickle.loads(Path(f).read_bytes())]
+    whos = sorted({r["who"] for r in runs}, key=lambda w: WHO_ID[w])
     courses = {}
 
     def course(seed):
@@ -130,7 +144,7 @@ def analyse():
     fin = collections.defaultdict(lambda: collections.defaultdict(list))
     for r in runs:
         fin[r["who"]][key(r)].append(r["ep"]["finished"])
-    for who in ("base", "teacher"):
+    for who in whos:
         f = {k: np.mean(v) for k, v in fin[who].items()}
         fails = [r for r in runs if r["who"] == who and not r["ep"]["finished"]]
         places = collections.Counter((place(r, course(r["course"])), r["ep"]["reason"]) for r in fails)
@@ -160,7 +174,7 @@ def analyse():
                              body=j.get("body"), all4=j.get("all4"), upright=j.get("upright"),
                              design=float(course(r["course"]).jumps[j["jump"]].design_speed)))
     jumps = {}
-    for who in ("base", "teacher"):
+    for who in whos:
         p = {k: np.mean(v) for k, v in att[who].items()}
         by = collections.defaultdict(list)
         for (c, s, k), v in p.items():
@@ -202,7 +216,7 @@ def analyse():
                                                and r["v_takeoff"] is not None] or [0])
                                        for i in {r["inst"] for r in rows if r["kind"] == kind}])), 3),
         landed=round(float(np.mean([r["landed"] for r in rows if r["kind"] == kind and r["who"] == who])), 3))
-        for who in ("base", "teacher")} for kind in sorted({r["kind"] for r in rows})}
+        for who in whos} for kind in sorted({r["kind"] for r in rows})}
     # corner and other failures: speed and lane offset in the last 2 s, vs the teacher at the same place
     tr_t = collections.defaultdict(list)
     for r in runs:
@@ -233,10 +247,24 @@ def analyse():
         faster_than_teacher=int(sum(r["v_teacher"] is not None and r["v_max"] > r["v_teacher"] + 0.3 for r in rows_c)),
         yaw_max_median=round(float(np.median([r["yaw_max"] for r in rows_c])), 1) if rows_c else None,
         rows=rows_c)
-    SUMMARY.write_text(json.dumps(out, indent=1, default=float))
+    summary.write_text(json.dumps(out, indent=1, default=float))
     print(json.dumps({k: v for k, v in out.items() if k != "corner_other"}, indent=1, default=float))
     print(json.dumps({k: v for k, v in out["corner_other"].items() if k != "rows"}, default=float))
 
 
+def main():
+    """collect | analyse, or e3: the map car and the map-following teacher, analysed with the base/teacher runs."""
+    cmd = sys.argv[1]
+    if cmd == "collect":
+        collect()
+    elif cmd == "analyse":
+        analyse()
+    elif cmd == "e3":
+        e3 = Path("runs/p47-e3-where.pkl")
+        if not e3.exists():
+            collect(("map", "mapteacher"), e3)
+        analyse((OUT, e3), Path("runs/p47-e3-where.json"))
+
+
 if __name__ == "__main__":
-    {"collect": collect, "analyse": analyse}[sys.argv[1]]()
+    main()

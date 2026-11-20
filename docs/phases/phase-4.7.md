@@ -111,3 +111,24 @@ Every experiment gets the owner's prediction before it runs.
   - One pass of 150 runs swings about ±3 laps from chance alone, about the size of every E1 and E2 "effect" (E1 validation 46–54; E2 fresh 81–86 vs base 84). Single-pass scores can't separate cars that close.
   - A residual trained on single crash/no-crash outcomes gets mostly chance as its signal. The literature names this the "curse of chaos": in systems sensitive to small differences, policy-gradient estimates become very noisy (Parmas et al., PIPPS, arXiv 1902.01240).
 - **Takeaway:** the car doesn't need new recoveries; it needs a lower crash probability at many risky moments, mostly jumps. To see that, scores must be probabilities (repeated noisy runs), not single passes.
+
+### After E2 — Where the coin flips happen (agent, owner: "go for it")
+
+- **Run:** `python -m sdc.phase47.where collect` then `analyse`. The base car and the teacher each drove the 150 selection runs 5 times with tiny action noise (std 0.02), with traces, takeoffs and landings recorded (about 35 min). Each run keeps its physics on every repeat. Base finished 127, 133, 135, 126, 131; teacher 139, 136, 141, 127, 142.
+- **Where they fail** (all 5 passes; "after landing" = off the lane 1–3 s after touching down, a fish-tail):
+
+  | Place | Base car | Teacher |
+  |---|---|---|
+  | Corner | 35 | 2 |
+  | Landing (within 1 s) | 16 | 26 |
+  | After landing (1–3 s) | 34 | 35 |
+  | Elsewhere | 13 | 2 |
+  | **All** | **98** | **65** |
+
+- **Corners are the whole gap.** 35 corner failures in 5 passes is 7 a pass, about the teacher's lead (137 vs 130 a pass).
+  - The base car enters sharp turns (> 0.15 /m) 0.5 m/s faster than the teacher at the same corner, at every grip level.
+  - The teacher slows more for sharper turns (4.19 → 3.95 m/s); the base car doesn't (4.53 → 4.66 m/s).
+  - It only crashes when grip is low: base car failures by grip quarter 24%, 11%, 7%, 10% (teacher 5%, 10%, 9%, 11%).
+  - Why: the base car (E10 arm B) has sensors only and copies a teacher that plans its braking from the true track. It can't see a sharp turn coming early enough to brake as the teacher does: Phase 4.5's lesson again.
+- **Landings are where the teacher itself fails:** 61 of its 65 failures, mostly rollovers on touchdown and spins 1–3 s after. The base car fails there about as often (50). Its pitch at touchdown is further off the landing slope (doubles: −30° on landings it survived, −41° on failures; teacher −12°), but both cars mostly fail on doubles taken 1.6–2 m/s under design speed.
+- **Takeaway:** two separate problems. Catching up to the teacher is a corner-speed problem (knowledge the student lacks), not a recovery problem. Beating the teacher needs better landings and post-landing stability, the one place the teacher fails.

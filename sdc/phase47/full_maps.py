@@ -1,6 +1,7 @@
 """Phase 4.7 after E3 (owner: "a map only hurts if it's inaccurate"): what are complete maps worth?
 
     python -m sdc.phase47.full_maps     -> runs/p47-maps-select-full.json, runs/p47-full-maps.pkl, printed summary
+    python -m sdc.phase47.full_maps trainval  -> runs/p47-maps-{val,train}-full.json (E3b's training maps)
 
 10 of the 150 selection runs had no map: their out-lap didn't finish (7 rolled over). A person would simply drive
 the out-lap again. Here each failed out-lap is retried with the stand-in's jump speed at 3.5, 3.0, 4.5, then
@@ -30,15 +31,32 @@ OUT = Path("runs/p47-full-maps.pkl")
 LADDER = (3.5, 3.0, 4.5, 5.0)
 
 
-def _retry(key):
+def _retry(key, d="gate"):
     torch.set_num_threads(1)
     c, x0 = key.split("|")
     for vj in LADDER:
-        log = laps.record(OutLapDriver(**{**OUTLAP_TRUGGY, "v_jump": vj}), int(c), float(x0), dr="gate",
+        log = laps.record(OutLapDriver(**{**OUTLAP_TRUGGY, "v_jump": vj}), int(c), float(x0), dr=d,
                           phys_seed=0, max_steps=6000, real="truggy")
         if log["reason"] == "finished":
             return key, dict(make_map(log), v_jump=vj)
     return key, make_map(log)
+
+
+def _retry_train(key):
+    return _retry(key, "train")
+
+
+def complete(src, dst, d):
+    """Copy of the maps in src with every failed out-lap retried (ladder above) at range d; written to dst."""
+    maps = json.loads(Path(src).read_text())
+    bad = [k for k, v in maps.items() if not v.get("kappa")]
+    with Pool(4) as p:
+        maps.update(dict(p.map(_retry if d == "gate" else _retry_train, bad, chunksize=1)))
+    tmp = Path(dst).with_suffix(".tmp")
+    tmp.write_text(json.dumps(maps))
+    tmp.replace(dst)
+    print(dst, "retried", len(bad), "out-laps;", sum(bool(maps[k].get("kappa")) for k in bad), "now have a map",
+          flush=True)
 
 
 def ep(r):
@@ -46,6 +64,13 @@ def ep(r):
 
 
 def main():
+    import sys
+    if sys.argv[1:] == ["trainval"]:      # E3b: complete maps for the student's training and validation runs
+        for name, d in (("val", "gate"), ("train", "train")):
+            dst = Path(f"runs/p47-maps-{name}-full.json")
+            if not dst.exists():
+                complete(f"runs/p47-maps-{name}.json", dst, d)
+        return
     maps = json.loads(Path(W.SELECT_MAP).read_text())
     bad = [k for k, v in maps.items() if not v.get("kappa")]
     if not FULL.exists():

@@ -44,20 +44,32 @@ FIELDS = ("t", "x", "y", "yaw", "v", "pitch", "up_z", "kappa", "air", "steer", "
 
 MAP_CAR = ("runs/p47-e3-s0", "runs/p47-e3-s1")      # E3: the map students (bc_loop --map), averaged
 SELECT_MAP = "runs/p47-maps-select.json"
+FULL_MAP = "runs/p47-maps-select-full.json"          # after E3: every failed out-lap driven again (full_maps.py)
+E3B_CAR = ("runs/p47-e3b-s0", "runs/p47-e3b-s1")    # E3b: map students trained on complete maps
+E4_CAR = ("runs/p47-e4-s0", "runs/p47-e4-s1")       # E4: sensors-only students copying the re-tuned teacher
+E4_TEACHER = "runs/p47-e4-teacher.json"              # e4_tune.py's chosen settings over TRUGGY
 
 
 def _driver(who):
-    """(policy, env) for base / teacher / map (E3's map students) / mapteacher (the teacher planning from the map)."""
+    """(policy, env) for base / teacher / map (E3's map students) / mapteacher (the teacher planning from the map) /
+    map_full (E3b's students, complete maps) / teacher_plus (E4's re-tuned teacher) / e4 (E4's students)."""
     env = env_kw(val=True)
     if who in ("map", "mapteacher"):
         env = dict(env, turn_map=SELECT_MAP)
-    if who in ("teacher", "mapteacher"):
+    if who == "map_full":
+        return Ensemble(E3B_CAR), dict(env, turn_map=FULL_MAP)
+    if who == "e4":
+        return Ensemble(E4_CAR), env
+    if who in ("teacher", "mapteacher", "teacher_plus"):
         env = {k: v for k, v in env.items() if k != "expo"}
-        return LoopExpert(use_turn_map=who == "mapteacher", **TRUGGY), env
+        over = {}
+        if who == "teacher_plus":
+            over = {k: v for k, v in json.loads(Path(E4_TEACHER).read_text()).items() if not k.startswith("_")}
+        return LoopExpert(use_turn_map=who == "mapteacher", **{**TRUGGY, **over}), env
     return Ensemble(MAP_CAR if who == "map" else BASE), env
 
 
-WHO_ID = dict(base=0, teacher=1, map=2, mapteacher=3)
+WHO_ID = dict(base=0, teacher=1, map=2, mapteacher=3, map_full=4, teacher_plus=5, e4=6)
 
 
 def _drive(who, rep, course):
@@ -289,6 +301,12 @@ def main():
         if not e3.exists():
             collect(("map", "mapteacher"), e3)
         analyse((OUT, e3), Path("runs/p47-e3-where.json"))
+    elif cmd in ("e3b", "e4teacher", "e4"):    # one more driver, analysed with the base car and the teacher
+        who = dict(e3b="map_full", e4teacher="teacher_plus", e4="e4")[cmd]
+        pk = Path(f"runs/p47-{cmd}-where.pkl")
+        if not pk.exists():
+            collect((who,), pk)
+        analyse((OUT, pk), Path(f"runs/p47-{cmd}-where.json"))
 
 
 if __name__ == "__main__":

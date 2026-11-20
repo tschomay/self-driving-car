@@ -27,7 +27,7 @@ from sdc.phase47.train_residual import env_kw
 
 OUT = Path("runs/p47-e4-tune.json")
 TEACHER = Path("runs/p47-e4-teacher.json")
-TUNE_LOOPS, REPEATS, MARGIN = 50, 3, 2.0
+TUNE_LOOPS, REPEATS, MARGIN = 50, 4, 3.0
 SETTINGS = {
     "current": {},
     "double 7.4": dict(jump_v={"double": 7.4}),

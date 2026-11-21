@@ -49,11 +49,12 @@ H_AHEAD = np.concatenate([np.arange(0.5, 12.1, 0.5), np.arange(14.0, 30.1, 2.0)]
 KINDS = ("double", "drop", "table")
 OBS_DIM = 14 + len(KAP_AHEAD) + len(H_AHEAD) + 8 + 3
 CRASH_PEN, FINISH_BONUS = 50.0, 50.0
+MARGIN = 0.0        # per-step cost for running near the lane edge (|y| > 1.0 m of the 1.5 m half-width)
 # E4's re-tuned teacher with 3.5 m/s^2 corners (headroom.py: 2.6 s a lap faster for about the same finishes)
 TEACHER = dict(TRUGGY, jump_v={"double": 7.4}, a_lat=3.5, a_brake=3.5)
 CFG = dict(workers=4, cars=32, n_steps=256, batch_size=4096, n_epochs=5, lr=1e-4, gamma=0.995, lam=0.95, clip=0.2,
            vf_coef=0.5, max_grad_norm=0.5, std=0.15, hidden=(256, 256), bc_rounds=4, bc_steps=200_000,
-           bc_epochs=10, critic_warmup=1_000_000, eval_every=3_000_000, eval0=True, crash_pen=CRASH_PEN, init=None)
+           bc_epochs=10, critic_warmup=1_000_000, eval_every=3_000_000, eval0=True, crash_pen=CRASH_PEN, init=None, margin=0.0)
 
 
 def env_train():
@@ -128,6 +129,8 @@ def _worker(conn, seed, n, courses):
             rew[i], term[i], trunc[i], reason = c.step(act[i], 0.0, b.max_steps, 0.0, FINISH_BONUS)
             if term[i] and reason != "finished":
                 rew[i] -= CRASH_PEN
+            if MARGIN and not term[i]:
+                rew[i] -= MARGIN * (max(0.0, abs(c.state()["y"]) - 1.0) / 0.5) ** 2
             if term[i] or trunc[i]:
                 term_obs[i] = priv_obs(c)
                 ep = c.summary(reason)
@@ -221,9 +224,9 @@ def score(path, procs=4, passes=2):
 # ---- training ------------------------------------------------------------------------------------------------
 
 def train(out, seed=0, hours=8.0, **over):
-    global CRASH_PEN
+    global CRASH_PEN, MARGIN
     cfg = {**CFG, **over}
-    CRASH_PEN = cfg["crash_pen"]                 # read by the forked workers
+    CRASH_PEN, MARGIN = cfg["crash_pen"], cfg["margin"]                 # read by the forked workers
     out = Path(out)
     (out / "ckpt").mkdir(parents=True, exist_ok=True)
     torch.set_num_threads(1)

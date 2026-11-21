@@ -337,3 +337,4 @@ The owner asked for research on what would really move the needle toward a good 
   - Failures look like the teacher's, mostly off the lane (RL 9 off the lane, 3 rolled; teacher 10 and 4).
 - **Reading (agent):** speed pays a little on every step. A crash is rare and partly chaotic, so its cost reaches the learner as a weak, noisy signal, and a bigger price or a longer horizon didn't fix that.
 - **Next (running):** a dense warning instead of only the rare crash. A small cost on every step the car is more than 1.0 m off the centre line (the lane is 1.5 m each side). `--set margin=0.5 --set crash_pen=200`, from s1 at 3M (`runs/p47-racer-s3`).
+  - 3M steps: 129, 131, mean 130.0 at 25.5 s. Finishes flat, laps a little faster. Every reward tried so far (crash 50, 200, 500 with long horizon, lane margin) settles near 130 finishes per pass. Still running.

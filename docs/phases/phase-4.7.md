@@ -384,7 +384,7 @@ The owner asked for research on what would really move the needle toward a good 
     - 198 in corners (off the lane)
     - 48 elsewhere off the lane
     - 38 on landings
-  - **Doubles** landed 87% (racer: higher; base 99.6%).
+  - **Jumps:** E5 landed 94.3% of all jumps (racer 96.3%, teacher 97.5%). Doubles were *better* (98.8%; racer 94.8%), drops worse (87.2%; racer 95.5%), tables about the same (97.9%; racer 98.3%).
   - **Corner entry:** E5 enters corners at 6.12 m/s, faster than the racer it copies (5.77). E4's students did the same against their teacher (4.75 against 4.12).
   - Validation (60 runs, start 0 and others): 40/60 and 31/60, against E4's 53 and 49.
   - Owner's prediction: speed survives ("driving is more dependent on ability to react rather than plan"): **right**. "A little less reliable on the jumps": **partly**. It is less reliable, but by far more than a little, and mostly in corners rather than on jumps.

@@ -345,6 +345,22 @@ The owner asked for research on what would really move the needle toward a good 
 - **What limits finishes?** "Crashing is a matter of luck and random chance at some point. Better driving can't prevent it."
 - **What survives on sensors?** "We would lose some route planning. But I'm thinking that driving is more dependent on ability to react rather than plan. It never learned or needed a racing line. I think it'll be a little less reliable on the jumps"
 
+### New goal (owner, after the RL pilot)
+
+- **Owner:** "Let's do total time for a 20 lap race. Crashes cost 7 seconds."
+- **Scoring:** race time = 20 × median lap + 20 × crash rate × 7 s, from the 5 noisy passes of the 150 selection runs (each run counts as one lap). Lower is better; success is a sensors-only car with a lower race time than the teacher.
+- **What it means (agent):** 1 s per lap is worth 20 s, about 3 crashes. A car can crash on 14 more laps in 100 for each second it gains per lap and still break even.
+
+  | Driver | Crashes per lap | Race |
+  |---|---|---|
+  | Base car | 0.133 | 633 s |
+  | Teacher | 0.087 | 628 s |
+  | Re-tuned teacher | 0.053 | 622 s |
+  | E4 students | 0.173 | 628 s |
+  | Teacher, corners 5.0 | 0.250 | 567 s |
+  | Best RL racer (privileged) | 0.115 | 534 s |
+  | RL racer, 9M steps (privileged) | 0.247 | 535 s |
+
 ### E5 — Copy the RL racer onto sensors
 
 - **Setup:** the base recipe (`bc_loop --truggy --rounds 16 --expo 0.4`, 2 seeds averaged), with the privileged RL racer as the teacher (`--teacher-racer runs/p47-racer-s1/ckpt/3014656.pt`; `bash sdc/phase47/e5_runs.sh`).

@@ -368,4 +368,24 @@ The owner asked for research on what would really move the needle toward a good 
   - Check, 1 pass on the selection runs with expo: 135 finished at 25.8 s (without expo, 5 passes: 132.8 at 25.9 s).
   - Scoring: 5 noisy passes of the 150 selection runs, racer and students (`python -m sdc.phase47.where e5`).
 - **Prediction (owner):** "a little less reliable on the jumps"; driving depends more on reacting than planning, so most of the speed should carry over.
-- **Result:** _running_
+- **Result:** a success under the owner's race rule. The sensors-only E5 car beats the teacher by 53 s over 20 laps. It keeps nearly all of the racer's speed, but crashes on 4 laps in 10. Scored over 5 passes × 150 selection runs; laps are paired against the teacher (`runs/p47-e5-where.json`).
+
+  | Driver | Finished per pass | Crashes per lap | Median lap | Lap vs teacher | 20-lap race |
+  |---|---|---|---|---|---|
+  | Base car | 127, 133, 135, 126, 131 | 0.131 | 30.7 s | −0.06 s | 633 s |
+  | Teacher | 139, 136, 141, 127, 142 | 0.087 | 30.8 s | — | 628 s |
+  | Re-tuned teacher | 136, 144, 142, 142, 144 | 0.056 | 30.5 s | −0.10 s | 618 s |
+  | E4 students | — (mean 124) | 0.173 | 30.4 s | −0.49 s | 631 s |
+  | RL racer (privileged) | 132, 136, 134, 130, 138 | 0.107 | 25.8 s | −4.92 s | 531 s |
+  | **E5 students** | 97, 89, 87, 89, 99 | 0.385 | 26.1 s | −4.78 s | **575 s** |
+
+  - **Speed carried over** almost whole: −4.78 s against the racer's −4.92 s.
+  - **Reliability did not.** E5 finished 92 per pass against the racer's 134. Its 289 failures (5 passes):
+    - 198 in corners (off the lane)
+    - 48 elsewhere off the lane
+    - 38 on landings
+  - **Doubles** landed 87% (racer: higher; base 99.6%).
+  - **Corner entry:** E5 enters corners at 6.12 m/s, faster than the racer it copies (5.77). E4's students did the same against their teacher (4.75 against 4.12).
+  - Validation (60 runs, start 0 and others): 40/60 and 31/60, against E4's 53 and 49.
+  - Owner's prediction: speed survives ("driving is more dependent on ability to react rather than plan"): **right**. "A little less reliable on the jumps": **partly**. It is less reliable, but by far more than a little, and mostly in corners rather than on jumps.
+- **Explanation (owner):** _pending_

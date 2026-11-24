@@ -199,6 +199,22 @@ class Driver:
             return self.net.actor(_t(np.stack([priv_obs(c) for c in b.cars]))).clamp(-1, 1).numpy()
 
 
+class ExpoDriver(Driver):
+    """The privileged driver on a car with steering expo (it was trained without): it sees its last steering as the
+    servo angle it asked for, and its steering is passed through the expo inverse, as the hand-coded teacher does."""
+
+    def __call__(self, b):
+        obs = np.stack([priv_obs(c) for c in b.cars])
+        e = np.array([getattr(c, "expo", 0.0) for c in b.cars], np.float32)
+        a0 = obs[:, 10]
+        obs[:, 10] = (1 - e) * a0 + e * a0 ** 3
+        with torch.no_grad():
+            act = self.net.actor(_t(obs)).clamp(-1, 1).numpy()
+        for i, c in enumerate(b.cars):
+            act[i, 0] = je.expo_inverse(float(act[i, 0]), float(e[i]))
+        return act
+
+
 def _make_driver(path, seed):
     import os
     return Noisy(Driver(path), seed * 1000 + os.getpid())

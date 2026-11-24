@@ -338,3 +338,18 @@ The owner asked for research on what would really move the needle toward a good 
 - **Reading (agent):** speed pays a little on every step. A crash is rare and partly chaotic, so its cost reaches the learner as a weak, noisy signal, and a bigger price or a longer horizon didn't fix that.
 - **Next (running):** a dense warning instead of only the rare crash. A small cost on every step the car is more than 1.0 m off the centre line (the lane is 1.5 m each side). `--set margin=0.5 --set crash_pen=200`, from s1 at 3M (`runs/p47-racer-s3`).
   - 3M steps: 129, 131, mean 130.0 at 25.5 s. Finishes flat, laps a little faster. Every reward tried so far (crash 50, 200, 500 with long horizon, lane margin) settles near 130 finishes per pass. Still running.
+
+### Owner's answers after the RL pilot
+
+- **Which car would you race?** "The faster one. The slow ones probably wins more but it isn't as exciting. And crashes are common in rc racing."
+- **What limits finishes?** "Crashing is a matter of luck and random chance at some point. Better driving can't prevent it."
+- **What survives on sensors?** "We would lose some route planning. But I'm thinking that driving is more dependent on ability to react rather than plan. It never learned or needed a racing line. I think it'll be a little less reliable on the jumps"
+
+### E5 — Copy the RL racer onto sensors
+
+- **Setup:** the base recipe (`bc_loop --truggy --rounds 16 --expo 0.4`, 2 seeds averaged), with the privileged RL racer as the teacher (`--teacher-racer runs/p47-racer-s1/ckpt/3014656.pt`; `bash sdc/phase47/e5_runs.sh`).
+  - The racer was trained without steering expo. On the expo car it sees its last steering as the servo angle it asked for, and its steering goes through the expo inverse, as the hand-coded teacher's does (`racer.ExpoDriver`).
+  - Check, 1 pass on the selection runs with expo: 135 finished at 25.8 s (without expo, 5 passes: 132.8 at 25.9 s).
+  - Scoring: 5 noisy passes of the 150 selection runs, racer and students (`python -m sdc.phase47.where e5`).
+- **Prediction (owner):** "a little less reliable on the jumps"; driving depends more on reacting than planning, so most of the speed should carry over.
+- **Result:** _running_

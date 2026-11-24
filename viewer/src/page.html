@@ -1,0 +1,221 @@
+<title>Truggy Race Replay</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: the 3D replay fills the screen. A timing tower along the top (lap, lap time, gap to the best lap, race
+   time, crashes), instruments bottom-left, a transport bar along the bottom (play, timeline with laps and crashes,
+   speed, camera), and an end card with the lap chart. Pit-board look from the owner's rc-racer game. */
+:root {
+  color-scheme: dark;
+  --slate: #1b221e;        /* pit-board green-black */
+  --slate-2: #29332c;
+  --line: #3d4a40;
+  --ink: #f1ecdd;          /* chalk white */
+  --dim: #aeb3a2;
+  --chalk: #f2c230;        /* pit-board yellow */
+  --warn: #ff7a4d;
+  --good: #86d993;
+  --ghost: #9fe6ff;
+  --rival: #5b9cf0;
+  --display: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --body: "Barlow", "Helvetica Neue", Arial, sans-serif;
+  --gl: max(16px, env(safe-area-inset-left, 0px));
+  --gr: max(16px, env(safe-area-inset-right, 0px));
+}
+html, body { height: 100%; }
+body { background: var(--slate); color: var(--ink); font: 400 15px/1.45 var(--body); overflow: hidden; overscroll-behavior: none; -webkit-user-select: none; user-select: none; }
+#app { position: relative; height: 100%; overflow: hidden; }
+#view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+button, select { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--chalk); outline-offset: 2px; }
+.num { font-family: var(--display); font-variant-numeric: tabular-nums; }
+.label { font: 600 11px/1 var(--display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+.panel { background: color-mix(in srgb, var(--slate) 80%, transparent); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+
+/* ---- HUD ---- */
+#hud { position: absolute; inset: 0; pointer-events: none; padding-top: calc(8px + env(safe-area-inset-top, 0px)); padding-left: var(--gl); padding-right: var(--gr);
+  padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); display: grid; grid-template-rows: auto 1fr auto; text-shadow: 0 1px 2px rgba(10, 14, 11, 0.7); }
+.tower { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.tl { display: flex; gap: 6px; align-items: stretch; }
+.box { padding: 5px 9px 6px; }
+.box .num { display: block; font-size: 24px; font-weight: 700; line-height: 1; margin-top: 3px; }
+#lap-box .num b { color: var(--dim); font-weight: 600; font-size: 17px; }
+#laptime { font-size: 34px !important; }
+#delta { font-size: 17px !important; margin-top: 2px !important; }
+#delta.ahead { color: var(--good); } #delta.behind { color: var(--warn); }
+.tr { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+#race-box { text-align: right; }
+#crash-box .num { color: var(--warn); }
+#rival-box { display: flex; align-items: center; gap: 7px; }
+#rival-box i { width: 10px; height: 10px; background: var(--rival); display: inline-block; }
+#rival-gap { font-size: 18px !important; margin: 0 !important; }
+.mid { display: grid; justify-items: center; align-content: start; gap: 8px; padding-top: 6vh; }
+#air { font: 700 44px/1 var(--display); color: var(--chalk); letter-spacing: 0.02em; opacity: 0; transition: opacity 0.25s; text-align: center; }
+#air small { display: block; font: 600 13px/1.2 var(--display); letter-spacing: 0.16em; color: var(--ink); text-transform: uppercase; }
+#air.show { opacity: 1; }
+#flag { padding: 10px 18px 12px; text-align: center; border-left: 4px solid var(--warn); }
+#flag h2 { margin: 0; font: 700 26px/1 var(--display); text-transform: uppercase; color: var(--warn); letter-spacing: 0.04em; }
+#flag p { margin: 4px 0 0; font: 600 16px/1.2 var(--display); }
+#flag .num { font-size: 44px; color: var(--ink); line-height: 1; display: block; margin-top: 4px; }
+#replay-tag { font: 700 15px/1 var(--display); letter-spacing: 0.3em; padding: 6px 10px 6px 13px; background: var(--chalk); color: #1b1a12; text-shadow: none; }
+#lapflash { font: 700 30px/1 var(--display); padding: 8px 14px; text-align: center; }
+#lapflash small { display: block; font: 600 12px/1.2 var(--display); letter-spacing: 0.16em; color: var(--dim); text-transform: uppercase; margin-bottom: 4px; }
+#lapflash.best { color: var(--good); }
+.inst { display: flex; align-items: flex-end; gap: 10px; }
+#speed { font-size: 40px; font-weight: 700; line-height: 0.9; }
+#speed small { font-size: 14px; color: var(--dim); font-weight: 600; margin-left: 3px; }
+.gauges { display: grid; gap: 6px; padding: 7px 9px; }
+.g { display: grid; grid-template-columns: 34px 120px; align-items: center; gap: 6px; }
+.bar { position: relative; height: 8px; background: rgba(241, 236, 221, 0.16); }
+.bar i { position: absolute; top: 0; bottom: 0; }
+#thr i { background: var(--good); } #thr i.brake { background: var(--warn); }
+#steer i { background: var(--chalk); }
+.bar::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: rgba(241, 236, 221, 0.5); }
+#car-tag { font: 600 12px/1.2 var(--display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); margin-bottom: 4px; }
+
+/* ---- transport ---- */
+#bar { position: absolute; left: 0; right: 0; bottom: 0; padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); padding-top: 8px; padding-left: var(--gl); padding-right: var(--gr);
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 8px; align-items: center; border-top: 2px solid var(--chalk); }
+.btn { min-height: 40px; min-width: 44px; padding: 0 10px; border: 1px solid var(--line); background: var(--slate-2); font: 600 15px/1 var(--display); letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+.btn:active { background: var(--line); }
+#play { font-size: 18px; }
+#tl { position: relative; height: 40px; }
+#tl input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+#tl .track { position: absolute; left: 0; right: 0; top: 17px; height: 6px; background: rgba(241, 236, 221, 0.18); pointer-events: none; }
+#tl .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--chalk); }
+#tl .tick { position: absolute; top: -4px; width: 1px; height: 14px; background: rgba(241, 236, 221, 0.45); }
+#tl .tick.best { background: var(--good); width: 2px; }
+#tl .crash { position: absolute; top: -3px; width: 6px; height: 12px; margin-left: -3px; background: var(--warn); }
+#tl .head { position: absolute; top: -7px; width: 4px; height: 20px; margin-left: -2px; background: var(--ink); box-shadow: 0 0 0 1px var(--slate); }
+#tl .lbl { position: absolute; top: 26px; font: 600 10px/1 var(--display); color: var(--dim); transform: translateX(-50%); white-space: nowrap; }
+.right { display: flex; gap: 6px; }
+
+/* ---- sheet (loops, options) ---- */
+#sheet { position: absolute; left: 0; right: 0; bottom: 0; max-height: 80%; overflow-y: auto; border-top: 2px solid var(--chalk);
+  padding-block: 14px calc(14px + env(safe-area-inset-bottom, 0px)); padding-left: var(--gl); padding-right: var(--gr); display: flex; flex-direction: column; gap: 12px; background: color-mix(in srgb, var(--slate) 95%, transparent); }
+#sheet h1, #card h1 { margin: 0; font: 700 30px/1 var(--display); text-transform: uppercase; text-wrap: balance; }
+#sheet h1 span, #card h1 span { color: var(--chalk); }
+.sub { color: var(--dim); font-size: 13px; margin: 0; max-width: 62ch; }
+.row { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 10px; align-items: center; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { flex: 1 1 auto; min-height: 38px; padding: 0 12px; border: 1px solid var(--line); background: var(--slate-2); font: 600 15px/1 var(--display); letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--chalk); border-color: var(--chalk); color: #1b1a12; }
+.seg button small { display: block; font-size: 11px; opacity: 0.75; margin-top: 2px; letter-spacing: 0.02em; }
+details { font-size: 13px; color: var(--dim); }
+details summary { color: var(--ink); cursor: pointer; min-height: 30px; display: flex; align-items: center; }
+details p { margin: 4px 0 8px; max-width: 62ch; }
+details b { color: var(--ink); font-weight: 600; }
+#close-sheet { align-self: stretch; min-height: 46px; background: var(--chalk); color: #1b1a12; font: 700 19px/1 var(--display); letter-spacing: 0.08em; text-transform: uppercase; }
+
+/* ---- end card ---- */
+#card { position: absolute; inset: 0; overflow-y: auto; padding-top: calc(18px + env(safe-area-inset-top, 0px)); padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px)); padding-left: var(--gl); padding-right: var(--gr);
+  background: color-mix(in srgb, var(--slate) 88%, transparent); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.card-in { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px; }
+.stat { background: var(--slate-2); padding: 9px 11px; }
+.stat .num { display: block; font-size: 30px; font-weight: 700; line-height: 1.05; margin-top: 3px; }
+.stat .num.good { color: var(--good); } .stat .num.warn { color: var(--warn); }
+.stat small { display: block; color: var(--dim); font-size: 12px; margin-top: 2px; }
+#chart { width: 100%; height: auto; display: block; background: var(--slate-2); }
+#chart text { font-family: var(--display); fill: var(--dim); font-size: 21px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--dim); }
+.legend i { display: inline-block; width: 10px; height: 10px; margin-right: 5px; vertical-align: -1px; }
+.card-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.card-btns button { flex: 1 1 140px; min-height: 46px; font: 700 18px/1 var(--display); letter-spacing: 0.06em; text-transform: uppercase; border: 1px solid var(--line); background: var(--slate-2); }
+.card-btns button.primary { background: var(--chalk); color: #1b1a12; border-color: var(--chalk); }
+
+#loading { position: absolute; inset: 0; display: grid; place-items: center; background: var(--slate); font: 600 18px/1.3 var(--display); letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); text-align: center; padding: 0 var(--gr) 0 var(--gl); }
+#loading b { display: block; color: var(--chalk); font-size: 34px; letter-spacing: 0.04em; margin-bottom: 6px; }
+
+@media (max-width: 520px) {
+  .box .num { font-size: 20px; } #laptime { font-size: 28px !important; } #speed { font-size: 32px; }
+  .g { grid-template-columns: 30px 92px; } #lap-box .num b { font-size: 14px; }
+  #tl .lbl { display: none; }
+  .btn { padding: 0 8px; }
+}
+@media (max-height: 460px) {
+  #flag .num { font-size: 30px; } #air { font-size: 32px; } .gauges { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { #air { transition: none; } }
+</style>
+
+<div id="app">
+  <canvas id="view" aria-label="3D replay of the race"></canvas>
+
+  <div id="hud" hidden>
+    <div class="tower">
+      <div class="tl">
+        <div class="box panel" id="lap-box"><span class="label">Lap</span><span class="num" id="lap">1<b>/20</b></span></div>
+        <div class="box panel"><span class="label">Lap time</span><span class="num" id="laptime">0.00</span><span class="num" id="delta"></span></div>
+      </div>
+      <div class="tr">
+        <div class="tl">
+          <div class="box panel" id="crash-box"><span class="label">Crashes</span><span class="num" id="crashes">0</span></div>
+          <div class="box panel" id="race-box"><span class="label">Race</span><span class="num" id="racetime">0:00.0</span></div>
+        </div>
+        <div class="box panel" id="rival-box" hidden><i></i><span class="label">vs <span id="rival-name">Teacher</span></span><span class="num" id="rival-gap">+0.0</span></div>
+      </div>
+    </div>
+    <div class="mid">
+      <div id="replay-tag" hidden>Replay</div>
+      <div id="flag" class="panel" hidden><h2 id="flag-h">Crash</h2><p id="flag-why"></p><span class="num" id="flag-n"></span></div>
+      <div id="lapflash" class="panel" hidden></div>
+      <div id="air"></div>
+    </div>
+    <div class="inst">
+      <div>
+        <div id="car-tag"></div>
+        <div class="num" id="speed">0.0<small>m/s</small></div>
+      </div>
+      <div class="gauges panel">
+        <div class="g"><span class="label">Pedal</span><span class="bar" id="thr"><i></i></span></div>
+        <div class="g"><span class="label">Steer</span><span class="bar" id="steer"><i></i></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="bar" class="panel" hidden>
+    <button class="btn" id="play" aria-label="Pause">❚❚</button>
+    <div id="tl"><div class="track"><div class="fill"></div></div><input id="scrub" type="range" min="0" max="1000" step="0.1" value="0" aria-label="Race timeline"></div>
+    <div class="right">
+      <button class="btn" id="speedbtn" aria-label="Playback speed">1×</button>
+      <button class="btn" id="cambtn" aria-label="Camera">TV</button>
+    </div>
+    <button class="btn" id="menubtn" aria-label="Loops and options">☰</button>
+  </div>
+
+  <div id="sheet" hidden>
+    <h1>Truggy <span>race replay</span></h1>
+    <p class="sub" id="sheet-sub"></p>
+    <div class="row"><span class="label">Loop</span><div class="seg" id="loops"></div></div>
+    <div class="row"><span class="label">Ghost</span><div class="seg" id="ghost-seg"><button data-v="1" aria-pressed="true">Best lap</button><button data-v="0">Off</button></div></div>
+    <div class="row"><span class="label">Rival</span><div class="seg" id="rival-seg"></div></div>
+    <div class="row"><span class="label">Replays</span><div class="seg" id="replay-seg"><button data-v="1" aria-pressed="true">Jumps &amp; crashes</button><button data-v="0">Off</button></div></div>
+    <details>
+      <summary>How this was made</summary>
+      <p id="how"></p>
+    </details>
+    <button id="close-sheet">Back to the race</button>
+  </div>
+
+  <div id="card" hidden>
+    <div class="card-in">
+      <div>
+        <span class="label" id="card-eyebrow"></span>
+        <h1 id="card-title">Chequered <span>flag</span></h1>
+      </div>
+      <div class="stats" id="stats"></div>
+      <div>
+        <svg id="chart" viewBox="0 0 640 230" role="img" aria-label="Lap times"></svg>
+        <div class="legend" id="legend"></div>
+      </div>
+      <div class="card-btns">
+        <button class="primary" id="again">Watch again</button>
+        <button id="next">Next loop</button>
+        <button id="card-close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="loading"><div><b>Truggy race replay</b><span id="loading-msg">Loading the race…</span></div></div>
+</div>

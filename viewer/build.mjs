@@ -43,7 +43,9 @@ const manifest = {
 };
 
 fs.mkdirSync('dist/data', { recursive: true });
-for (const l of list) for (const f of [l.track, ...Object.values(l.races)]) fs.copyFileSync(path.join(DATA, f), path.join('dist/data', f));
+fs.rmSync('dist/data', { recursive: true, force: true }); fs.mkdirSync('dist/data', { recursive: true });
+for (const l of list) for (const f of [l.track, ...Object.values(l.races)])   // base64 text: artifacts serve text, not .gz
+  fs.writeFileSync(path.join('dist/data', `${f}.txt`), fs.readFileSync(path.join(DATA, f)).toString('base64'));
 fs.writeFileSync('dist/data/manifest.json', JSON.stringify(manifest, null, 1));
 
 const out = await build({ entryPoints: ['src/main.js'], bundle: true, format: 'esm', write: false, minify: true, target: 'es2020', external: ['three'], logLevel: 'warning' });
@@ -56,7 +58,7 @@ fs.writeFileSync('dist/race.html', `${page}
 console.log(`dist/race.html (${(js.length / 1024).toFixed(0)} KB js), ${list.length} loops, cars ${names.join(', ')}, main ${main}`);
 
 if (process.argv.includes('--serve')) {   // a static server that wraps race.html in a document, as the artifact host does
-  const types = { '.json': 'application/json', '.gz': 'application/gzip', '.html': 'text/html' };
+  const types = { '.json': 'application/json', '.txt': 'text/plain', '.html': 'text/html' };
   http.createServer((req, res) => {
     let p = decodeURIComponent(req.url.split('?')[0]);
     if (p === '/') { res.setHeader('content-type', 'text/html'); return res.end(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><style>*,*::before,*::after{box-sizing:border-box}body{margin:0}[hidden]{display:none!important}</style></head><body>${fs.readFileSync('dist/race.html', 'utf8')}</body></html>`); }

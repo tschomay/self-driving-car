@@ -7,10 +7,13 @@ const $ = (id) => document.getElementById(id);
 const CAR_COLOR = 0xe8431a, RIVAL_COLOR = 0x1f6fd6;
 const SPEEDS = [1, 2, 4, 8];
 
+// recordings ship as gzipped JSON in base64 text (artifacts serve text, not binary archives)
 async function gz(url) {
-  const r = await fetch(url);
+  const r = await fetch(`${url}.txt`);
   if (!r.ok) throw new Error(`${url}: ${r.status}`);
-  const ds = r.body.pipeThrough(new DecompressionStream('gzip'));
+  const bin = atob((await r.text()).trim()), bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const ds = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
   return JSON.parse(await new Response(ds).text());
 }
 

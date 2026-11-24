@@ -36,7 +36,7 @@ const names = [...new Set(list.flatMap((l) => Object.keys(l.races)))];
 const main = arg('--main', names.find((n) => n !== 'teacher') ?? names[0]);
 const sample = read(list[0].races[main]);
 const manifest = {
-  main, rivals: names.filter((n) => n !== main && list.every((l) => l.races[n])), laps: sample.laps, crash_s: sample.crash_s,
+  main, rivals: names.filter((n) => n !== main && list.every((l) => l.races[n])).sort((a, b) => (b === 'teacher') - (a === 'teacher')), laps: sample.laps, crash_s: sample.crash_s,
   cars: Object.fromEntries(names.map((n) => [n, CARS[n] ?? { label: n, short: n, what: 'a recorded car.' }])),
   loops: list,
   how: `<b>Recorded, not re-simulated.</b> Each race ran in the project's MuJoCo sim (sdc/race/record.py) with the current car: truggy physics, steering expo 0.4, and one physics draw from the gate range kept for the whole race. Poses, suspension, steering and controls were saved 25 times a second, and this page plays them back. <b>Scoring:</b> total time for ${sample.laps} laps, plus ${sample.crash_s} s for each crash: rolled over, off the lane, stuck, or spun round (facing backwards for half a second). After a crash the car sits out the penalty, then a marshal puts it back on the centre line at the furthest point it reached (or ${9} m before the kicker if it crashed on a jump), and its memory restarts. <b>The ghost</b> replays the fastest lap so far. <b>The rival</b> is a separate recording on the same loop. The two cars never touch. The loops are validation loops ${list.map((l) => l.seed).join(', ')}. The track, terrain and car look come from the rc-racer game.`,

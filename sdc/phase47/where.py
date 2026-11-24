@@ -48,6 +48,8 @@ FULL_MAP = "runs/p47-maps-select-full.json"          # after E3: every failed ou
 E3B_CAR = ("runs/p47-e3b-s0", "runs/p47-e3b-s1")    # E3b: map students trained on complete maps
 E4_CAR = ("runs/p47-e4-s0", "runs/p47-e4-s1")       # E4: sensors-only students copying the re-tuned teacher
 E4_TEACHER = "runs/p47-e4-teacher.json"              # e4_tune.py's chosen settings over TRUGGY
+E5_CAR = ("runs/p47-e5-s0", "runs/p47-e5-s1")       # E5: sensors-only students copying the privileged RL racer
+E5_RACER = "runs/p47-racer-s1/ckpt/3014656.pt"       # the racer they copy (crash price 200, 3M steps)
 
 
 def _driver(who):
@@ -60,6 +62,13 @@ def _driver(who):
         return Ensemble(E3B_CAR), dict(env, turn_map=FULL_MAP)
     if who == "e4":
         return Ensemble(E4_CAR), env
+    if who == "e5":
+        return Ensemble(E5_CAR), env
+    if who == "racer":                                # privileged, so scored like the teachers: no expo
+        from sdc.phase47.racer import Driver
+        return Driver(E5_RACER), {k: v for k, v in env.items() if k != "expo"}
+    if who.startswith("e4cap"):                       # E4 students with forward throttle scaled to e4capNN percent
+        return Capped(Ensemble(E4_CAR), int(who[5:]) / 100), env
     if who in ("teacher", "mapteacher", "teacher_plus"):
         env = {k: v for k, v in env.items() if k != "expo"}
         over = {}
@@ -69,7 +78,21 @@ def _driver(who):
     return Ensemble(MAP_CAR if who == "map" else BASE), env
 
 
-WHO_ID = dict(base=0, teacher=1, map=2, mapteacher=3, map_full=4, teacher_plus=5, e4=6)
+class Capped:
+    """Scales the positive (forward) throttle by k; braking and steering untouched. A crude speed limit."""
+    def __init__(self, pol, k):
+        self.pol, self.k = pol, k
+
+    def reset(self, n):
+        self.pol.reset(n)
+
+    def __call__(self, b):
+        a = np.array(self.pol(b), np.float32)
+        a[:, 1] = np.where(a[:, 1] > 0, a[:, 1] * self.k, a[:, 1])
+        return a
+
+
+WHO_ID = dict(base=0, teacher=1, map=2, mapteacher=3, map_full=4, teacher_plus=5, e4=6, e4cap95=7, e4cap90=8, racer=9, e5=10)
 
 
 def _drive(who, rep, course):
@@ -307,6 +330,16 @@ def main():
         if not pk.exists():
             collect((who,), pk)
         analyse((OUT, pk), Path(f"runs/p47-{cmd}-where.json"))
+    elif cmd == "e5":                           # E5: the RL racer and its sensor students
+        pk = Path("runs/p47-e5-where.pkl")
+        if not pk.exists():
+            collect(("racer", "e5"), pk)
+        analyse((OUT, pk), Path("runs/p47-e5-where.json"))
+    elif cmd == "e4cap":                        # after E4: does a lower speed limit trade the lap time back for finishes?
+        pk = Path("runs/p47-e4cap-where.pkl")
+        if not pk.exists():
+            collect(("e4cap95", "e4cap90"), pk)
+        analyse((OUT, pk), Path("runs/p47-e4cap-where.json"))
 
 
 if __name__ == "__main__":

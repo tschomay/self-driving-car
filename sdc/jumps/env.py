@@ -499,8 +499,9 @@ class JumpCar:
         out, res = np.zeros(len(self._wheel_bodies)), np.zeros(6)
         for k, bid in enumerate(self._wheel_bodies):
             mujoco.mj_objectVelocity(self.m, self.d, mujoco.mjtObj.mjOBJ_BODY, int(bid), res, 0)
-            vp = res[3:6] + np.cross(res[0:3], np.array([0.0, 0.0, -cr.WHEEL_R]))
-            out[k] = np.hypot(vp[0], vp[1])
+            # res[3:6] + cross(res[0:3], (0, 0, -R)), written out (np.cross was a third of the sim's time); the same
+            # floating-point operations, so results are bit-identical
+            out[k] = np.hypot(res[3] + (res[1] * -cr.WHEEL_R - res[2] * 0.0), res[4] + (res[2] * 0.0 - res[0] * -cr.WHEEL_R))
         return out
 
     def _physics(self, a):

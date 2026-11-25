@@ -49,12 +49,13 @@ H_AHEAD = np.concatenate([np.arange(0.5, 12.1, 0.5), np.arange(14.0, 30.1, 2.0)]
 KINDS = ("double", "drop", "table")
 OBS_DIM = 14 + len(KAP_AHEAD) + len(H_AHEAD) + 8 + 3
 CRASH_PEN, FINISH_BONUS = 50.0, 50.0
+PREVIEW = None      # E6a: metres of track ahead the driver sees (None: all 30 m); beyond it reads as flat, straight, no jump
 MARGIN = 0.0        # per-step cost for running near the lane edge (|y| > 1.0 m of the 1.5 m half-width)
 # E4's re-tuned teacher with 3.5 m/s^2 corners (headroom.py: 2.6 s a lap faster for about the same finishes)
 TEACHER = dict(TRUGGY, jump_v={"double": 7.4}, a_lat=3.5, a_brake=3.5)
 CFG = dict(workers=4, cars=32, n_steps=256, batch_size=4096, n_epochs=5, lr=1e-4, gamma=0.995, lam=0.95, clip=0.2,
            vf_coef=0.5, max_grad_norm=0.5, std=0.15, hidden=(256, 256), bc_rounds=4, bc_steps=200_000,
-           bc_epochs=10, critic_warmup=1_000_000, eval_every=3_000_000, eval0=True, crash_pen=CRASH_PEN, init=None, margin=0.0)
+           bc_epochs=10, critic_warmup=1_000_000, eval_every=3_000_000, eval0=True, crash_pen=CRASH_PEN, init=None, margin=0.0, preview=None)
 
 
 def env_train():
@@ -86,9 +87,14 @@ def priv_obs(car):
     o = [st["y"], st["yaw"], st["v_fwd"] / 10, st["vz"] / 5, st["pitch"], st["roll"], st["up_z"],
          st["pitch_rate"] / 10, st["yaw_rate"] / 5, float(car.airborne), float(car.last_act[0]),
          float(car.last_act[1]), spin / 5, float(getattr(car, "servo_set", 0.0)) / cr.STEER_MAX]
-    o += list(c.curvature(s + KAP_AHEAD) * 5)
-    o += list((c.height(s + H_AHEAD) - h0) * 2)
+    kap, hts = c.curvature(s + KAP_AHEAD) * 5, (c.height(s + H_AHEAD) - h0) * 2
     nj = _next_jump(c, s)
+    if PREVIEW is not None:
+        kap, hts = np.where(KAP_AHEAD <= PREVIEW, kap, 0.0), np.where(H_AHEAD <= PREVIEW, hts, 0.0)
+        if nj is not None and nj[0] > PREVIEW:
+            nj = None
+    o += list(kap)
+    o += list(hts)
     if nj is None:
         o += [3.0, 3.0, 3.0, 0.0, 0, 0, 0, 0.0]
     else:
@@ -240,9 +246,9 @@ def score(path, procs=4, passes=2):
 # ---- training ------------------------------------------------------------------------------------------------
 
 def train(out, seed=0, hours=8.0, **over):
-    global CRASH_PEN, MARGIN
+    global CRASH_PEN, MARGIN, PREVIEW
     cfg = {**CFG, **over}
-    CRASH_PEN, MARGIN = cfg["crash_pen"], cfg["margin"]                 # read by the forked workers
+    CRASH_PEN, MARGIN, PREVIEW = cfg["crash_pen"], cfg["margin"], cfg["preview"]                 # read by the forked workers
     out = Path(out)
     (out / "ckpt").mkdir(parents=True, exist_ok=True)
     torch.set_num_threads(1)

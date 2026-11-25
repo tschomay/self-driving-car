@@ -392,3 +392,35 @@ The owner asked for research on what would really move the needle toward a good 
   1. "The sensor car doesn't know to brake in time because it can't see the corner coming. It's luck that it is still able to make corners, either by drastic maneuvers or because the teacher left some on the table. It also must learn to brake randomly after a long period of relative straight and acceleration. Or just to arbitrarily got the brakes sometimes."
   2. "The sensor driver can't see through the corner, so it doesn't know how sharp or long the corner is."
   3. "I like the idea of skipping the teacher, but we've always found that transfer learning from the teacher works better. Maybe a bigger network and more training would work? But yes having the teacher match the students knowledge send likely to help so that the student has clear reasons for actions."
+
+### After E5 — Checking the owner's explanation against the traces (`python -m sdc.phase47.corners`)
+
+Every sharp turn (|curvature| > 0.15 /m) each driver reached, from where.py's 0.1 s traces (5 passes × 150 selection runs). "Brake" means a command below −0.2.
+
+| | Teacher | Base | E4 | RL racer | E5 |
+|---|---|---|---|---|---|
+| Turns reached | 4728 | 4618 | 4510 | 4633 | 3902 |
+| Speed 8 m before (m/s) | 7.11 | 6.27 | 6.46 | 7.52 | 7.37 |
+| Speed at turn start (m/s) | 4.13 | 4.62 | 4.78 | 5.79 | 6.16 |
+| Slowest in turn (m/s) | 3.35 | 3.47 | 3.52 | 4.57 | 4.77 |
+| Braking starts (m before turn) | 0.1 | 2.3 | 2.7 | 2.6 | 1.8 |
+| Turns with no braking | 90% | 25% | 22% | 5% | 16% |
+| Entry speed, mild turns (peak ≤ 0.3 /m) | 4.15 | 4.61 | 4.77 | 5.83 | 6.11 |
+| Entry speed, sharp turns (peak > 0.3 /m) | 3.99 | 4.68 | 4.86 | 5.61 | 6.39 |
+| Run ended in a mild / sharp turn | 0.0% / 0.0% | 0.6% / 1.3% | 1.1% / 0.5% | 0.5% / 0.2% | 4.9% / 4.4% |
+| Largest steering in turn (median) | 0.44 | 0.60 | 0.62 | 0.30 | 0.46 |
+| Braking with no sharp turn in the next 15 m | 0% | 7.6% | 7.0% | 2.5% | 7.7% |
+| Braking with a sharp turn within 4 m | 97% | 87% | 87% | 96% | 90% |
+
+- **"Doesn't know to brake in time":** supported. E5 starts braking later than the racer (1.8 m before the turn against 2.6 m), skips braking three times as often (16% of turns against 5%), and enters 0.4 m/s faster.
+- **"Drastic maneuvers":** supported. E5 steers about 50% harder in turns (0.46 against 0.30).
+- **"Brake randomly / arbitrarily":** supported, but small. 7.7% of E5's braking has no sharp turn in the next 15 m, against the racer's 2.5%. The base car and E4 do the same (7–8%), so every sensor car does it. Most braking is still near turns.
+- **"Doesn't know how sharp the corner is":** supported for speed. Every driver that sees the track enters sharp turns slower than mild ones (racer −0.22 m/s, teacher −0.16). Every sensor car enters them *faster* (E5 +0.28, E4 +0.09, base +0.07), so they don't adjust to sharpness at all. But E5 doesn't crash more in sharp turns (4.4%) than in mild ones (4.9%): its corner crashes come from too much speed everywhere, not mainly in the sharp ones.
+- **The racer's braking:** 96% of it happens with the turn already within 4 m, inside the sensors' range. It brakes late and hard, knowing what's coming.
+
+### E6a — A teacher that sees only as far as the sensors
+
+- **Question:** how much of the racer's speed comes from seeing the track ahead? A teacher that sees only what the student can would give the student "clear reasons for actions" (owner).
+- **Setup:** the pilot's recipe (copy of the teacher, then PPO, crash cost 200, 9 h, `runs/p47-e6a`). The driver sees the track only 4 m ahead (`--set preview=4.0`): curvature at 0, 2 and 4 m, heights to 4 m, and the next jump only within 4 m. Beyond that the track reads as flat and straight. It keeps the true state and the physics.
+- **Prediction (owner):** "a little slower and a little safer. It's only fast now because it doesn't know to prepare for corners (ie it's reckless)"
+- **Result:** _running_

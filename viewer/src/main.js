@@ -126,9 +126,9 @@ async function loadLoop(idx) {
   S.R = prepRace(raw, c); S.R.L = c.length;
   S.rival = rawRival ? prepRace(rawRival, c) : null; if (S.rival) S.rival.L = c.length;
   for (const k of ['car', 'ghost', 'rivalCar']) if (S[k]) view.removeCar(S[k]);
-  S.car = view.addCar(CAR_COLOR, { number: 1 });
+  S.car = view.addCar(CAR_COLOR, { number: 1, marks: true, wheelColor: 0xd9ee2c, accent: 0x15161a });
   S.ghost = view.addCar(CAR_COLOR, { ghost: true });
-  S.rivalCar = S.rival ? view.addCar(RIVAL_COLOR, { number: 2 }) : null;
+  S.rivalCar = S.rival ? view.addCar(RIVAL_COLOR, { number: 2, marks: true, wheelColor: 0xf1f1ec, accent: 0xf2c230 }) : null;
   S.t = 0; S.replay = null; S.recordAir = 0; S.replayedLaps.clear(); S.replayedCrashes.clear(); S.ended = false;
   view.camInit = false;
   buildTimeline();
@@ -182,19 +182,19 @@ function setPlaying(p) {
 }
 $('speedbtn').addEventListener('click', () => { S.speed = SPEEDS[(SPEEDS.indexOf(S.speed) + 1) % SPEEDS.length]; $('speedbtn').textContent = `${S.speed}×`; });
 $('cambtn').addEventListener('click', () => { view.camMode = (view.camMode + 1) % CAMERAS.length; $('cambtn').textContent = CAMERAS[view.camMode]; view.camInit = false; });
-$('scrub').addEventListener('input', (e) => { S.t = +e.target.value; S.replay = null; S.ended = false; $('card').hidden = true; view.camInit = false; });
+$('scrub').addEventListener('input', (e) => { S.t = +e.target.value; view.clearMarks(); S.replay = null; S.ended = false; $('card').hidden = true; view.camInit = false; });
 $('menubtn').addEventListener('click', () => { $('sheet').hidden = !$('sheet').hidden; });
 $('close-sheet').addEventListener('click', () => { $('sheet').hidden = true; });
 seg($('ghost-seg'), [{ v: true, html: 'Best lap' }, { v: false, html: 'Off' }], true, (v) => { S.ghostOn = v; });
 seg($('replay-seg'), [{ v: true, html: 'Jumps &amp; crashes' }, { v: false, html: 'Off' }], true, (v) => { S.replaysOn = v; if (!v) S.replay = null; });
-$('again').addEventListener('click', () => { S.t = 0; S.ended = false; S.replayedLaps.clear(); S.replayedCrashes.clear(); S.recordAir = 0; $('card').hidden = true; setPlaying(true); view.camInit = false; });
+$('again').addEventListener('click', () => { S.t = 0; view.clearMarks(); S.ended = false; S.replayedLaps.clear(); S.replayedCrashes.clear(); S.recordAir = 0; $('card').hidden = true; setPlaying(true); view.camInit = false; });
 $('next').addEventListener('click', () => { loadLoop((S.loopIdx + 1) % S.man.loops.length).then(() => setPlaying(true)); });
 $('card-close').addEventListener('click', () => { $('card').hidden = true; });
 addEventListener('keydown', (e) => {
   if (e.key === ' ') { e.preventDefault(); setPlaying(!S.playing); }
   if (e.key === 'c') $('cambtn').click();
-  if (e.key === 'ArrowRight') S.t += 5;
-  if (e.key === 'ArrowLeft') S.t = Math.max(0, S.t - 5);
+  if (e.key === 'ArrowRight') { S.t += 5; view.clearMarks(); }
+  if (e.key === 'ArrowLeft') { S.t = Math.max(0, S.t - 5); view.clearMarks(); }
 });
 // orbit: drag to look around, pinch or wheel to zoom
 const ptrs = new Map();

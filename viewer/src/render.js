@@ -2,7 +2,7 @@
 // (tschomay/sandbox projects/rc-racer); the circuit is a recorded sim loop and the cars replay recorded frames.
 import * as THREE from 'three';
 import { bakeGround, detailNormal, canvasTexture, fbm, PALETTE } from './terrainart.js';
-import { makeCar } from './carmesh.js';
+import { makeCar, setSuspension } from './carmesh.js';
 import { LANE_W, BANK_RUN, rng32 } from './track.js';
 import { WHEEL_R, CORNER, MOUNT_Z } from './carmodel.js';
 
@@ -178,6 +178,7 @@ export class View {
       for (const m of mats) { for (const k of ['map', 'normalMap', 'bumpMap']) if (m[k]) m[k].dispose(); m.dispose(); }
     });
     W.clear();
+    this.clearMarks?.();
         this.camInit = false;
   }
 
@@ -395,30 +396,84 @@ export class View {
     const car = makeCar(color, opts);
     if (opts.ghost) { car.paint.color.set(opts.ghostColor ?? 0x9fe6ff); car.paint.opacity = 0.3; }
     this.scene.add(car.body);
-    car.wheels.forEach((w) => this.scene.add(w));
     car.spin = 0;
+    car.blobs = opts.ghost ? [] : car.wheels.map(() => {
+      const m = new THREE.Mesh(this._blobGeo(), new THREE.MeshBasicMaterial({ map: this._blobTex(), transparent: true, depthWrite: false, color: 0x000000, opacity: 0, polygonOffset: true, polygonOffsetFactor: -2 }));
+      m.renderOrder = 2; this.scene.add(m); return m;
+    });
+    car.marks = opts.marks ? car.wheels.map(() => null) : null;
     return car;
   }
 
-  removeCar(car) { this.scene.remove(car.body); car.wheels.forEach((w) => this.scene.remove(w)); }
+  removeCar(car) { this.scene.remove(car.body); car.blobs.forEach((b) => { this.scene.remove(b); b.material.dispose(); }); }
+
+  _blobTex() {
+    if (!this.blobTex) this.blobTex = canvasTexture(64, 64, (g) => {
+      const r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+      r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.45, 'rgba(255,255,255,0.6)'); r.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = r; g.fillRect(0, 0, 64, 64);
+    }, false);
+    return this.blobTex;
+  }
+  _blobGeo() { return this.blobGeo ??= new THREE.PlaneGeometry(1, 1); }
 
   /** Pose a car from a sample p: position, quaternion, suspension per wheel, steer angle; spin from speed. */
   poseCar(vis, p, dt) {
-    vis.body.visible = true; vis.wheels.forEach((w) => (w.visible = true));
+    vis.body.visible = true;
     vis.body.position.set(p.x, p.y, p.z);
     vis.body.quaternion.set(p.qx, p.qy, p.qz, p.qw);
     vis.spin = (vis.spin + p.v / WHEEL_R * dt) % (2 * Math.PI);
-    const susp = [p.s1, p.s2, p.s3, p.s4];
-    ['fl', 'fr', 'rl', 'rr'].forEach((w, k) => {
-      const g = vis.wheels[k];
-      g.position.set(CORNER[w][0], CORNER[w][1], MOUNT_Z + susp[k]).applyQuaternion(vis.body.quaternion).add(vis.body.position);
-      g.quaternion.copy(vis.body.quaternion);
-      if (k < 2) g.quaternion.multiply(this.tmpQ.setFromAxisAngle(this.tmpV.set(0, 0, 1), p.st));
-      g.userData.spin.rotation.y = vis.spin;
+    setSuspension(vis, [p.s1, p.s2, p.s3, p.s4], p.st, vis.spin);
+    if (!vis.blobs.length) return;
+    vis.body.updateMatrixWorld(true);
+    const c = this.c, lat = -p.vx * Math.sin(p.yaw) + p.vy * Math.cos(p.yaw);
+    vis.wheels.forEach((w, k) => {
+      const wp = w.getWorldPosition(this.tmpV), h = c.height(wp.x, wp.y), gap = wp.z - WHEEL_R - h;
+      // contact shadow: dark and tight when the tire is down, fading and spreading as it lifts
+      const b = vis.blobs[k], near = THREE.MathUtils.clamp(1 - gap / 0.12, 0, 1);
+      b.visible = near > 0.02;
+      b.position.set(wp.x, wp.y, h + 0.002);
+      const sz = 0.085 + Math.max(0, gap) * 0.7;
+      b.scale.set(sz * 1.25, sz, 1);
+      b.rotation.set(0, 0, p.yaw);
+      b.material.opacity = 0.62 * near * near;
+      // skid marks where a tire slides sideways, spins up or lands
+      if (!vis.marks) return;
+      const down = (p.gnd & (1 << k)) !== 0 && gap < 0.012;
+      const sliding = down && dt > 0 && (Math.abs(lat) > 0.9 || (k >= 2 && p.ct > 0.6 && p.v < 3.5));
+      if (!sliding) { vis.marks[k] = null; return; }
+      const last = vis.marks[k];
+      if (!last) { vis.marks[k] = { x: wp.x, y: wp.y }; return; }
+      const dx = wp.x - last.x, dy = wp.y - last.y, d = Math.hypot(dx, dy);
+      if (d < 0.05) return;
+      if (d < 0.6) this.addMark((wp.x + last.x) / 2, (wp.y + last.y) / 2, Math.atan2(dy, dx), d, Math.min(1, Math.abs(lat) / 2.5 + 0.35));
+      vis.marks[k] = { x: wp.x, y: wp.y };
     });
   }
 
-  hideCar(vis) { vis.body.visible = false; vis.wheels.forEach((w) => (w.visible = false)); }
+  hideCar(vis) { vis.body.visible = false; vis.blobs.forEach((b) => (b.visible = false)); }
+
+  // ---- skid marks: a ring buffer of flat quads on the ground ----------------------------------------------
+  _marksInit() {
+    const N = this.markN = 5000;
+    const mat = new THREE.MeshBasicMaterial({ color: 0x3b2817, transparent: true, opacity: 0.38, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 });
+    const m = this.markMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), mat, N);
+    m.count = 0; m.frustumCulled = false; m.renderOrder = 1;
+    m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(N * 3).fill(1), 3);
+    this.scene.add(m);
+    this.markNext = 0;
+  }
+  addMark(x, y, ang, len, strength) {
+    if (!this.markMesh) this._marksInit();
+    const i = this.markNext, m4 = new THREE.Matrix4(), q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), ang);
+    m4.compose(new THREE.Vector3(x, y, this.c.height(x, y) + 0.003), q, new THREE.Vector3(len + 0.01, 0.034, 1));
+    this.markMesh.setMatrixAt(i, m4);
+    this.markMesh.setColorAt(i, new THREE.Color(1, 1, 1).multiplyScalar(0.4 + 0.6 * strength));
+    this.markNext = (i + 1) % this.markN;
+    this.markMesh.count = Math.max(this.markMesh.count, i + 1);
+    this.markMesh.instanceMatrix.needsUpdate = true; this.markMesh.instanceColor.needsUpdate = true;
+  }
+  clearMarks() { if (this.markMesh) { this.markMesh.count = 0; this.markNext = 0; } }
 
   /** Dust: rear wheels throw dirt with speed; a landing throws a ring. */
   dustFrom(p, landed, dt) {

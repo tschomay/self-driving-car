@@ -2,7 +2,9 @@
 // (tschomay/sandbox projects/rc-racer); the circuit is a recorded sim loop and the cars replay recorded frames.
 import * as THREE from 'three';
 import { bakeGround, detailNormal, canvasTexture, fbm, PALETTE } from './terrainart.js';
-import { makeCar, setSuspension } from './carmesh.js';
+import { makeCar, setSuspension, holoTime } from './carmesh.js';
+import { Post } from './post.js';
+import { dress, wind } from './world.js';
 import { LANE_W, BANK_RUN, rng32 } from './track.js';
 import { WHEEL_R, CORNER, MOUNT_Z } from './carmodel.js';
 
@@ -31,13 +33,29 @@ export class View {
     this.cars = [];
     this.orbit = { yaw: 0.8, pitch: 0.35, dist: 2.2 };
     this.tmpQ = new THREE.Quaternion(); this.tmpV = new THREE.Vector3();
+    this.noAO = [this.dust];            // drawn, but left out of the ambient-occlusion and depth-of-field depth passes
+    this._clods();
+    this.post = new Post(r, this.scene, this.camera, quality.post);
+    for (const pass of [this.post.ao, this.post.dof]) {
+      const orig = pass.render.bind(pass);
+      pass.render = (...a) => {
+        const hidden = this.noAO.filter((o) => o.visible); hidden.forEach((o) => (o.visible = false));
+        const sky = this.sky.visible; this.sky.visible = pass !== this.post.ao && sky;
+        orig(...a);
+        hidden.forEach((o) => (o.visible = true)); this.sky.visible = sky;
+      };
+    }
+    this.shake = 0; this.clock = 0;
   }
+
+  setQuality(level) { this.post.setLevel(level); }
 
   resize(w, h) {
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.portrait = h > w;
     this.camera.updateProjectionMatrix();
+    this.post.setSize(w, h);
   }
 
   _sky() {
@@ -91,7 +109,7 @@ export class View {
     const s = this.quality.shadowSize;
     sun.shadow.mapSize.set(s, s);
     const cam = sun.shadow.camera;
-    cam.left = -7; cam.right = 7; cam.top = 7; cam.bottom = -7; cam.near = 1; cam.far = 80;
+    cam.left = -4.5; cam.right = 4.5; cam.top = 4.5; cam.bottom = -4.5; cam.near = 1; cam.far = 80;
     sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.01;
     this.scene.add(sun, sun.target);
     this.scene.add(new THREE.HemisphereLight(0xa9c6ee, 0x6d5a3c, 0.5));
@@ -108,7 +126,9 @@ export class View {
       transparent: true, depthWrite: false,
       uniforms: { color: { value: new THREE.Color(0xc9a878) }, scale: { value: 600 } },
       vertexShader: `attribute vec2 aux; varying float vA; uniform float scale;
-        void main(){ vA = aux.y; vec4 mv = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix * mv; gl_PointSize = aux.x * scale / -mv.z; }`,
+        void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix * mv;
+          vA = aux.y * smoothstep(0.35, 1.6, -mv.z);                       // fade dust right at the lens
+          gl_PointSize = min(aux.x * scale / -mv.z, 90.0); }`,
       fragmentShader: `uniform vec3 color; varying float vA;
         void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; float a = smoothstep(1.0, 0.25, d) * vA; if (a < 0.004) discard; gl_FragColor = vec4(color, a); }`,
     });
@@ -168,6 +188,9 @@ export class View {
     this._surroundings(c);
     this._trackside(c);
     this._tvCams(c);
+    const d = dress(c, this.world, this.quality.grass);
+    this.noAO = this.noAO.filter((o) => o !== this.grassObj).concat([d.grass]);
+    this.grassObj = d.grass;
   }
 
   clearCircuit() {
@@ -218,16 +241,17 @@ export class View {
     hills.position.set(c.centerX, c.centerY, 0);
     W.add(hills);
     // trees around the lot
-    const nT = 150, trunkGeo = new THREE.CylinderGeometry(0.16, 0.24, 1, 7), leafGeo = new THREE.IcosahedronGeometry(1, 1);
+    const nT = 150, trunkGeo = new THREE.CylinderGeometry(0.16, 0.24, 1, 9), leafGeo = new THREE.IcosahedronGeometry(1, 3);
     trunkGeo.rotateX(Math.PI / 2);
     const lp = leafGeo.attributes.position;       // lumpy crowns
     for (let i = 0; i < lp.count; i++) {
-      const k = 0.82 + 0.36 * fbm(lp.getX(i) * 2 + 3, lp.getY(i) * 2 + lp.getZ(i) * 3, 2);
+      const k = 0.78 + 0.3 * fbm(lp.getX(i) * 2 + 3, lp.getY(i) * 2 + lp.getZ(i) * 3, 3) + 0.08 * fbm(lp.getX(i) * 9, lp.getY(i) * 9 + lp.getZ(i) * 7, 2);
       lp.setXYZ(i, lp.getX(i) * k, lp.getY(i) * k, lp.getZ(i) * k);
     }
     leafGeo.computeVertexNormals();
     const trunks = new THREE.InstancedMesh(trunkGeo, new THREE.MeshStandardMaterial({ color: 0x5a4632, roughness: 1 }), nT);
-    const leaves = new THREE.InstancedMesh(leafGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95 }), nT * 2);
+    const leaves = new THREE.InstancedMesh(leafGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 }), nT * 3);
+    leaves.castShadow = true;
     const m4 = new THREE.Matrix4(), col = new THREE.Color(), qI = new THREE.Quaternion();
     const hx = c.sizeX / 2, hy = c.sizeY / 2;
     for (let i = 0; i < nT; i++) {
@@ -236,12 +260,12 @@ export class View {
       x += c.centerX; y += c.centerY;
       const th = rng.uniform(2.2, 4.0), cr = rng.uniform(1.7, 3.1);
       m4.compose(new THREE.Vector3(x, y, th / 2), qI, new THREE.Vector3(1, 1, th)); trunks.setMatrixAt(i, m4);
-      for (let k = 0; k < 2; k++) {
-        const s = cr * (k ? 0.72 : 1);
+      for (let k = 0; k < 3; k++) {
+        const s = cr * (k ? 0.68 : 1);
         qI.setFromEuler(new THREE.Euler(rng() * 6, rng() * 6, rng() * 6));
-        m4.compose(new THREE.Vector3(x + (k ? rng.uniform(-0.8, 0.8) : 0), y + (k ? rng.uniform(-0.8, 0.8) : 0), th + cr * (k ? 1.25 : 0.55)), qI, new THREE.Vector3(s, s, s * rng.uniform(0.85, 1.15)));
-        leaves.setMatrixAt(i * 2 + k, m4);
-        col.setHSL(rng.uniform(0.22, 0.31), rng.uniform(0.3, 0.5), rng.uniform(0.2, 0.31)); leaves.setColorAt(i * 2 + k, col);
+        m4.compose(new THREE.Vector3(x + (k ? rng.uniform(-1.1, 1.1) : 0), y + (k ? rng.uniform(-1.1, 1.1) : 0), th + cr * (k === 1 ? 1.25 : k === 2 ? 0.8 : 0.55)), qI, new THREE.Vector3(s, s, s * rng.uniform(0.85, 1.15)));
+        leaves.setMatrixAt(i * 3 + k, m4);
+        col.setHSL(rng.uniform(0.22, 0.31), rng.uniform(0.3, 0.5), rng.uniform(0.2, 0.31)); leaves.setColorAt(i * 3 + k, col);
       }
       qI.identity();
     }
@@ -337,7 +361,7 @@ export class View {
       p[3 * i] += v[3 * i] * dt; p[3 * i + 1] += v[3 * i + 1] * dt; p[3 * i + 2] += v[3 * i + 2] * dt;
       v[3 * i] *= 1 - 2.5 * dt; v[3 * i + 1] *= 1 - 2.5 * dt; v[3 * i + 2] = v[3 * i + 2] * (1 - 2 * dt) + 0.05 * dt;
       aux[2 * i] += 0.35 * dt;
-      aux[2 * i + 1] = 0.5 * (1 - t) * Math.min(1, t * 8);
+      aux[2 * i + 1] = 0.34 * (1 - t) * Math.min(1, t * 8);
     }
     this.dust.geometry.attributes.position.needsUpdate = true;
     this.dust.geometry.attributes.aux.needsUpdate = true;
@@ -394,18 +418,18 @@ export class View {
   // ---- cars ---------------------------------------------------------------------------------------------
   addCar(color, opts = {}) {
     const car = makeCar(color, opts);
-    if (opts.ghost) { car.paint.color.set(opts.ghostColor ?? 0x9fe6ff); car.paint.opacity = 0.3; }
+    if (opts.ghost) this.noAO.push(car.body);
     this.scene.add(car.body);
     car.spin = 0;
     car.blobs = opts.ghost ? [] : car.wheels.map(() => {
       const m = new THREE.Mesh(this._blobGeo(), new THREE.MeshBasicMaterial({ map: this._blobTex(), transparent: true, depthWrite: false, color: 0x000000, opacity: 0, polygonOffset: true, polygonOffsetFactor: -2 }));
-      m.renderOrder = 2; this.scene.add(m); return m;
+      m.renderOrder = 2; this.scene.add(m); this.noAO.push(m); return m;
     });
     car.marks = opts.marks ? car.wheels.map(() => null) : null;
     return car;
   }
 
-  removeCar(car) { this.scene.remove(car.body); car.blobs.forEach((b) => { this.scene.remove(b); b.material.dispose(); }); }
+  removeCar(car) { this.noAO = this.noAO.filter((o) => o !== car.body && !car.blobs.includes(o)); this.scene.remove(car.body); car.blobs.forEach((b) => { this.scene.remove(b); b.material.dispose(); }); }
 
   _blobTex() {
     if (!this.blobTex) this.blobTex = canvasTexture(64, 64, (g) => {
@@ -422,7 +446,8 @@ export class View {
     vis.body.visible = true;
     vis.body.position.set(p.x, p.y, p.z);
     vis.body.quaternion.set(p.qx, p.qy, p.qz, p.qw);
-    vis.spin = (vis.spin + p.v / WHEEL_R * dt) % (2 * Math.PI);
+    const spin = (vis.spin + p.v / WHEEL_R * dt) % (2 * Math.PI);
+    vis.spin = Number.isFinite(spin) ? spin : 0;            // never let one bad sample stick
     setSuspension(vis, [p.s1, p.s2, p.s3, p.s4], p.st, vis.spin);
     if (!vis.blobs.length) return;
     vis.body.updateMatrixWorld(true);
@@ -458,7 +483,7 @@ export class View {
     const N = this.markN = 5000;
     const mat = new THREE.MeshBasicMaterial({ color: 0x3b2817, transparent: true, opacity: 0.38, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 });
     const m = this.markMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), mat, N);
-    m.count = 0; m.frustumCulled = false; m.renderOrder = 1;
+    m.count = 0; m.frustumCulled = false; m.renderOrder = 1; this.noAO.push(m);
     m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(N * 3).fill(1), 3);
     this.scene.add(m);
     this.markNext = 0;
@@ -511,7 +536,7 @@ export class View {
       px = p.x - back * Math.cos(this.camYaw); py = p.y - back * Math.sin(this.camYaw);
       pz = Math.max(p.z + up, c.height(px, py) + 0.25);
       lx += 0.6 * Math.cos(this.camYaw); ly += 0.6 * Math.sin(this.camYaw);
-      fov = this.portrait ? 72 : 60;
+      fov = (this.portrait ? 72 : 60) + THREE.MathUtils.clamp(p.v - 4, 0, 8) * 1.3;     // a speed kick
     } else if (mode === 'TV') {
       const i = this.tvFor(p.s);
       if (i !== this.tvIdx) { this.tvIdx = i; snap = true; }
@@ -521,6 +546,8 @@ export class View {
       fov = THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(2 * Math.atan(1.3 / Math.max(dist, 1.5))), 7, 55) * (this.portrait ? 1.45 : 1);
       // lead the car a little, as a camera operator does
       lx += p.vx * 0.12; ly += p.vy * 0.12;
+      const tt = this.clock;                                    // a hand on the camera: slow drift
+      lx += 0.05 * Math.sin(tt * 0.9) + 0.02 * Math.sin(tt * 2.3); lz += 0.04 * Math.sin(tt * 1.3 + 1);
     } else if (mode === 'Orbit') {
       const o = this.orbit;
       if (!this.dragging) o.yaw += 0.12 * dt;               // a slow drift when left alone
@@ -543,6 +570,11 @@ export class View {
     }
     if (mode === 'TV') this.camLook.lerp(this.tmpV.set(lx, ly, lz), snap ? 1 : k(10));
     cam.position.copy(this.camPos);
+    if (this.shake > 0.001 && mode !== 'Orbit') {               // landing shake
+      const a = this.shake, t = this.clock * 40;
+      cam.position.x += a * 0.03 * Math.sin(t * 1.1); cam.position.y += a * 0.03 * Math.sin(t * 1.7 + 2); cam.position.z += a * 0.04 * Math.sin(t * 2.3 + 1);
+    }
+    this.shake *= Math.exp(-dt * 7);
     cam.lookAt(this.camLook);
     if (snap && mode === 'TV') { cam.fov = fov; cam.updateProjectionMatrix(); }
     else if (Math.abs(cam.fov - fov) > 0.01) { cam.fov += (fov - cam.fov) * k(4); cam.updateProjectionMatrix(); }
@@ -550,5 +582,65 @@ export class View {
     this.sun.position.copy(this.sun.target.position).addScaledVector(this.sunDir, 40);
   }
 
-  render() { this.sky.position.copy(this.camera.position); this.sky.material.uniforms.time.value = performance.now() / 1000; this.renderer.render(this.scene, this.camera); }
+  /** replay: letterbox + depth of field on the car. */
+  render(dt = 0.016, replay = false, focusOn = null) {
+    this.clock += dt;
+    wind.value += dt; holoTime.value = performance.now() / 1000;
+    this.sky.position.copy(this.camera.position); this.sky.material.uniforms.time.value = performance.now() / 1000;
+    // the sun on screen, for the lens flare
+    const sp = this.tmpV.copy(this.camera.position).addScaledVector(this.sunDir, 500).project(this.camera);
+    const L = this.post.lens.uniforms;
+    L.sunUv.value.set(sp.x * 0.5 + 0.5, sp.y * 0.5 + 0.5);
+    L.sunOn.value = sp.z < 1 && Math.abs(sp.x) < 1.3 && Math.abs(sp.y) < 1.3 ? 1 : 0;
+    const focus = focusOn ? this.camera.position.distanceTo(focusOn) : 6;
+    this.post.render(dt, replay, focus);
+  }
+
+  // ---- dirt clods thrown by the tires --------------------------------------------------------------------
+  _clods() {
+    const N = this.clodN = 420;
+    const geo = new THREE.DodecahedronGeometry(1, 0);
+    const m = this.clodMesh = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color: 0x6e4a2c, roughness: 1, flatShading: true }), N);
+    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; m.castShadow = false; m.count = N;
+    this.clodP = new Float32Array(N * 3); this.clodV = new Float32Array(N * 3); this.clodL = new Float32Array(N); this.clodS = new Float32Array(N); this.clodNext = 0;
+    const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+    for (let i = 0; i < N; i++) m.setMatrixAt(i, zero);
+    this.scene.add(m);
+  }
+  clod(x, y, z, vx, vy, vz, size) {
+    const i = this.clodNext; this.clodNext = (i + 1) % this.clodN;
+    this.clodP.set([x, y, z], 3 * i); this.clodV.set([vx, vy, vz], 3 * i); this.clodL[i] = 1.2; this.clodS[i] = size;
+  }
+  stepClods(dt) {
+    const m = this.clodMesh, P = this.clodP, Vv = this.clodV, m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(), pos = new THREE.Vector3();
+    for (let i = 0; i < this.clodN; i++) {
+      if (this.clodL[i] <= 0) continue;
+      this.clodL[i] -= dt;
+      Vv[3 * i + 2] -= 9.81 * dt;
+      for (let k = 0; k < 3; k++) P[3 * i + k] += Vv[3 * i + k] * dt;
+      const g = this.c ? this.c.height(P[3 * i], P[3 * i + 1]) : 0;
+      if (P[3 * i + 2] < g || this.clodL[i] <= 0) { this.clodL[i] = 0; m.setMatrixAt(i, m4.makeScale(0, 0, 0)); continue; }
+      const s = this.clodS[i];
+      e.set(this.clodL[i] * 13 + i, this.clodL[i] * 9, i); q.setFromEuler(e);
+      m.setMatrixAt(i, m4.compose(pos.set(P[3 * i], P[3 * i + 1], P[3 * i + 2]), q, sc.set(s, s, s * 0.8)));
+    }
+    m.instanceMatrix.needsUpdate = true;
+  }
+  /** Roost: rear tires on the power throw clods back and up; a landing kicks a ring of them. */
+  roost(p, landed, dt) {
+    const yaw = p.yaw, cy = Math.cos(yaw), sy = Math.sin(yaw);
+    if (landed) {
+      this.shake = Math.min(1.5, this.shake + 0.8);
+      for (let k = 0; k < 24; k++) { const a = Math.random() * 6.283, v = 0.8 + Math.random() * 1.8; this.clod(p.x + 0.2 * Math.cos(a), p.y + 0.2 * Math.sin(a), p.z - 0.08, v * Math.cos(a), v * Math.sin(a), 0.8 + Math.random() * 1.6, 0.004 + Math.random() * 0.008); }
+    }
+    const rate = (p.ct > 0.3 && p.v > 1.5 ? (p.ct - 0.3) * 60 : 0) * dt;
+    for (const k of [2, 3]) {
+      if (!(p.gnd & (1 << k))) continue;
+      let n = rate; while (n > 0) { if (Math.random() < n) {
+        const w = CORNER[k === 2 ? 'rl' : 'rr'], x = p.x + (w[0] - 0.04) * cy - w[1] * sy, y = p.y + (w[0] - 0.04) * sy + w[1] * cy;
+        const back = 1.2 + Math.random() * 2.2, side = (Math.random() - 0.5) * 1.2;
+        this.clod(x, y, this.c.height(x, y) + 0.02, p.vx * 0.4 - back * cy - side * sy, p.vy * 0.4 - back * sy + side * cy, 0.6 + Math.random() * 1.5, 0.003 + Math.random() * 0.007);
+      } n -= 1; }
+    }
+  }
 }

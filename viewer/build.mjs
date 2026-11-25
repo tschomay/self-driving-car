@@ -48,11 +48,11 @@ for (const l of list) for (const f of [l.track, ...Object.values(l.races)])   //
   fs.writeFileSync(path.join('dist/data', `${f}.txt`), fs.readFileSync(path.join(DATA, f)).toString('base64'));
 fs.writeFileSync('dist/data/manifest.json', JSON.stringify(manifest, null, 1));
 
-const out = await build({ entryPoints: ['src/main.js'], bundle: true, format: 'esm', write: false, minify: true, target: 'es2020', external: ['three'], logLevel: 'warning' });
+const out = await build({ entryPoints: ['src/main.js'], bundle: true, format: 'esm', write: false, minify: true, target: 'es2020', external: ['three', 'three/addons/*'], logLevel: 'warning' });
 const js = out.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
 const page = fs.readFileSync('src/page.html', 'utf8');
 fs.writeFileSync('dist/race.html', `${page}
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@${THREE_VER}/build/three.module.js"}}</script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@${THREE_VER}/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@${THREE_VER}/examples/jsm/"}}</script>
 <script type="module">${js}</script>
 `);
 console.log(`dist/race.html (${(js.length / 1024).toFixed(0)} KB js), ${list.length} loops, cars ${names.join(', ')}, main ${main}`);

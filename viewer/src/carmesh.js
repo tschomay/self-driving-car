@@ -15,24 +15,17 @@ const HUB_Y = 0.112;            // |y| of the hub carrier's inner face (wheel ce
 let shared = null;
 function sharedAssets() {
   if (shared) return shared;
-  // mini-pin tread: a grid of round pins, as a bump map (bright = raised)
-  const pins = canvasTexture(256, 64, (g, w, h) => {
-    g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
-    const grd = (x, y) => { const r = g.createRadialGradient(x, y, 0, x, y, 3.4); r.addColorStop(0, '#fff'); r.addColorStop(0.7, '#bbb'); r.addColorStop(1, 'rgba(0,0,0,0)'); return r; };
-    for (let i = 0; i < 32; i++) for (let j = 0; j < 8; j++) { const x = i * 8 + (j % 2) * 4 + 4, y = j * 8 + 4; g.fillStyle = grd(x, y); g.fillRect(x - 4, y - 4, 8, 8); }
-  }, false);
-  pins.wrapS = pins.wrapT = THREE.RepeatWrapping;
-  pins.repeat.set(5, 1);
+  // the tire's surface, unwrapped: u around the wheel (1024 px), v across the profile from one bead to the other (256 px).
+  // Height: mini pins on the tread, raised lettering on both sidewalls. Colour: rubber, a little lighter on the sidewalls.
+  const tread = tireTextures();
   // tire: a lathe profile (radius, y) with rounded shoulders and a little sidewall bulge
   const prof = [[0.031, -0.024], [0.04, -0.0262], [0.0485, -0.0262], [0.0535, -0.023], [0.055, -0.016], [0.055, 0.016], [0.0535, 0.023], [0.0485, 0.0262], [0.04, 0.0262], [0.031, 0.024]]
     .map(([r, y]) => new THREE.Vector2(r, y));
-  const tireGeo = new THREE.LatheGeometry(prof, 36);
+  const tireGeo = new THREE.LatheGeometry(prof, 64);
   // the lathe's u runs around the wheel and v across the profile: tread pins wrap around the tire
-  const uv = tireGeo.attributes.uv;
-  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i), uv.getY(i));
   shared = {
     tireGeo,
-    tireMat: new THREE.MeshStandardMaterial({ color: 0x1a1a1c, roughness: 0.93, bumpMap: pins, bumpScale: 2.2 }),
+    tireMat: new THREE.MeshStandardMaterial({ map: tread.map, normalMap: tread.normal, normalScale: new THREE.Vector2(1.4, 1.4), roughness: 0.9 }),
     carbon: new THREE.MeshStandardMaterial({ color: 0x1c1d20, roughness: 0.5, metalness: 0.35 }),
     alu: new THREE.MeshStandardMaterial({ color: 0x9aa2ad, roughness: 0.32, metalness: 0.9 }),
     gun: new THREE.MeshStandardMaterial({ color: 0x5b5f66, roughness: 0.35, metalness: 0.85 }),
@@ -43,6 +36,81 @@ function sharedAssets() {
     spring: helix(),
   };
   return shared;
+}
+
+function tireTextures() {
+  const W = 1024, H = 256;
+  const hc = document.createElement('canvas'); hc.width = W; hc.height = H;
+  const g = hc.getContext('2d');
+  g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+  // pins: 64 around x 9 across, staggered, on the tread band (v 0.24-0.76)
+  for (let i = 0; i < 64; i++) for (let j = 0; j < 9; j++) {
+    const x = (i + (j % 2) * 0.5) * W / 64, y = H * (0.25 + 0.5 * (j + 0.5) / 9);
+    const r = g.createRadialGradient(x, y, 0, x, y, 7.5);
+    r.addColorStop(0, '#fff'); r.addColorStop(0.55, '#eee'); r.addColorStop(0.8, '#555'); r.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = r; g.fillRect(x - 8, y - 8, 16, 16);
+    if (x < 8) { g.fillStyle = r; g.save(); g.translate(W, 0); g.fillRect(x - 8, y - 8, 16, 16); g.restore(); }
+  }
+  // sidewall lettering, raised
+  g.font = '700 26px "Barlow Condensed", Arial, sans-serif'; g.textBaseline = 'middle'; g.fillStyle = '#9a9a9a';
+  for (const [y, flip] of [[H * 0.1, false], [H * 0.9, true]]) for (let k = 0; k < 3; k++) {
+    g.save(); g.translate(k * W / 3 + 40, y); if (flip) g.scale(1, -1); g.fillText('SDC  MINI-PIN  1/8 TRUGGY', 0, 0); g.restore();
+  }
+  // colour map: rubber, sidewalls a shade lighter, lettering grey
+  const map = canvasTexture(W, H, (c) => {
+    c.fillStyle = '#19191b'; c.fillRect(0, 0, W, H);
+    c.fillStyle = '#222225'; c.fillRect(0, 0, W, H * 0.2); c.fillRect(0, H * 0.8, W, H * 0.2);
+    c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.18; c.drawImage(hc, 0, 0);
+  });
+  // normal map from the height canvas
+  const src = g.getImageData(0, 0, W, H).data, nc = document.createElement('canvas'); nc.width = W; nc.height = H;
+  const nx = nc.getContext('2d'), img = nx.createImageData(W, H), d = img.data, ht = (x, y) => src[4 * (((y + H) % H) * W + ((x + W) % W))] / 255;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const dx = (ht(x - 1, y) - ht(x + 1, y)) * 2.5, dy = (ht(x, y - 1) - ht(x, y + 1)) * 2.5, l = Math.hypot(dx, dy, 1), o = 4 * (y * W + x);
+    d[o] = (dx / l * 0.5 + 0.5) * 255; d[o + 1] = (dy / l * 0.5 + 0.5) * 255; d[o + 2] = (1 / l * 0.5 + 0.5) * 255; d[o + 3] = 255;
+  }
+  nx.putImageData(img, 0, 0);
+  const normal = new THREE.CanvasTexture(nc);
+  normal.anisotropy = 8;
+  return { map, normal };
+}
+
+/** A racing dish wheel face: the car's wheel colour, a darker bead ring, vent holes, a hex hub. */
+function dishTexture(color) {
+  const c = '#' + new THREE.Color(color).getHexString(), dk = '#' + new THREE.Color(color).multiplyScalar(0.55).getHexString();
+  return canvasTexture(256, 256, (g, W) => {
+    g.fillStyle = c; g.fillRect(0, 0, W, W);
+    const R = W / 2;
+    g.translate(R, R);
+    const sh = g.createRadialGradient(0, 0, R * 0.2, 0, 0, R);            // the dish: lighter centre, shaded towards the rim
+    sh.addColorStop(0, 'rgba(255,255,255,0.18)'); sh.addColorStop(0.7, 'rgba(0,0,0,0)'); sh.addColorStop(0.92, 'rgba(0,0,0,0.35)'); sh.addColorStop(1, 'rgba(0,0,0,0.6)');
+    g.fillStyle = sh; g.beginPath(); g.arc(0, 0, R, 0, 7); g.fill();
+    g.strokeStyle = dk; g.lineWidth = 7; g.beginPath(); g.arc(0, 0, R * 0.86, 0, 7); g.stroke();
+    g.fillStyle = '#111';
+    for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; g.beginPath(); g.ellipse(Math.cos(a) * R * 0.6, Math.sin(a) * R * 0.6, 12, 7, a, 0, 7); g.fill(); }
+    g.fillStyle = dk; g.beginPath(); g.arc(0, 0, R * 0.3, 0, 7); g.fill();
+    g.fillStyle = '#6d7178'; g.beginPath();
+    for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI * 2; g[k ? 'lineTo' : 'moveTo'](Math.cos(a) * R * 0.16, Math.sin(a) * R * 0.16); } g.fill();
+    g.fillStyle = '#2a2c30'; g.beginPath(); g.arc(0, 0, R * 0.07, 0, 7); g.fill();
+  });
+}
+
+/** The ghost: a hologram (fresnel rim, scan lines), additive, shared clock in holoTime. */
+export const holoTime = { value: 0 };
+let holoMat = null;
+export function hologram() {
+  return holoMat ??= new THREE.ShaderMaterial({
+    uniforms: { time: holoTime, tint: { value: new THREE.Color(0x7fe4ff) } },
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    vertexShader: `varying vec3 vN; varying vec3 vV; varying float vZ;
+      void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vZ = wp.z; vec4 mv = viewMatrix * wp;
+        vN = normalize(mat3(modelMatrix) * normal); vV = normalize(cameraPosition - wp.xyz); gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `uniform float time; uniform vec3 tint; varying vec3 vN; varying vec3 vV; varying float vZ;
+      void main(){ float f = pow(1.0 - abs(dot(normalize(vN), vV)), 2.2);
+        float scan = 0.65 + 0.35 * sin(vZ * 260.0 - time * 9.0);
+        float flick = 0.92 + 0.08 * sin(time * 37.0);
+        gl_FragColor = vec4(tint * (0.08 + 0.9 * f) * scan * flick, 1.0); }`,
+  });
 }
 
 /** A coil spring of unit length along +y (scaled per frame), 1 cm across. */
@@ -129,9 +197,9 @@ function livery(color, accent, number) {
 export function makeCar(color, { ghost = false, number = 1, wheelColor = 0xd9ee2c, accent = 0x15161a } = {}) {
   const A = sharedAssets();
   const body = new THREE.Group();
-  const ghostMat = ghost ? new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.28, depthWrite: false }) : null;
+  const ghostMat = ghost ? hologram() : null;
   const M = (m) => ghostMat ?? m;
-  const paint = ghostMat ?? new THREE.MeshPhysicalMaterial({ map: livery(color, accent, number), roughness: 0.35, clearcoat: 1, clearcoatRoughness: 0.12, side: THREE.DoubleSide });
+  const paint = ghostMat ?? new THREE.MeshPhysicalMaterial({ map: livery(color, accent, number), roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.06, envMapIntensity: 2.4, side: THREE.DoubleSide });
   const wheelMat = M(new THREE.MeshStandardMaterial({ color: wheelColor, roughness: 0.45 }));
 
   const shell = new THREE.Mesh(shellGeometry(), paint);
@@ -167,14 +235,10 @@ export function makeCar(color, { ghost = false, number = 1, wheelColor = 0xd9ee2
     const tire = new THREE.Mesh(A.tireGeo, M(A.tireMat)); tire.castShadow = !ghost; spin.add(tire);
     if (!ghost) {
       const rim = new THREE.Mesh(new THREE.CylinderGeometry(RIM_R, RIM_R, TIRE_W * 0.9, 28, 1, true), wheelMat); spin.add(rim);
-      const dish = new THREE.Mesh(new THREE.CircleGeometry(RIM_R, 28), wheelMat);
+      const dish = new THREE.Mesh(new THREE.CircleGeometry(RIM_R, 32), new THREE.MeshStandardMaterial({ map: dishTexture(wheelColor), roughness: 0.4 }));
       dish.position.y = sy * TIRE_W * 0.2; dish.rotation.x = sy * -Math.PI / 2; spin.add(dish);          // the outer face, set in
       const hex = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.012, 6), A.gun);
       hex.position.y = sy * (TIRE_W * 0.2 + 0.004); spin.add(hex);
-      for (let k = 0; k < 5; k++) {                                                                       // dish ribs, so the spin shows
-        const rib = box(M(new THREE.MeshStandardMaterial({ color: new THREE.Color(wheelColor).multiplyScalar(0.7), roughness: 0.5 })), 0.003, 0.004, RIM_R * 1.6, 0, sy * TIRE_W * 0.2, 0, false);
-        rib.rotation.y = (k * Math.PI) / 5; spin.add(rib);
-      }
       const knuckle = box(A.gun, 0.02, 0.01, 0.03, 0, -sy * (0.14 - HUB_Y - 0.005), 0);
       wheel.add(knuckle);
     }

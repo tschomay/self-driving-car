@@ -97,7 +97,8 @@ function lapTimeAt(R, k, u) {
 // ---- app ----------------------------------------------------------------------------------------------------
 const canvas = $('view');
 const coarse = matchMedia('(pointer: coarse)').matches;
-const quality = { pixelRatio: Math.min(window.devicePixelRatio || 1, coarse ? 1.75 : 2), shadows: true, shadowSize: coarse ? 1024 : 2048, groundSize: coarse ? 2048 : 4096 };
+let gfx = (() => { try { return +(localStorage.getItem('race-gfx') ?? (coarse ? 1 : 2)); } catch { return coarse ? 1 : 2; } })();
+const quality = { pixelRatio: Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2), shadows: true, shadowSize: coarse ? 2048 : 4096, groundSize: coarse ? 2048 : 4096, post: gfx, grass: coarse ? 4000 : 9000 };
 const view = new View(canvas, quality);
 view.camMode = 0;
 
@@ -186,6 +187,10 @@ $('scrub').addEventListener('input', (e) => { S.t = +e.target.value; view.clearM
 $('menubtn').addEventListener('click', () => { $('sheet').hidden = !$('sheet').hidden; });
 $('close-sheet').addEventListener('click', () => { $('sheet').hidden = true; });
 seg($('ghost-seg'), [{ v: true, html: 'Best lap' }, { v: false, html: 'Off' }], true, (v) => { S.ghostOn = v; });
+seg($('gfx-seg'), [{ v: 2, html: 'High' }, { v: 1, html: 'Medium' }, { v: 0, html: 'Fast' }], gfx, (v) => {
+  gfx = v; view.setQuality(v); perf.locked = true; try { localStorage.setItem('race-gfx', String(v)); } catch { /* private mode */ }
+});
+$('gfx-seg').querySelectorAll('button').forEach((b, i) => (b.dataset.v = String(2 - i)));
 seg($('replay-seg'), [{ v: true, html: 'Jumps &amp; crashes' }, { v: false, html: 'Off' }], true, (v) => { S.replaysOn = v; if (!v) S.replay = null; });
 $('again').addEventListener('click', () => { S.t = 0; view.clearMarks(); S.ended = false; S.replayedLaps.clear(); S.replayedCrashes.clear(); S.recordAir = 0; $('card').hidden = true; setPlaying(true); view.camInit = false; });
 $('next').addEventListener('click', () => { loadLoop((S.loopIdx + 1) % S.man.loops.length).then(() => setPlaying(true)); });
@@ -226,7 +231,7 @@ function triggerReplays(t0, t1) {
     const at = e.t + 2.6;
     if (at > t0 && at <= t1 && !S.replayedCrashes.has(e.t)) {
       S.replayedCrashes.add(e.t);
-      S.replay = { from: e.t - 2.4, to: e.t + 1.6, rate: 0.35, resume: at, label: 'Crash replay' };
+      S.replay = { t: e.t - 2.4, from: e.t - 2.4, to: e.t + 1.6, rate: 0.35, resume: at, label: 'Crash replay' };
       return;
     }
   }
@@ -234,7 +239,7 @@ function triggerReplays(t0, t1) {
     const at = e.t + e.air + 0.8;
     if (at > t0 && at <= t1 && e.air > S.recordAir && e.air >= 0.5 && !S.replayedLaps.has(e.lap)) {
       S.recordAir = e.air; S.replayedLaps.add(e.lap);
-      S.replay = { from: e.t - 1.1, to: e.t + e.air + 0.7, rate: 0.3, resume: at, label: 'Longest air so far' };
+      S.replay = { t: e.t - 1.1, from: e.t - 1.1, to: e.t + e.air + 0.7, rate: 0.3, resume: at, label: 'Longest air so far' };
       return;
     }
     if (at > t0 && at <= t1) S.recordAir = Math.max(S.recordAir, e.air);
@@ -356,6 +361,21 @@ function drawChart() {
     + (rv ? `<span><i style="background:#5b9cf0"></i>${S.man.cars[S.rivalName].short}</span>` : '') + '<span>Lap 1 starts from standstill.</span>';
 }
 
+// auto quality: if frames are slow, drop ambient occlusion, then bloom and grading, then resolution
+const perf = { n: 0, sum: 0, settle: 0 };
+function autoQuality(dt) {
+  if (perf.locked) return;
+  if (++perf.settle < 40) return;                   // let the shaders compile and the first loop build
+  perf.n++; perf.sum += dt;
+  if (perf.n < 60) return;
+  const avg = perf.sum / perf.n; perf.n = 0; perf.sum = 0;
+  if (avg < 1 / 40) return;
+  if (gfx > 0) { gfx--; view.setQuality(gfx); markGfx(); }
+  else if (view.renderer.getPixelRatio() > 1) { view.renderer.setPixelRatio(Math.max(1, view.renderer.getPixelRatio() - 0.25)); resize(); }
+  else perf.locked = true;
+}
+function markGfx() { $('gfx-seg')?.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.v === gfx))); }
+
 let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
@@ -364,7 +384,7 @@ function frame(now) {
   const R = S.R;
   let cut = false;
   if (S.replay) {
-    S.replay.t = (S.replay.t ?? S.replay.from) + (S.playing ? dtw * S.replay.rate : 0);
+    S.replay.t += S.playing ? dtw * S.replay.rate : 0;
     if (S.replay.t >= S.replay.to) { S.t = S.replay.resume; S.replay = null; cut = true; view.camInit = false; }
   } else if (S.playing && !S.ended) {
     const t0 = S.t;
@@ -377,7 +397,9 @@ function frame(now) {
   const p = sample(R, t, P);
   view.poseCar(S.car, p, S.playing ? dtv : 0);
   const air = p.air > 0.5;
-  view.dustFrom(p, S.wasAir && !air && S.playing, dtv);
+  const landed = S.wasAir && !air && S.playing;
+  view.dustFrom(p, landed, dtv);
+  if (S.playing) view.roost(p, landed, dtv);
   S.wasAir = air;
   // ghost: the best completed lap, at the same time into its lap
   const k = R.lapOf(t), bb = R.bestBefore[k];
@@ -396,8 +418,11 @@ function frame(now) {
   $('replay-tag').hidden = !S.replay;
   if (S.replay) $('replay-tag').textContent = S.replay.label;
   hud(p, t);
-  view.stepDust(dtw * (S.playing ? Math.min(S.speed, 2) : 0));
-  view.render();
+  const dtp = S.playing ? (S.replay ? dtw * S.replay.rate : dtw * Math.min(S.speed, 2)) : 0;
+  view.stepDust(dtp);
+  view.stepClods(dtp);
+  view.render(dtw, !!S.replay, S.car.body.position);
+  autoQuality(dtw);
 }
 
 async function main() {

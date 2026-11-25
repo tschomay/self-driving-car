@@ -388,4 +388,7 @@ The owner asked for research on what would really move the needle toward a good 
   - **Corner entry:** E5 enters corners at 6.12 m/s, faster than the racer it copies (5.77). E4's students did the same against their teacher (4.75 against 4.12).
   - Validation (60 runs, start 0 and others): 40/60 and 31/60, against E4's 53 and 49.
   - Owner's prediction: speed survives ("driving is more dependent on ability to react rather than plan"): **right**. "A little less reliable on the jumps": **partly**. It is less reliable, but by far more than a little, and mostly in corners rather than on jumps.
-- **Explanation (owner):** _pending_
+- **Explanation (owner):**
+  1. "The sensor car doesn't know to brake in time because it can't see the corner coming. It's luck that it is still able to make corners, either by drastic maneuvers or because the teacher left some on the table. It also must learn to brake randomly after a long period of relative straight and acceleration. Or just to arbitrarily got the brakes sometimes."
+  2. "The sensor driver can't see through the corner, so it doesn't know how sharp or long the corner is."
+  3. "I like the idea of skipping the teacher, but we've always found that transfer learning from the teacher works better. Maybe a bigger network and more training would work? But yes having the teacher match the students knowledge send likely to help so that the student has clear reasons for actions."

@@ -423,4 +423,20 @@ Every sharp turn (|curvature| > 0.15 /m) each driver reached, from where.py's 0.
 - **Question:** how much of the racer's speed comes from seeing the track ahead? A teacher that sees only what the student can would give the student "clear reasons for actions" (owner).
 - **Setup:** the pilot's recipe (copy of the teacher, then PPO, crash cost 200, 9 h, `runs/p47-e6a`). The driver sees the track only 4 m ahead (`--set preview=4.0`): curvature at 0, 2 and 4 m, heights to 4 m, and the next jump only within 4 m. Beyond that the track reads as flat and straight. It keeps the true state and the physics.
 - **Prediction (owner):** "a little slower and a little safer. It's only fast now because it doesn't know to prepare for corners (ie it's reckless)"
+- **Result:** seeing 4 m instead of 30 m cost almost nothing. Training ran like the pilot's first run, eval for eval (2 passes each):
+
+  | Steps | E6a (sees 4 m) | Pilot s0 (sees 30 m) |
+  |---|---|---|
+  | 0 (copy of the teacher) | 136.5 at 28.1 s | 132.5 at 28.1 s |
+  | 3M | 126.0 at 27.1 s | 129.0 at 27.2 s |
+  | 6M | 123.0 at 26.0 s | 124.5 at 26.0 s |
+  | 9M | 114.0 at 25.2 s | 113.0 at 25.0 s |
+
+  - 5 passes, 6M checkpoint: 124.0 finished per pass (124, 123, 121, 126, 126) at 25.87 s, race **541.7 s**. The best full-sight racer: 134 at 25.82 s, race 531.3 s. Same speed, 10 more crashes in 1,000 laps, 10 s slower over 20 laps.
+  - Training was stopped after the 9M eval: like the full-sight runs, it was drifting toward speed and losing finishes.
+- **Next:** E6, copy E6a onto sensors (below).
+
+### E6 — Copy the 4 m racer onto sensors
+
+- **Setup:** as E5, with E6a's 6M checkpoint as the teacher (`bash sdc/phase47/e6_runs.sh`; `bc_loop --teacher-racer runs/p47-e6a/ckpt/6029312.pt --teacher-preview 4.0`), then `where e6`.
 - **Result:** _running_

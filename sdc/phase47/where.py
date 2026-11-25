@@ -50,6 +50,7 @@ E4_CAR = ("runs/p47-e4-s0", "runs/p47-e4-s1")       # E4: sensors-only students 
 E4_TEACHER = "runs/p47-e4-teacher.json"              # e4_tune.py's chosen settings over TRUGGY
 E5_CAR = ("runs/p47-e5-s0", "runs/p47-e5-s1")       # E5: sensors-only students copying the privileged RL racer
 E5_RACER = "runs/p47-racer-s1/ckpt/3014656.pt"       # the racer they copy (crash price 200, 3M steps)
+E6_CAR = ("runs/p47-e6-s0", "runs/p47-e6-s1")       # E6: sensors-only students copying E6a (racer that sees 4 m)
 
 
 def _driver(who):
@@ -64,6 +65,8 @@ def _driver(who):
         return Ensemble(E4_CAR), env
     if who == "e5":
         return Ensemble(E5_CAR), env
+    if who == "e6":
+        return Ensemble(E6_CAR), env
     if who == "racer":                                # privileged, so scored like the teachers: no expo
         from sdc.phase47.racer import Driver
         return Driver(E5_RACER), {k: v for k, v in env.items() if k != "expo"}
@@ -92,7 +95,7 @@ class Capped:
         return a
 
 
-WHO_ID = dict(base=0, teacher=1, map=2, mapteacher=3, map_full=4, teacher_plus=5, e4=6, e4cap95=7, e4cap90=8, racer=9, e5=10)
+WHO_ID = dict(base=0, teacher=1, map=2, mapteacher=3, map_full=4, teacher_plus=5, e4=6, e4cap95=7, e4cap90=8, racer=9, e5=10, e6=11)
 
 
 def _drive(who, rep, course):
@@ -335,6 +338,11 @@ def main():
         if not pk.exists():
             collect(("racer", "e5"), pk)
         analyse((OUT, pk), Path("runs/p47-e5-where.json"))
+    elif cmd == "e6":                           # E6: sensor students of the 4 m racer (E6a)
+        pk = Path("runs/p47-e6-where.pkl")
+        if not pk.exists():
+            collect(("e6",), pk)
+        analyse((OUT, pk), Path("runs/p47-e6-where.json"))
     elif cmd == "e4cap":                        # after E4: does a lower speed limit trade the lap time back for finishes?
         pk = Path("runs/p47-e4cap-where.pkl")
         if not pk.exists():

@@ -70,6 +70,7 @@ def main():
     ap.add_argument("--train-map", default=TRAIN_MAP, help="out-lap maps of the practice loops (with --map)")
     ap.add_argument("--val-map", default=VAL_MAP, help="out-lap maps of the validation runs (with --map)")
     ap.add_argument("--teacher-racer", default=None, help="Phase 4.7: a privileged RL racer checkpoint as teacher")
+    ap.add_argument("--teacher-preview", type=float, default=None, help="Phase 4.7 E6: metres of track the racer sees")
     ap.add_argument("--teacher-json", default=None, help="JSON file of LoopExpert settings over the teacher's defaults")
     a = ap.parse_args()
     torch.set_num_threads(1)
@@ -96,8 +97,9 @@ def main():
         tkw.update({k: v for k, v in json.loads(Path(a.teacher_json).read_text()).items() if not k.startswith("_")})
     teacher = LoopExpert(use_turn_map=a.map, **tkw)
     if a.teacher_racer:
-        from sdc.phase47.racer import ExpoDriver
-        teacher, tkw = ExpoDriver(a.teacher_racer), dict(racer=a.teacher_racer)
+        from sdc.phase47 import racer as _racer
+        _racer.PREVIEW = a.teacher_preview                       # read by forked workers; must match how it was trained
+        teacher, tkw = _racer.ExpoDriver(a.teacher_racer), dict(racer=a.teacher_racer, preview=a.teacher_preview)
     ref = pickle.load(open(REF_TRUGGY if a.truggy else REF, "rb"))
     ref1 = ref[::len(dr_starts)]                        # start 0 only (prun orders by course, then start)
     val_env = student_env(a.map, val=True, real=real, expo=a.expo, notes=a.notes, maps=mp)

@@ -439,4 +439,15 @@ Every sharp turn (|curvature| > 0.15 /m) each driver reached, from where.py's 0.
 ### E6 — Copy the 4 m racer onto sensors
 
 - **Setup:** as E5, with E6a's 6M checkpoint as the teacher (`bash sdc/phase47/e6_runs.sh`; `bc_loop --teacher-racer runs/p47-e6a/ckpt/6029312.pt --teacher-preview 4.0`), then `where e6`.
-- **Result:** _running_
+- **Prediction (owner):** not given before the result came in.
+- **Result:** worse than E5. A teacher that sees only what the sensors see did not make it easier to copy.
+
+  | Car | Finished per pass | Crashes per lap | Median lap | Race |
+  |---|---|---|---|---|
+  | Teacher (hand-coded) | 137 | 0.087 | 30.78 s | 627.7 s |
+  | E5 (copies the 30 m racer) | 92.2 | 0.385 | 26.06 s | 575.1 s |
+  | E6 (copies the 4 m racer) | 78.8 (77, 83, 73, 81, 80) | 0.475 | 26.35 s | 593.5 s |
+
+  - Failures (5 passes): corners off the lane 251 (E5 198), other off the lane 54 (48), landings 50 (38).
+  - Students at the end of training (60 runs): E6 29 and 34 finished; E5 40 and 31.
+  - Still beats the teacher's race by 34 s, but E5 remains the best sensor car.

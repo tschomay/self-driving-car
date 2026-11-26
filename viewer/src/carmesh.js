@@ -241,9 +241,21 @@ const SCHEMES = {
   2: { a: 0xf3f1ea, b: 0xc81e2b, flame: 0x15161a, flame2: 0x4a4d55 },     // rival: white to red, black flames
 };
 
-export function makeCar(color, { ghost = false, number = 1, wheelColor = 0xf3f2ee, accent = 0x15161a } = {}) {
+/** The sim's car geometry (record.py writes it into each recording): the old 1/10-size car by default. */
+export const SMALL = { wheel_r: WHEEL_R, corner_x: CORNER.fl[0], corner_y: CORNER.fl[1], mount_z: MOUNT_Z, box: [0.23, 0.09, 0.035] };
+
+export function makeCar(color, { ghost = false, number = 1, wheelColor = 0xf3f2ee, accent = 0x15161a, geom = SMALL } = {}) {
   const A = sharedAssets();
   const body = new THREE.Group();
+  // The body kit (shell, chassis plate, towers, wing) is drawn at the old car's size and scaled to the sim's wheelbase.
+  // Its chassis plate sits at the sim's collision-box bottom when that is a realistic ride height (the full-size
+  // truggy: about 3 cm), else 5 cm above the ground (the old car's box rode 7 cm up). Wheels and links follow the sim.
+  const sc = geom.corner_x / 0.15, kr = geom.wheel_r / WHEEL_R;
+  const ground = geom.mount_z - 0.002 - geom.wheel_r, boxBot = -geom.box[2];
+  const plateZ = boxBot - ground <= 0.045 ? boxBot : ground + 0.052;
+  const kitZ = plateZ + 0.055 * sc;
+  const kit = new THREE.Group(); kit.scale.setScalar(sc); kit.position.z = kitZ; body.add(kit);
+  const K = (x, y, z) => new THREE.Vector3(x * sc, y * sc, kitZ + z * sc);
   const ghostMat = ghost ? hologram() : null;
   const M = (m) => ghostMat ?? m;
   const scheme = SCHEMES[number] ?? SCHEMES[1];
@@ -253,20 +265,20 @@ export function makeCar(color, { ghost = false, number = 1, wheelColor = 0xf3f2e
 
   const shell = new THREE.Mesh(shellGeometry(), paint);
   shell.castShadow = !ghost;
-  body.add(shell);
+  kit.add(shell);
 
   // chassis plate (long and narrow, exposed front and rear), front bumper and skid
-  body.add(plate(M(A.carbon), [[-0.245, -0.045], [0.17, -0.05], [0.235, -0.03], [0.235, 0.03], [0.17, 0.05], [-0.245, 0.045]], 0.004, 'xy', -0.055));
+  kit.add(plate(M(A.carbon), [[-0.245, -0.045], [0.17, -0.05], [0.235, -0.03], [0.235, 0.03], [0.17, 0.05], [-0.245, 0.045]], 0.004, 'xy', -0.055));
   const bump = plate(M(A.plastic), [[0.215, -0.058], [0.268, -0.046], [0.276, -0.03], [0.268, -0.026], [0.222, -0.046]], 0.12, 'xz');
-  body.add(bump);
+  kit.add(bump);
   // shock towers: grey composite plates, wide at the top where the shocks mount
   const tower = (x) => plate(grey, [[-0.05, -0.053], [0.05, -0.053], [0.088, 0.024], [0.082, 0.036], [0.058, 0.036], [0.026, 0.004], [-0.026, 0.004], [-0.058, 0.036], [-0.082, 0.036], [-0.088, 0.024]], 0.006, 'yz', x);
   if (!ghost) {
     const ft = tower(0.122), rt = tower(-0.122);
-    body.add(ft, rt);
+    kit.add(ft, rt);
     // diff housings and a centre driveshaft, visible through the open chassis
-    for (const x of [0.15, -0.15]) body.add(box(A.gun, 0.05, 0.06, 0.036, x, 0, -0.034));
-    const cs = new THREE.Mesh(A.unitRod, A.alu); setRod(cs, V(0.125, 0, -0.038), V(-0.125, 0, -0.038), 0.004); body.add(cs);
+    for (const x of [0.15, -0.15]) kit.add(box(A.gun, 0.05, 0.06, 0.036, x, 0, -0.034));
+    const cs = new THREE.Mesh(A.unitRod, A.alu); setRod(cs, V(0.125, 0, -0.038), V(-0.125, 0, -0.038), 0.004); kit.add(cs);
   }
 
   // wing: a wide swept wing on a grey mount from the rear tower, white endplates
@@ -282,15 +294,15 @@ export function makeCar(color, { ghost = false, number = 1, wheelColor = 0xf3f2e
   }
   for (const y of [-0.06, 0.0, 0.06]) wing.add(box(wingMat, 0.1, 0.002, 0.008, -0.005, y, 0.013));
   wing.position.set(-0.225, 0, 0.058); wing.rotation.y = 0.05;
-  body.add(wing);
+  kit.add(wing);
   if (!ghost) for (const sy of [1, -1]) {
     const strut = plate(grey, [[-0.122, 0.03], [-0.108, 0.03], [-0.21, 0.06], [-0.234, 0.06]], 0.005, 'xz', sy * 0.03);
-    body.add(strut);
+    kit.add(strut);
   }
 
   // per corner: wheel (steered knuckle + spinning tire), lower and upper arms, driveshaft, shock
   const corners = WHEELS.map((w) => {
-    const [cx, cy] = CORNER[w], sy = Math.sign(cy), front = w[0] === 'f';
+    const front = w[0] === 'f', sy = w[1] === 'l' ? 1 : -1, cx = (front ? 1 : -1) * geom.corner_x, cy = sy * geom.corner_y;
     const wheel = new THREE.Group(), spin = new THREE.Group();
     const tire = new THREE.Mesh(A.tireGeo, M(A.tireMat)); tire.castShadow = !ghost; spin.add(tire);
     if (!ghost) {
@@ -303,8 +315,9 @@ export function makeCar(color, { ghost = false, number = 1, wheelColor = 0xf3f2e
       wheel.add(knuckle);
     }
     wheel.add(spin);
+    wheel.scale.setScalar(kr);
     body.add(wheel);
-    const part = { w, cx, cy, sy, front, wheel, spin };
+    const part = { w, cx, cy, sy, front, wheel, spin, dx: cx / sc };
     if (!ghost) {
       part.lowerF = new THREE.Mesh(A.unitRod, A.plastic); part.lowerR = new THREE.Mesh(A.unitRod, A.plastic);
       part.upper = new THREE.Mesh(A.unitRod, A.gun); part.shaft = new THREE.Mesh(A.unitRod, A.alu);
@@ -318,12 +331,14 @@ export function makeCar(color, { ghost = false, number = 1, wheelColor = 0xf3f2e
       part.spring = new THREE.Mesh(A.spring, M(new THREE.MeshStandardMaterial({ color: 0x1b1c20, roughness: 0.35, metalness: 0.6 })));
       part.eye = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.01, 10), A.gun);
       for (const m of [cap, bodyC, collar, part.rod, part.spring, part.eye]) { m.castShadow = true; sh.add(m); }
+      sh.scale.setScalar(sc);
       body.add(sh);
     }
     return part;
   });
 
-  const car = { body, wheels: corners.map((c) => c.wheel), corners, paint, ghost, spinAngle: 0 };
+  const car = { body, wheels: corners.map((c) => c.wheel), corners, paint, ghost, spinAngle: 0, geom, R: geom.wheel_r, sc, kr, K,
+    hubY: geom.corner_y - (0.14 - HUB_Y) * kr };
   setSuspension(car, [-0.002, -0.002, -0.002, -0.002], 0, 0);
   return car;
 }
@@ -331,26 +346,27 @@ export function makeCar(color, { ghost = false, number = 1, wheelColor = 0xf3f2e
 const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3(), tmpC = new THREE.Vector3();
 /** Pose the running gear: susp = slide travel per wheel (m, + = compressed), steer (rad), spin (rad). */
 export function setSuspension(car, susp, steer, spin) {
+  const { K, kr, sc } = car;
   for (let k = 0; k < 4; k++) {
-    const c = car.corners[k], zc = MOUNT_Z + susp[k];
+    const c = car.corners[k], zc = car.geom.mount_z + susp[k];
     c.wheel.position.set(c.cx, c.cy, zc);
     c.wheel.rotation.set(0, 0, c.front ? steer : 0);
     c.spin.rotation.y = spin;
     if (car.ghost) continue;
-    const sy = c.sy, hubY = sy * HUB_Y;
+    const sy = c.sy, hubY = sy * car.hubY, dx = c.dx;
     // lower A-arm: two rods from the chassis pivots (front and rear of the arm) to the hub's lower ball
-    const ball = tmpA.set(c.cx, hubY, zc - 0.015);
-    setRod(c.lowerF, V(c.cx + 0.03, sy * 0.034, -0.05), ball, 0.005);
-    setRod(c.lowerR, V(c.cx - 0.03, sy * 0.034, -0.05), ball, 0.005);
+    const ball = tmpA.set(c.cx, hubY, zc - 0.015 * kr);
+    setRod(c.lowerF, K(dx + 0.03, sy * 0.034, -0.05), ball, 0.005 * sc);
+    setRod(c.lowerR, K(dx - 0.03, sy * 0.034, -0.05), ball, 0.005 * sc);
     // upper link (turnbuckle) to the top of the hub carrier
-    setRod(c.upper, V(c.cx + (c.front ? -0.02 : 0.02), sy * 0.045, -0.008), tmpB.set(c.cx, hubY, zc + 0.024), 0.0028);
+    setRod(c.upper, K(dx + (c.front ? -0.02 : 0.02), sy * 0.045, -0.008), tmpB.set(c.cx, hubY, zc + 0.024 * kr), 0.0028 * sc);
     // driveshaft from the diff to the hub
-    setRod(c.shaft, V(c.cx, sy * 0.03, -0.036), tmpB.set(c.cx, hubY, zc), 0.0038);
+    setRod(c.shaft, K(dx, sy * 0.03, -0.036), tmpB.set(c.cx, hubY, zc), 0.0038 * sc);
     // coil-over: from the top of the tower, leaning in, to a mount near the outer end of the lower arm
-    const top = V(c.cx + (c.front ? -0.028 : 0.028), sy * 0.074, 0.03);
-    const bot = tmpC.set(c.cx, sy * 0.034, -0.05).lerp(ball, 0.86);
-    const len = aim(c.shock, top, bot);
-    // body: fixed at the top (0..0.06); shaft: from the eyelet up into the body; spring: collar to eyelet
+    const top = K(dx + (c.front ? -0.028 : 0.028), sy * 0.074, 0.03);
+    const bot = tmpC.copy(K(dx, sy * 0.034, -0.05)).lerp(ball, 0.86);
+    const len = aim(c.shock, top, bot) / sc;                    // in the shock group's own (unscaled) units
+    c.shock.scale.setScalar(sc);
     c.rod.position.set(0, 0.04, 0); c.rod.scale.set(0.0032, Math.max(0.001, len - 0.04), 0.0032);
     c.spring.position.set(0, 0.014, 0); c.spring.quaternion.identity(); c.spring.scale.set(1, Math.max(0.01, len - 0.02), 1);
     c.eye.position.set(0, len, 0); c.eye.rotation.set(0, 0, Math.PI / 2);

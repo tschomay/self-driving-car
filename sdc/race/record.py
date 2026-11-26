@@ -188,7 +188,10 @@ def race(car, seed, phys_seed=0, laps=LAPS, log=print):
     cols = {}
     for i, (k, sc) in enumerate(COLS.items()):
         cols[k] = np.rint(fr[:, i] * sc).astype(np.int32).tolist()
-    return dict(car=label, loop=seed, phys_seed=phys_seed, phys={k: round(v, 4) for k, v in vars(phys).items()},
+    geom = (cr.geometry(c.real) if hasattr(cr, "geometry")         # the full-size truggy ("size8") and later sims
+            else dict(wheel_r=cr.WHEEL_R, corner_x=0.15, corner_y=0.14, mount_z=cr.MOUNT_Z, box=(0.23, 0.09, 0.035)))
+    geom = {k: geom[k] for k in ("wheel_r", "corner_x", "corner_y", "mount_z", "box")}
+    return dict(car=label, loop=seed, phys_seed=phys_seed, geom=geom, real=sorted(c.real), phys={k: round(v, 4) for k, v in vars(phys).items()},
                 laps=laps, crash_s=CRASH_S, fps=FPS, n=len(frames), race_time=round(t_race, 3),
                 lap_times=lap_times, best_lap=min(lap_times) if lap_times else None, crashes=crashes, dnf=dnf,
                 scales=COLS, cols=cols, events=events)

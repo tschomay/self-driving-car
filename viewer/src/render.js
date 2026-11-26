@@ -6,7 +6,7 @@ import { makeCar, setSuspension, holoTime } from './carmesh.js';
 import { Post } from './post.js';
 import { dress, wind } from './world.js';
 import { LANE_W, BANK_RUN, rng32 } from './track.js';
-import { WHEEL_R, CORNER, MOUNT_Z } from './carmodel.js';
+import { SMALL } from './carmesh.js';
 
 THREE.Object3D.DEFAULT_UP.set(0, 0, 1);
 
@@ -446,14 +446,14 @@ export class View {
     vis.body.visible = true;
     vis.body.position.set(p.x, p.y, p.z);
     vis.body.quaternion.set(p.qx, p.qy, p.qz, p.qw);
-    const spin = (vis.spin + p.v / WHEEL_R * dt) % (2 * Math.PI);
+    const spin = (vis.spin + p.v / vis.R * dt) % (2 * Math.PI);
     vis.spin = Number.isFinite(spin) ? spin : 0;            // never let one bad sample stick
     setSuspension(vis, [p.s1, p.s2, p.s3, p.s4], p.st, vis.spin);
     if (!vis.blobs.length) return;
     vis.body.updateMatrixWorld(true);
     const c = this.c, lat = -p.vx * Math.sin(p.yaw) + p.vy * Math.cos(p.yaw);
     vis.wheels.forEach((w, k) => {
-      const wp = w.getWorldPosition(this.tmpV), h = c.height(wp.x, wp.y), gap = wp.z - WHEEL_R - h;
+      const wp = w.getWorldPosition(this.tmpV), h = c.height(wp.x, wp.y), gap = wp.z - vis.R - h;
       // contact shadow: dark and tight when the tire is down, fading and spreading as it lifts
       const b = vis.blobs[k], near = THREE.MathUtils.clamp(1 - gap / 0.12, 0, 1);
       b.visible = near > 0.02;
@@ -513,7 +513,7 @@ export class View {
     const rate = Math.max(0, p.v - 1.5) * 6 * dt;
     for (const k of [2, 3]) {
       if (!(p.gnd & (1 << k)) || Math.random() > rate) continue;
-      const w = CORNER[k === 2 ? 'rl' : 'rr'];
+      const g = this.geom ?? SMALL, w = [-g.corner_x, k === 2 ? g.corner_y : -g.corner_y];
       const cy = Math.cos(yaw), sy = Math.sin(yaw), x = p.x + w[0] * cy - w[1] * sy, y = p.y + w[0] * sy + w[1] * cy;
       this.puff(x, y, c.height(x, y) + 0.01, -vx * 0.15 + (Math.random() - 0.5) * 0.5, -vy * 0.15 + (Math.random() - 0.5) * 0.5,
         0.25 + Math.random() * 0.5, 0.09 + Math.random() * 0.1, 0.5 + Math.random() * 0.5);
@@ -555,7 +555,7 @@ export class View {
       pz = Math.max(p.z + o.dist * Math.sin(o.pitch), c.height(px, py) + 0.1);
       fov = this.portrait ? 70 : 55; snap = true;
     } else if (mode === 'On board') {
-      const f = new THREE.Vector3(0.02, 0, 0.075).applyQuaternion(vis.body.quaternion).add(vis.body.position);
+      const f = new THREE.Vector3(0.02, 0, 0.075 * (vis.sc ?? 1)).applyQuaternion(vis.body.quaternion).add(vis.body.position);
       const l = new THREE.Vector3(2, 0, 0.1).applyQuaternion(vis.body.quaternion).add(vis.body.position);
       const u = new THREE.Vector3(0, 0, 1).applyQuaternion(vis.body.quaternion);
       cam.up.copy(u);
@@ -637,7 +637,7 @@ export class View {
     for (const k of [2, 3]) {
       if (!(p.gnd & (1 << k))) continue;
       let n = rate; while (n > 0) { if (Math.random() < n) {
-        const w = CORNER[k === 2 ? 'rl' : 'rr'], x = p.x + (w[0] - 0.04) * cy - w[1] * sy, y = p.y + (w[0] - 0.04) * sy + w[1] * cy;
+        const g = this.geom ?? SMALL, w = [-g.corner_x, k === 2 ? g.corner_y : -g.corner_y], x = p.x + (w[0] - 0.04) * cy - w[1] * sy, y = p.y + (w[0] - 0.04) * sy + w[1] * cy;
         const back = 1.2 + Math.random() * 2.2, side = (Math.random() - 0.5) * 1.2;
         this.clod(x, y, this.c.height(x, y) + 0.02, p.vx * 0.4 - back * cy - side * sy, p.vy * 0.4 - back * sy + side * cy, 0.6 + Math.random() * 1.5, 0.003 + Math.random() * 0.007);
       } n -= 1; }

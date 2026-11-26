@@ -128,9 +128,12 @@ async function loadLoop(idx) {
   S.R = prepRace(raw, c); S.R.L = c.length;
   S.rival = rawRival ? prepRace(rawRival, c) : null; if (S.rival) S.rival.L = c.length;
   for (const k of ['car', 'ghost', 'rivalCar']) if (S[k]) view.removeCar(S[k]);
-  S.car = view.addCar(CAR_COLOR, { number: 1, marks: true, wheelColor: 0xf3f2ee, accent: 0x15161a });
-  S.ghost = view.addCar(CAR_COLOR, { ghost: true });
-  S.rivalCar = S.rival ? view.addCar(RIVAL_COLOR, { number: 2, marks: true, wheelColor: 0xe9d23a, accent: 0xc81e2b }) : null;
+  // each car is drawn at its own recording's geometry (the old 1/10-size car, or the full-size truggy)
+  const geomOf = (R) => R.geom ?? undefined;
+  view.geom = geomOf(S.R);
+  S.car = view.addCar(CAR_COLOR, { number: 1, marks: true, wheelColor: 0xf3f2ee, accent: 0x15161a, geom: geomOf(S.R) });
+  S.ghost = view.addCar(CAR_COLOR, { ghost: true, geom: geomOf(S.R) });
+  S.rivalCar = S.rival ? view.addCar(RIVAL_COLOR, { number: 2, marks: true, wheelColor: 0xe9d23a, accent: 0xc81e2b, geom: geomOf(S.rival) }) : null;
   S.t = 0; S.replay = null; S.recordAir = 0; S.replayedLaps.clear(); S.replayedCrashes.clear(); S.ended = false;
   view.camInit = false;
   buildTimeline();

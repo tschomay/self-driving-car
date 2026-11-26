@@ -50,8 +50,10 @@ TRUGGY_SWITCHES = ("esc", "lsd", "power", "heavy", "elliptic", "slide")
 #   wheels      each wheel's spin inertia about its axle 3.4e-4 kg·m² (a tyre carries its mass at the tread; was
 #               1.56e-4, a solid ball). The chassis feels it in the air: throttle and brake pitch it about 2x harder.
 #   groundroll  "rolled over" ends a run only on the ground (a flip in the air can still land)
-# "truggy2" = "truggy" plus these two.
-AIR_SWITCHES = ("wheels", "groundroll")
+#   size8       the full-size 1/8 truggy (owner, 2026-11-26): 380 mm wheelbase, 143 mm tyres, 4.0 kg, 34 mm ride
+#               height (car.GEOM, docs/phases/truggy-size.md)
+# "truggy2" = "truggy" plus these three.
+AIR_SWITCHES = ("wheels", "groundroll", "size8")
 
 
 def switches(real):

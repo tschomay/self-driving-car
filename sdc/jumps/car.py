@@ -72,7 +72,7 @@ def _site_zaxis(direction):
 #   tires: wide tires (a 3 cm tread with rounded shoulders: a capsule along the axle) instead of spheres
 #   susp:  soft suspension (about 30% sag, about critically damped) and a higher centre of mass (battery on top)
 #   drive: one motor through open differentials (equal torque to the wheels; back-EMF on the mean wheel speed)
-MODEL_SWITCHES = ("tires", "susp", "drive", "esc", "lsd", "power", "heavy", "elliptic", "wheels")
+MODEL_SWITCHES = ("tires", "susp", "drive", "esc", "lsd", "power", "heavy", "elliptic", "wheels", "size8")
 TIRE_W = 0.03         # m, flat part of the tread (capsule segment)
 SOFT_K = 185.0          # N/m per corner: 4.4 N static load per corner / 2.4 cm sag (30% of 8 cm travel)
 SOFT_C = 18.0           # N·s/m per corner: about critically damped with the 0.45 kg corner load. At 0.4 the springs
@@ -80,9 +80,28 @@ SOFT_C = 18.0           # N·s/m per corner: about critically damped with the 0.
 BATTERY_M, BATTERY_Z = 0.4, 0.05   # moved from the chassis box to a pack on top (centre of mass about 1 cm higher)
 
 
+# "size8" (owner, 2026-11-26: "go with the full-size truggy"): a 1/8 electric truggy (Tekno ET48 / Losi 8IGHT-T class),
+# not the Phase 4 1/10 buggy. Wheelbase 380 mm, track 356 mm centre to centre (about 420 mm over the tyres), tyres
+# 143 mm, 4.0 kg, chassis bottom 34 mm off the ground, collision box 0.58 m long. Springs keep about 30% sag at
+# about 3 Hz, damped just under critical; the motor keeps the same thrust per kg and a 18 m/s no-load speed.
+# Sources and estimates: docs/phases/truggy-size.md.
+GEOM = dict(
+    small=dict(wheel_r=0.055, corner_x=0.15, corner_y=0.14, mount_z=-0.05, box=(0.23, 0.09, 0.035), bumper_x=0.235,
+               side_y=0.095, chassis_m=1.8, battery=(0.4, 0.05), corner_m=0.05, wheel_m=0.12, axle_i=3.4e-4,
+               k=185.0, c=18.0, power=(0.6, 16.0)),
+    size8=dict(wheel_r=0.0715, corner_x=0.19, corner_y=0.178, mount_z=0.0085, box=(0.29, 0.10, 0.035),
+               bumper_x=0.295, side_y=0.105, chassis_m=2.9, battery=(0.6, 0.0), corner_m=0.08, wheel_m=0.2,
+               axle_i=6.5e-4, k=296.0, c=26.0, power=(1.25, 18.0)),
+)
+
+
+def geometry(real=()):
+    return GEOM["size8" if "size8" in set(real) else "small"]
+
+
 def motor(real=()):
     """(torque per wheel N·m, no-load top speed m/s): Phase 4's motor, or the physics review's "power" motor."""
-    return (0.6, 16.0) if "power" in set(real) else (TAU_MAX, TOP_SPEED)
+    return geometry(real)["power"] if "power" in set(real) else (TAU_MAX, TOP_SPEED)
 
 
 LSD = dict(centre=0.03, front=0.002, rear=0.001)   # limited-slip diff damping, N·m·s/rad (physics review)
@@ -94,46 +113,50 @@ def model_xml(real=(), terrain=None) -> str:
     """terrain: None = the straight jump lane (course.py); or a dict(nrow, ncol, rx, ry, cx, cy) for another
     heightfield (Phase 4.6's loops: sdc/jumps/loop.py)."""
     real = set(real)
+    g = geometry(real)
+    wheel_r, bx, sy, mount_z = g["wheel_r"], g["bumper_x"], g["side_y"], g["mount_z"]
+    corner = {w: (g["corner_x"] * (1 if w[0] == "f" else -1), g["corner_y"] * (1 if w[1] == "l" else -1)) for w in WHEELS}
     L, W = crs.LENGTH, crs.WIDTH
     t = terrain or dict(nrow=crs.NROW, ncol=crs.NCOL, rx=L / 2, ry=W / 2, cx=L / 2, cy=0.0)
     texrep = "60 4" if terrain is None else f"{int(t['rx'])} {int(t['ry'])}"
     rays = []
     for i, a in enumerate(RAY_ANGLES):
         r = np.deg2rad(a)
-        rays.append(f'<site name="ray{i}" pos="0.235 0 0.02" zaxis="{_site_zaxis((np.cos(r), 0, -np.sin(r)))}" size=".005"/>')
+        rays.append(f'<site name="ray{i}" pos="{bx} 0 0.02" zaxis="{_site_zaxis((np.cos(r), 0, -np.sin(r)))}" size=".005"/>')
     for i, a in enumerate(FAN_ANGLES):
         r, dn = np.deg2rad(a), 0.0
         v = (np.cos(r) * np.cos(dn), np.sin(r) * np.cos(dn), -np.sin(dn))
-        rays.append(f'<site name="fan{i}" pos="0.235 {0.001 * (i + 1):.3f} 0.02" zaxis="{_site_zaxis(v)}" size=".005"/>')
-    rays.append('<site name="rayL" pos="0 0.095 0.02" zaxis="0 1 0" size=".005"/>')
-    rays.append('<site name="rayR" pos="0 -0.095 0.02" zaxis="0 -1 0" size=".005"/>')
+        rays.append(f'<site name="fan{i}" pos="{bx} {0.001 * (i + 1):.3f} 0.02" zaxis="{_site_zaxis(v)}" size=".005"/>')
+    rays.append(f'<site name="rayL" pos="0 {sy} 0.02" zaxis="0 1 0" size=".005"/>')
+    rays.append(f'<site name="rayR" pos="0 -{sy} 0.02" zaxis="0 -1 0" size=".005"/>')
     corners = []
     if "susp" in real:   # spring at rest at full droop (no preload): sags 2.4 cm under the static load
-        susp = (f'<joint name="{{w}}_susp" type="slide" axis="0 0 1" range="-0.03 0.05" stiffness="{SOFT_K}" '
-                f'springref="-0.03" damping="{SOFT_C}" limited="true" solreflimit="0.005 1" armature="0.01"/>')
+        susp = (f'<joint name="{{w}}_susp" type="slide" axis="0 0 1" range="-0.03 0.05" stiffness="{g['k']}" '
+                f'springref="-0.03" damping="{g['c']}" limited="true" solreflimit="0.005 1" armature="0.01"/>')
     else:
         susp = ('<joint name="{w}_susp" type="slide" axis="0 0 1" range="-0.03 0.05" stiffness="1500" damping="30"\n'
                 '               limited="true" solreflimit="0.005 1" armature="0.01"/>')
     if "tires" in real:  # a capsule along the axle: a 3 cm flat tread with fully rounded shoulders
         # (A true cylinder snags on the heightfield's grid in MuJoCo: up to 2.8 m/s lost in one landing step.)
         tire = (f'<geom name="{{w}}_tire" type="capsule" euler="1.5708 0 0" group="1" contype="1" conaffinity="0" '
-                f'size="{WHEEL_R} {TIRE_W / 2}" mass="0.12" friction="1.0 0.005 0.0001" rgba=".15 .15 .15 1"/>')
+                f'size="{wheel_r} {TIRE_W / 2}" mass="{g['wheel_m']}" friction="1.0 0.005 0.0001" rgba=".15 .15 .15 1"/>')
     else:
-        tire = (f'<geom name="{{w}}_tire" type="sphere" group="1" contype="1" conaffinity="0" size="{WHEEL_R}" mass="0.12" '
+        tire = (f'<geom name="{{w}}_tire" type="sphere" group="1" contype="1" conaffinity="0" size="{wheel_r}" mass="{g['wheel_m']}" '
                 f'friction="1.0 0.005 0.0001"\n                rgba=".15 .15 .15 1"/>')
     # back-EMF drag: per wheel (one motor each), or on the single motor's speed (the mean wheel speed, via a tendon)
     tau_max, top_speed = motor(real)
-    spin_damp = 1e-5 if "drive" in real else tau_max / (top_speed / WHEEL_R)
+    spin_damp = 1e-5 if "drive" in real else tau_max / (top_speed / wheel_r)
     arm = f' armature="{WHEEL_ARMATURE}"' if "heavy" in real else ""
-    w_in = (f'<inertial pos="0 0 0" mass="0.12" diaginertia="{WHEEL_AXLE_I / 2} {WHEEL_AXLE_I} {WHEEL_AXLE_I / 2}"/>'
+    ai = g["axle_i"]
+    w_in = (f'<inertial pos="0 0 0" mass="{g["wheel_m"]}" diaginertia="{ai / 2} {ai} {ai / 2}"/>'
             if "wheels" in real else "")
     for w in WHEELS:
-        cx, cy = CORNER[w]
+        cx, cy = corner[w]
         steer = (f'<joint name="{w}_steer" type="hinge" axis="0 0 1" range="-{STEER_MAX} {STEER_MAX}" '
                  f'damping="0.05" armature="0.0005"/>') if w[0] == "f" else ""
         corners.append(f'''
-      <body name="{w}" pos="{cx} {cy} {MOUNT_Z}">
-        <inertial pos="0 0 0" mass="0.05" diaginertia="2e-5 2e-5 2e-5"/>
+      <body name="{w}" pos="{cx} {cy} {mount_z}">
+        <inertial pos="0 0 0" mass="{g['corner_m']}" diaginertia="2e-5 2e-5 2e-5"/>
         {susp.format(w=w)}
         {steer}
         <body name="{w}_wheel">
@@ -150,7 +173,7 @@ def model_xml(real=(), terrain=None) -> str:
     if "drive" in real:   # one motor: equal torque to every wheel (open diffs), drag on the mean wheel speed
         motors = f'<motor name="motor" tendon="drive" gear="{4 * tau_max}" ctrlrange="-1 1"/>'
         # "esc": back-EMF is computed with the brake in env.JumpCar._actuate instead of this tendon damper
-        emf = 0.0 if "esc" in real else 4 * tau_max / (top_speed / WHEEL_R)
+        emf = 0.0 if "esc" in real else 4 * tau_max / (top_speed / wheel_r)
         diffs = ""
         if "lsd" in real:
             diffs = (f'<fixed name="dfront" damping="{LSD["front"]}"><joint joint="fl_spin" coef="1"/>'
@@ -164,10 +187,11 @@ def model_xml(real=(), terrain=None) -> str:
                   + "".join(f'<joint joint="{w}_spin" coef="0.25"/>' for w in WHEELS) + '</fixed>' + diffs
                   + '</tendon>')
     if "susp" in real:
-        chassis_m, battery = 1.8 - BATTERY_M, (f'\n      <geom name="battery" type="box" group="1" contype="0" conaffinity="0" '
-                                               f'pos="0 0 {BATTERY_Z}" size="0.07 0.035 0.015" mass="{BATTERY_M}" rgba=".2 .2 .2 1"/>')
+        bm, bz = g["battery"]
+        chassis_m, battery = g["chassis_m"] - bm, (f'\n      <geom name="battery" type="box" group="1" contype="0" conaffinity="0" '
+                                                   f'pos="0 0 {bz}" size="0.07 0.035 0.015" mass="{bm}" rgba=".2 .2 .2 1"/>')
     else:
-        chassis_m, battery = 1.8, ""
+        chassis_m, battery = g["chassis_m"], ""
     return f'''<mujoco model="rc-buggy">
   <compiler angle="radian"/>
   <option timestep="{TIMESTEP}" integrator="implicitfast"{' cone="elliptic"' if "elliptic" in real else ""}/>
@@ -186,7 +210,7 @@ def model_xml(real=(), terrain=None) -> str:
     <body name="car" pos="{crs.START_X} 0 0.25">
       <freejoint name="root"/>
       <camera name="chase" mode="trackcom" pos="-1.6 -1.6 0.9" xyaxes="0.707 -0.707 0 0.25 0.25 0.935" fovy="50"/>
-      <geom name="chassis" type="box" group="1" contype="1" conaffinity="0" size="0.23 0.09 0.035" mass="{chassis_m}" rgba=".12 .44 .92 1"/>{battery}
+      <geom name="chassis" type="box" group="1" contype="1" conaffinity="0" size="{g['box'][0]} {g['box'][1]} {g['box'][2]}" mass="{chassis_m}" rgba=".12 .44 .92 1"/>{battery}
       <site name="imu" pos="0 0 0" size=".01"/>
       {"".join(rays)}
       {"".join(corners)}

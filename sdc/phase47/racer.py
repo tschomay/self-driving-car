@@ -82,7 +82,7 @@ def priv_obs(car):
     st = car.state()
     c = car.course
     s = st["x"]
-    spin = float(car.d.qvel[car.spin_dof].mean()) * cr.WHEEL_R - st["v_fwd"]
+    spin = float(car.d.qvel[car.spin_dof].mean()) * car.wheel_r - st["v_fwd"]
     h0 = c.height(s)
     o = [st["y"], st["yaw"], st["v_fwd"] / 10, st["vz"] / 5, st["pitch"], st["roll"], st["up_z"],
          st["pitch_rate"] / 10, st["yaw_rate"] / 5, float(car.airborne), float(car.last_act[0]),

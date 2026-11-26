@@ -14,7 +14,7 @@ from sdc.phase46.teacher import LoopExpert
 from sdc.phase47 import e2_prep, racer
 from sdc.phase47.lap_chaos import Noisy
 
-GAINS = [(6.0, 1.0), (4.0, 0.7), (3.0, 0.5), (2.0, 0.35)]
+GAINS = [(6.0, 1.0), (3.0, 0.5)]
 
 
 def _make(kp, kd, seed):

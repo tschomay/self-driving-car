@@ -451,3 +451,14 @@ Every sharp turn (|curvature| > 0.15 /m) each driver reached, from where.py's 0.
   - Failures (5 passes): corners off the lane 251 (E5 198), other off the lane 54 (48), landings 50 (38).
   - Students at the end of training (60 runs): E6 29 and 34 finished; E5 40 and 31.
   - Still beats the teacher's race by 34 s, but E5 remains the best sensor car.
+- **Explanation (owner),** asked why copying loses crashes but hardly any speed: "Is there something in the setup? Like what you do now impacts how likely you are to crash a few moves ahead? I still haven't determined if we should be working towards a clean racing line that plans ahead or a scrappy racer that is good at reacting. I think we've tried both and neither has helped. Maybe we found the happy medium? I find that hard to believe."
+
+### E7 — Train the sensor car itself, with a coach that sees the whole track
+
+- **Question:** most of the loss is in the copying (racers crash on 11–17% of laps, their students on 39–48%). Can RL on the student's own driving win it back?
+- **Setup:** `python -m sdc.phase47.e7 --out runs/p47-e7` (9 h).
+  - Actor: E5's seed-0 student (GRU, sensors only), trained by PPO on 64-step sequences from its own memory.
+  - Critic: a separate network on the racer's privileged inputs, started from the racer's critic and warmed for 1M steps before the actor changes. It is used only in training.
+  - Reward as the racer (progress, crash 200, finish 50). Student env (truggy, expo 0.4), E2's train loops. Scored every 3M steps on the 150 selection runs (2 passes); best checkpoint then scored over 5 passes.
+- **Prediction (owner):** "Crash more but go faster. Won't beat e5."
+- **Result:** _running_

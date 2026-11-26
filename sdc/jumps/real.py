@@ -46,6 +46,12 @@ PHYS_SWITCHES = ("tires", "susp", "drive", "servo", "battery", "delay")
 # (esc also caps the brake at 0.65 of the motor's torque: a full brake no longer flips the car on high grip.)
 # "truggy" = "all" plus these six.
 TRUGGY_SWITCHES = ("esc", "lsd", "power", "heavy", "elliptic", "slide")
+# Phase 4.7 air-control study (docs/phases/air-control.md):
+#   wheels      each wheel's spin inertia about its axle 3.4e-4 kg·m² (a tyre carries its mass at the tread; was
+#               1.56e-4, a solid ball). The chassis feels it in the air: throttle and brake pitch it about 2x harder.
+#   groundroll  "rolled over" ends a run only on the ground (a flip in the air can still land)
+# "truggy2" = "truggy" plus these two.
+AIR_SWITCHES = ("wheels", "groundroll")
 
 
 def switches(real):
@@ -53,8 +59,10 @@ def switches(real):
         return frozenset(PHYS_SWITCHES)
     if real in ("truggy", ("truggy",), ["truggy"]):
         return frozenset(PHYS_SWITCHES + TRUGGY_SWITCHES)
+    if real in ("truggy2", ("truggy2",), ["truggy2"]):
+        return frozenset(PHYS_SWITCHES + TRUGGY_SWITCHES + AIR_SWITCHES)
     real = frozenset([real] if isinstance(real, str) else (real or ()))
-    bad = real - set(PHYS_SWITCHES + TRUGGY_SWITCHES)
+    bad = real - set(PHYS_SWITCHES + TRUGGY_SWITCHES + AIR_SWITCHES)
     assert not bad, f"unknown physics switches {bad}"
     return real
 

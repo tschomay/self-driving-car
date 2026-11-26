@@ -592,7 +592,7 @@ class JumpCar:
         if st["x"] >= (self.course.finish if self.loop else crs.FINISH_X):
             reason = "finished"
             reward += finish_bonus
-        elif st["up_z"] < 0.2:
+        elif st["up_z"] < 0.2 and not ("groundroll" in self.real and self.airborne):
             reason = "rolled over"
         elif abs(st["y"]) > crs.DRIVE_W / 2:     # centre past the lane edge: its outer wheels are on the bank
             reason = "off the lane"

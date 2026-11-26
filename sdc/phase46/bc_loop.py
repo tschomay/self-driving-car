@@ -18,6 +18,7 @@ Writes model.pt and metrics.json (load with common.load_student).
 from __future__ import annotations
 
 import argparse
+import os
 import functools
 import json
 import pickle
@@ -84,7 +85,7 @@ def main():
         own = json.loads(Path(a.train_map).read_text())
         courses = [c for c in courses if own.get(f"{c}|0.00", {}).get("kappa")]
     mp = (a.train_map, a.val_map)
-    real = "truggy" if a.truggy else "all"
+    real = os.environ.get("SDC_REAL", "truggy") if a.truggy else "all"   # SDC_REAL=truggy2: air-control physics
     env = student_env(a.map, real=real, expo=a.expo, notes=a.notes, maps=mp)
     bc_rnn.ENV.clear()
     bc_rnn.ENV.update(env, steer_cost=0.03, jump_bonus=10.0, courses=courses)

@@ -72,7 +72,7 @@ def _site_zaxis(direction):
 #   tires: wide tires (a 3 cm tread with rounded shoulders: a capsule along the axle) instead of spheres
 #   susp:  soft suspension (about 30% sag, about critically damped) and a higher centre of mass (battery on top)
 #   drive: one motor through open differentials (equal torque to the wheels; back-EMF on the mean wheel speed)
-MODEL_SWITCHES = ("tires", "susp", "drive", "esc", "lsd", "power", "heavy", "elliptic")
+MODEL_SWITCHES = ("tires", "susp", "drive", "esc", "lsd", "power", "heavy", "elliptic", "wheels")
 TIRE_W = 0.03         # m, flat part of the tread (capsule segment)
 SOFT_K = 185.0          # N/m per corner: 4.4 N static load per corner / 2.4 cm sag (30% of 8 cm travel)
 SOFT_C = 18.0           # N·s/m per corner: about critically damped with the 0.45 kg corner load. At 0.4 the springs
@@ -87,6 +87,7 @@ def motor(real=()):
 
 LSD = dict(centre=0.03, front=0.002, rear=0.001)   # limited-slip diff damping, N·m·s/rad (physics review)
 WHEEL_ARMATURE = 1.5e-4                            # "heavy": extra spin inertia per wheel, kg·m²
+WHEEL_AXLE_I = 3.4e-4                              # "wheels": coupled spin inertia per wheel, kg·m² (air-control.md)
 
 
 def model_xml(real=(), terrain=None) -> str:
@@ -124,6 +125,8 @@ def model_xml(real=(), terrain=None) -> str:
     tau_max, top_speed = motor(real)
     spin_damp = 1e-5 if "drive" in real else tau_max / (top_speed / WHEEL_R)
     arm = f' armature="{WHEEL_ARMATURE}"' if "heavy" in real else ""
+    w_in = (f'<inertial pos="0 0 0" mass="0.12" diaginertia="{WHEEL_AXLE_I / 2} {WHEEL_AXLE_I} {WHEEL_AXLE_I / 2}"/>'
+            if "wheels" in real else "")
     for w in WHEELS:
         cx, cy = CORNER[w]
         steer = (f'<joint name="{w}_steer" type="hinge" axis="0 0 1" range="-{STEER_MAX} {STEER_MAX}" '
@@ -134,6 +137,7 @@ def model_xml(real=(), terrain=None) -> str:
         {susp.format(w=w)}
         {steer}
         <body name="{w}_wheel">
+          {w_in}
           <joint name="{w}_spin" type="hinge" axis="0 1 0" damping="{spin_damp:.6f}"{arm}/>
           {tire.format(w=w)}
         </body>

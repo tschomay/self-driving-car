@@ -61,6 +61,13 @@ def driver(car):
     """(policy, env kwargs, label). car: 'teacher', 'base', 'e4', or run directories (averaged)."""
     from sdc.phase46.ensemble import Ensemble
     from sdc.phase47 import where
+    if car == ["teacher"]:
+        try:   # the race teacher (Phase 4.7 racer.py; on the full-size truggy it takes doubles at 7.8 m/s), no expo
+            from sdc.phase46.teacher import LoopExpert
+            from sdc.phase47 import racer
+            return LoopExpert(**racer.TEACHER), racer.env_eval(), "teacher"
+        except ImportError:
+            pass
     if car in (["teacher"], ["base"], ["e4"]):
         pol, env = where._driver(car[0])
         return pol, env, car[0]

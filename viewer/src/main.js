@@ -68,7 +68,8 @@ function sample(R, t, out = {}) {
   out.yaw = Math.atan2(2 * (out.qw * out.qz + out.qx * out.qy), 1 - 2 * (out.qy * out.qy + out.qz * out.qz));
   const i0 = Math.max(0, i - 1), i1 = Math.min(R.n - 1, i + 2), dt = (i1 - i0) / R.fps;
   out.vx = (f.x[i1] - f.x[i0]) / dt; out.vy = (f.y[i1] - f.y[i0]) / dt;
-  out.u = R.u[i] * (1 - a) + R.u[j] * a; out.um = R.um[i]; out.prog = R.prog[i];
+  out.u = Math.abs(R.u[j] - R.u[i]) > 5 ? (a < 0.5 ? R.u[i] : R.u[j]) : R.u[i] * (1 - a) + R.u[j] * a;   // no blend across the line
+  out.um = R.um[i]; out.prog = R.prog[i];
   out.s = ((out.u % R.L) + R.L) % R.L;
   return out;
 }

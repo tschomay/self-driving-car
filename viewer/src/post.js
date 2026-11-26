@@ -67,6 +67,15 @@ export class Post {
     this.dof = new BokehPass(scene, camera, { focus: 6, aperture: 0.004, maxblur: 0.006 });
     this.dof.enabled = false;
     comp.addPass(this.dof);
+    // guard: replace NaN/Inf (a razor-sharp glint can overflow half floats) before bloom spreads it into black blocks
+    comp.addPass(new ShaderPass({
+      uniforms: { tDiffuse: { value: null } },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: `uniform sampler2D tDiffuse; varying vec2 vUv;
+        void main(){ vec4 c = texture2D(tDiffuse, vUv);
+          bvec3 bad = bvec3(!(c.r == c.r) || c.r > 6e4, !(c.g == c.g) || c.g > 6e4, !(c.b == c.b) || c.b > 6e4);
+          c.rgb = clamp(mix(c.rgb, vec3(0.0), vec3(bad)), 0.0, 50.0); gl_FragColor = vec4(c.rgb, 1.0); }`,
+    }));
     this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.32, 0.55, 0.88);
     comp.addPass(this.bloom);
     comp.addPass(new OutputPass());

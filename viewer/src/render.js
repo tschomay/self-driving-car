@@ -127,7 +127,7 @@ export class View {
       uniforms: { color: { value: new THREE.Color(0xc9a878) }, scale: { value: 600 } },
       vertexShader: `attribute vec2 aux; varying float vA; uniform float scale;
         void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix * mv;
-          vA = aux.y * smoothstep(0.35, 1.6, -mv.z);                       // fade dust right at the lens
+          vA = max(aux.y, 0.0) * smoothstep(0.35, 1.6, -mv.z);                       // fade dust right at the lens
           gl_PointSize = min(aux.x * scale / -mv.z, 90.0); }`,
       fragmentShader: `uniform vec3 color; varying float vA;
         void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; float a = smoothstep(1.0, 0.25, d) * vA; if (a < 0.004) discard; gl_FragColor = vec4(color, a); }`,
@@ -361,7 +361,7 @@ export class View {
       p[3 * i] += v[3 * i] * dt; p[3 * i + 1] += v[3 * i + 1] * dt; p[3 * i + 2] += v[3 * i + 2] * dt;
       v[3 * i] *= 1 - 2.5 * dt; v[3 * i + 1] *= 1 - 2.5 * dt; v[3 * i + 2] = v[3 * i + 2] * (1 - 2 * dt) + 0.05 * dt;
       aux[2 * i] += 0.35 * dt;
-      aux[2 * i + 1] = 0.34 * (1 - t) * Math.min(1, t * 8);
+      aux[2 * i + 1] = 0.34 * Math.max(0, 1 - t) * Math.min(1, t * 8);   // never negative: a negative alpha paints black
     }
     this.dust.geometry.attributes.position.needsUpdate = true;
     this.dust.geometry.attributes.aux.needsUpdate = true;
@@ -555,7 +555,7 @@ export class View {
       pz = Math.max(p.z + o.dist * Math.sin(o.pitch), c.height(px, py) + 0.1);
       fov = this.portrait ? 70 : 55; snap = true;
     } else if (mode === 'On board') {
-      const f = new THREE.Vector3(0.0, 0, 0.17).applyQuaternion(vis.body.quaternion).add(vis.body.position);
+      const f = new THREE.Vector3(0.02, 0, 0.075).applyQuaternion(vis.body.quaternion).add(vis.body.position);
       const l = new THREE.Vector3(2, 0, 0.1).applyQuaternion(vis.body.quaternion).add(vis.body.position);
       const u = new THREE.Vector3(0, 0, 1).applyQuaternion(vis.body.quaternion);
       cam.up.copy(u);

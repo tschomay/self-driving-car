@@ -1,3 +1,7 @@
+// Proportions follow a real 1/8 truggy (TLR 8IGHT-XT: 373 mm wheelbase, 421 mm wide, 185 mm tall, 40 mm ground
+// clearance) scaled to the sim's 300 mm wheelbase. The sim's own collision box (46 x 18 x 7 cm) rides higher than a real
+// chassis (72 mm clearance vs about 32 mm scaled), so the visible chassis plate sits 2 cm below the box's bottom.
+//
 // The truggy: a 1/8-style racing truggy (low cab-forward shell, big pin-tread tires on dish wheels, long A-arms,
 // coil-over shocks, a tall wing), built around the sim car's dimensions (sdc/jumps/car.py: chassis 46 x 18 x 7 cm,
 // 5.5 cm wheels at x ±15 cm, y ±14 cm, mounted at z -5 cm on 8 cm of slide travel). Body frame: x forward, y left, z up.
@@ -154,9 +158,9 @@ function plate(mat, pts, t, plane = 'xz', y0 = 0) {
 // The shell: a small truck cab on a narrow body (about half the car's width), lofted from cross-sections along x,
 // each a squared-off arch open at the bottom. The chassis, the front and rear ends and the shocks stay exposed.
 const SHELL = [  // x, half-width, bottom z, top z
-  [-0.135, 0.045, -0.02, 0.022], [-0.11, 0.054, -0.024, 0.036], [-0.075, 0.059, -0.026, 0.046], [-0.06, 0.06, -0.026, 0.094],
-  [-0.02, 0.06, -0.026, 0.104], [0.022, 0.059, -0.026, 0.101], [0.07, 0.057, -0.026, 0.052], [0.115, 0.053, -0.026, 0.04],
-  [0.16, 0.047, -0.024, 0.03], [0.2, 0.038, -0.02, 0.018], [0.222, 0.026, -0.014, 0.008]];
+  [-0.15, 0.052, -0.046, -0.012], [-0.12, 0.066, -0.05, -0.002], [-0.082, 0.073, -0.052, 0.004], [-0.064, 0.074, -0.052, 0.024],
+  [-0.025, 0.075, -0.052, 0.034], [0.018, 0.074, -0.052, 0.032], [0.06, 0.071, -0.052, 0.006], [0.105, 0.066, -0.052, -0.006],
+  [0.155, 0.058, -0.05, -0.016], [0.198, 0.046, -0.048, -0.027], [0.225, 0.03, -0.045, -0.035]];
 const SX0 = SHELL[0][0], SX1 = SHELL[SHELL.length - 1][0];
 function shellGeometry() {
   const nx = 90, na = 36, pos = [], uv = [], idx = [];
@@ -243,7 +247,7 @@ export function makeCar(color, { ghost = false, number = 1, wheelColor = 0xf3f2e
   const ghostMat = ghost ? hologram() : null;
   const M = (m) => ghostMat ?? m;
   const scheme = SCHEMES[number] ?? SCHEMES[1];
-  const paint = ghostMat ?? new THREE.MeshPhysicalMaterial({ map: livery(scheme, number), roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 2.4, side: THREE.DoubleSide });
+  const paint = ghostMat ?? new THREE.MeshPhysicalMaterial({ map: livery(scheme, number), roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.14, envMapIntensity: 2.4, side: THREE.DoubleSide });
   const wheelMat = M(new THREE.MeshStandardMaterial({ color: wheelColor, roughness: 0.42 }));
   const grey = M(new THREE.MeshStandardMaterial({ color: 0x6c7077, roughness: 0.55, metalness: 0.15 }));   // composite towers, wing mount
 
@@ -252,17 +256,17 @@ export function makeCar(color, { ghost = false, number = 1, wheelColor = 0xf3f2e
   body.add(shell);
 
   // chassis plate (long and narrow, exposed front and rear), front bumper and skid
-  body.add(plate(M(A.carbon), [[-0.245, -0.042], [0.17, -0.046], [0.235, -0.028], [0.235, 0.028], [0.17, 0.046], [-0.245, 0.042]], 0.004, 'xy', -0.036));
-  const bump = plate(M(A.plastic), [[0.215, -0.038], [0.268, -0.022], [0.274, -0.006], [0.266, -0.002], [0.222, -0.026]], 0.11, 'xz');
+  body.add(plate(M(A.carbon), [[-0.245, -0.045], [0.17, -0.05], [0.235, -0.03], [0.235, 0.03], [0.17, 0.05], [-0.245, 0.045]], 0.004, 'xy', -0.055));
+  const bump = plate(M(A.plastic), [[0.215, -0.058], [0.268, -0.046], [0.276, -0.03], [0.268, -0.026], [0.222, -0.046]], 0.12, 'xz');
   body.add(bump);
   // shock towers: grey composite plates, wide at the top where the shocks mount
-  const tower = (x) => plate(grey, [[-0.05, -0.03], [0.05, -0.03], [0.082, 0.088], [0.074, 0.104], [0.05, 0.104], [0.022, 0.06], [-0.022, 0.06], [-0.05, 0.104], [-0.074, 0.104], [-0.082, 0.088]], 0.006, 'yz', x);
+  const tower = (x) => plate(grey, [[-0.05, -0.053], [0.05, -0.053], [0.088, 0.024], [0.082, 0.036], [0.058, 0.036], [0.026, 0.004], [-0.026, 0.004], [-0.058, 0.036], [-0.082, 0.036], [-0.088, 0.024]], 0.006, 'yz', x);
   if (!ghost) {
     const ft = tower(0.122), rt = tower(-0.122);
     body.add(ft, rt);
     // diff housings and a centre driveshaft, visible through the open chassis
-    for (const x of [0.15, -0.15]) body.add(box(A.gun, 0.05, 0.06, 0.04, x, 0, -0.016));
-    const cs = new THREE.Mesh(A.unitRod, A.alu); setRod(cs, V(0.125, 0, -0.02), V(-0.125, 0, -0.02), 0.004); body.add(cs);
+    for (const x of [0.15, -0.15]) body.add(box(A.gun, 0.05, 0.06, 0.036, x, 0, -0.034));
+    const cs = new THREE.Mesh(A.unitRod, A.alu); setRod(cs, V(0.125, 0, -0.038), V(-0.125, 0, -0.038), 0.004); body.add(cs);
   }
 
   // wing: a wide swept wing on a grey mount from the rear tower, white endplates
@@ -270,17 +274,17 @@ export function makeCar(color, { ghost = false, number = 1, wheelColor = 0xf3f2e
   const foil = new THREE.Shape([[0.06, 0], [0.02, 0.009], [-0.03, 0.01], [-0.06, 0.004], [-0.065, 0.016], [-0.069, 0.016], [-0.062, -0.001], [0.06, -0.003]].map(([x, z]) => new THREE.Vector2(x, z)));
   const fg = new THREE.ExtrudeGeometry(foil, { depth: 0.25, bevelEnabled: false });
   fg.rotateX(Math.PI / 2); fg.translate(0, 0.125, 0);
-  const wingMat = M(new THREE.MeshPhysicalMaterial({ color: 0x15171a, roughness: 0.25, clearcoat: 0.6, side: THREE.DoubleSide }));
+  const wingMat = M(new THREE.MeshPhysicalMaterial({ color: 0x15171a, roughness: 0.25, clearcoat: 0.6, clearcoatRoughness: 0.2, side: THREE.DoubleSide }));
   const wm = new THREE.Mesh(fg, wingMat); wm.castShadow = !ghost; wing.add(wm);
   for (const sy of [1, -1]) {
     const ep = plate(M(new THREE.MeshStandardMaterial({ color: 0xf3f2ee, roughness: 0.4 })), [[0.065, -0.02], [-0.07, -0.025], [-0.075, 0.03], [0.03, 0.022]], 0.0025, 'xz', sy * 0.126);
     wing.add(ep);
   }
   for (const y of [-0.06, 0.0, 0.06]) wing.add(box(wingMat, 0.1, 0.002, 0.008, -0.005, y, 0.013));
-  wing.position.set(-0.215, 0, 0.16); wing.rotation.y = 0.06;
+  wing.position.set(-0.225, 0, 0.058); wing.rotation.y = 0.05;
   body.add(wing);
   if (!ghost) for (const sy of [1, -1]) {
-    const strut = plate(grey, [[-0.118, 0.09], [-0.104, 0.09], [-0.2, 0.162], [-0.224, 0.162]], 0.005, 'xz', sy * 0.03);
+    const strut = plate(grey, [[-0.122, 0.03], [-0.108, 0.03], [-0.21, 0.06], [-0.234, 0.06]], 0.005, 'xz', sy * 0.03);
     body.add(strut);
   }
 
@@ -308,7 +312,7 @@ export function makeCar(color, { ghost = false, number = 1, wheelColor = 0xf3f2e
       // the shock: a group aimed from the tower top to the arm, +y down the shock
       const sh = part.shock = new THREE.Group();
       const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.0125, 0.0125, 0.008, 18).translate(0, 0.004, 0), A.gun);
-      const bodyC = new THREE.Mesh(new THREE.CylinderGeometry(0.0105, 0.0105, 0.052, 18).translate(0, 0.034, 0), A.shockBody);
+      const bodyC = new THREE.Mesh(new THREE.CylinderGeometry(0.0105, 0.0105, 0.04, 18).translate(0, 0.028, 0), A.shockBody);
       const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.0155, 0.0155, 0.004, 18).translate(0, 0.012, 0), M(new THREE.MeshStandardMaterial({ color: accent === 0x15161a ? 0xff7418 : 0xc81e2b, roughness: 0.35, metalness: 0.7 })));
       part.rod = new THREE.Mesh(A.unitRod, A.shaft);
       part.spring = new THREE.Mesh(A.spring, M(new THREE.MeshStandardMaterial({ color: 0x1b1c20, roughness: 0.35, metalness: 0.6 })));
@@ -336,18 +340,18 @@ export function setSuspension(car, susp, steer, spin) {
     const sy = c.sy, hubY = sy * HUB_Y;
     // lower A-arm: two rods from the chassis pivots (front and rear of the arm) to the hub's lower ball
     const ball = tmpA.set(c.cx, hubY, zc - 0.015);
-    setRod(c.lowerF, V(c.cx + 0.03, sy * 0.032, -0.034), ball, 0.005);
-    setRod(c.lowerR, V(c.cx - 0.03, sy * 0.032, -0.034), ball, 0.005);
+    setRod(c.lowerF, V(c.cx + 0.03, sy * 0.034, -0.05), ball, 0.005);
+    setRod(c.lowerR, V(c.cx - 0.03, sy * 0.034, -0.05), ball, 0.005);
     // upper link (turnbuckle) to the top of the hub carrier
-    setRod(c.upper, V(c.cx + (c.front ? -0.02 : 0.02), sy * 0.04, 0.02), tmpB.set(c.cx, hubY, zc + 0.024), 0.0028);
+    setRod(c.upper, V(c.cx + (c.front ? -0.02 : 0.02), sy * 0.045, -0.008), tmpB.set(c.cx, hubY, zc + 0.024), 0.0028);
     // driveshaft from the diff to the hub
-    setRod(c.shaft, V(c.cx, sy * 0.03, -0.016), tmpB.set(c.cx, hubY, zc), 0.0038);
+    setRod(c.shaft, V(c.cx, sy * 0.03, -0.036), tmpB.set(c.cx, hubY, zc), 0.0038);
     // coil-over: from the top of the tower, leaning in, to a mount near the outer end of the lower arm
-    const top = V(c.cx + (c.front ? -0.028 : 0.028), sy * 0.068, 0.098);
-    const bot = tmpC.set(c.cx, sy * 0.032, -0.034).lerp(ball, 0.86);
+    const top = V(c.cx + (c.front ? -0.028 : 0.028), sy * 0.074, 0.03);
+    const bot = tmpC.set(c.cx, sy * 0.034, -0.05).lerp(ball, 0.86);
     const len = aim(c.shock, top, bot);
     // body: fixed at the top (0..0.06); shaft: from the eyelet up into the body; spring: collar to eyelet
-    c.rod.position.set(0, 0.05, 0); c.rod.scale.set(0.0032, Math.max(0.001, len - 0.05), 0.0032);
+    c.rod.position.set(0, 0.04, 0); c.rod.scale.set(0.0032, Math.max(0.001, len - 0.04), 0.0032);
     c.spring.position.set(0, 0.014, 0); c.spring.quaternion.identity(); c.spring.scale.set(1, Math.max(0.01, len - 0.02), 1);
     c.eye.position.set(0, len, 0); c.eye.rotation.set(0, 0, Math.PI / 2);
   }

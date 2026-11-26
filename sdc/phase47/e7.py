@@ -267,7 +267,12 @@ def main():
     ap.add_argument("--hours", type=float, default=9.0)
     ap.add_argument("--set", action="append", default=[], metavar="KEY=VALUE")
     a = ap.parse_args()
-    over = {k: json.loads(v) for k, v in (kv.split("=", 1) for kv in a.set)}
+    def val(v):                                       # JSON when it parses (numbers), else a plain string (paths)
+        try:
+            return json.loads(v)
+        except json.JSONDecodeError:
+            return v
+    over = {k: val(v) for k, v in (kv.split("=", 1) for kv in a.set)}
     train(a.out, a.seed, a.hours, **over)
 
 

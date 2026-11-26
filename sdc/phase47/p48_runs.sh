@@ -15,12 +15,14 @@ print("best", b, round(race(b), 1))
 shutil.copy(f"{run}/ckpt/{b['steps']}.pt", f"{run}/ckpt/best.pt")
 PY
 }
+if [ "${1:-}" != e7 ]; then   # p48_runs.sh e7: only the E7 steps
 best runs/p48-racer runs/p48-racer.log > runs/p48-best.log || { echo best > runs/p48.failed; exit 1; }
 for s in 0 1; do python -m sdc.phase46.bc_loop --truggy --rounds 16 --expo 0.4 --seed "$s" --procs 2 \
   --teacher-racer runs/p48-racer/ckpt/best.pt --out "runs/p48-e5-s$s" > "runs/p48-e5-s$s.log" 2>&1 & done
 wait
 for s in 0 1; do [ -f "runs/p48-e5-s$s/metrics.json" ] || { echo "e5 seed $s" > runs/p48.failed; exit 1; }; done
 python -m sdc.phase47.where p48 p48racer p48e5 > runs/p48-where-e5.log 2>&1 || { echo where-e5 > runs/p48.failed; exit 1; }
+fi
 python -m sdc.phase47.e7 --out runs/p48-e7 --seed 0 --hours 9 --set actor=runs/p48-e5-s0 \
   --set critic=runs/p48-racer/ckpt/best.pt > runs/p48-e7.log 2>&1 || { echo e7 > runs/p48.failed; exit 1; }
 best runs/p48-e7 runs/p48-e7.log >> runs/p48-best.log

@@ -461,4 +461,28 @@ Every sharp turn (|curvature| > 0.15 /m) each driver reached, from where.py's 0.
   - Critic: a separate network on the racer's privileged inputs, started from the racer's critic and warmed for 1M steps before the actor changes. It is used only in training.
   - Reward as the racer (progress, crash 200, finish 50). Student env (truggy, expo 0.4), E2's train loops. Scored every 3M steps on the 150 selection runs (2 passes); best checkpoint then scored over 5 passes.
 - **Prediction (owner):** "Crash more but go faster. Won't beat e5."
+- **Result:** stopped on the old car, before its first score, when the owner switched to the full-size truggy (next section). Rerun there as E7 below.
+
+## The full-size truggy (`SDC_REAL=truggy2`; `docs/phases/air-control.md`, `docs/phases/truggy-size.md`)
+
+The owner saw too little air control in renders, and a chassis riding about 4 cm too high. Fixes: wheel spin inertia that couples to the body in the air (`wheels`), no rollover end while airborne (`groundroll`), and a full-size 1/8 truggy body, wheels, springs and motor (`size8`). Owner: "A, go with the full-size truggy." Everything after this section runs on it.
+
+- **Teacher retune** (`python -m sdc.phase47.air_teacher`): the old gains still work best; the double-jump speed goes from 7.4 to 7.8 m/s.
+- **RL racer** (`runs/p48-racer`, 9 h, crash price 200), 2-pass race estimates: 585 s at start, 553 at 9M, 538 at 15M, 560 at 18M, 535 at the end (19.7M, chosen).
+- **Sensor cars** (`runs/p48-e5-s0/s1`): the E5 recipe copying the chosen racer.
+
+Race over 5 noisy passes of the 150 selection runs (`python -m sdc.phase47.where p48 ...`, `runs/p48-race.json`):
+
+| Driver | Finished | Crash rate | Median lap | Race |
+|---|---|---|---|---|
+| Teacher | 672/750 | 10.4% | 28.41 s | 582.8 s |
+| RL racer (privileged) | 531/750 | 29.2% | 24.96 s | 540.1 s |
+| Sensor cars (E5 recipe) | 335/750 | 55.3% | 25.48 s | 587.1 s |
+
+The sensor cars lose to the teacher by 4.3 s. They lap only 0.5 s slower than the racer but crash almost twice as often (55% against 29%). On the old car the gap was 39–48% against 11–17%.
+
+### E7 on the full-size truggy (`sdc/phase47/p48_runs.sh e7`)
+
+Same setup as E7 above: actor `runs/p48-e5-s0`, critic from the chosen racer, 9 h.
+
 - **Result:** _running_

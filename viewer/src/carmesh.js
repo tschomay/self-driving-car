@@ -8,9 +8,9 @@ import * as THREE from 'three';
 import { canvasTexture } from './terrainart.js';
 import { WHEEL_R, CORNER, MOUNT_Z, WHEELS } from './carmodel.js';
 
-const TIRE_W = 0.052;           // looks: a truggy's wide tire (the sim's capsule tread is 3 cm plus round shoulders)
-const RIM_R = 0.034;
-const HUB_Y = 0.112;            // |y| of the hub carrier's inner face (wheel centre at 0.14)
+const TIRE_W = 0.06;            // looks: a truggy's wide tire (the sim's capsule tread is 3 cm plus round shoulders)
+const RIM_R = 0.035;
+const HUB_Y = 0.106;            // |y| of the hub carrier's inner face (wheel centre at 0.14)
 
 let shared = null;
 function sharedAssets() {
@@ -19,7 +19,7 @@ function sharedAssets() {
   // Height: mini pins on the tread, raised lettering on both sidewalls. Colour: rubber, a little lighter on the sidewalls.
   const tread = tireTextures();
   // tire: a lathe profile (radius, y) with rounded shoulders and a little sidewall bulge
-  const prof = [[0.031, -0.024], [0.04, -0.0262], [0.0485, -0.0262], [0.0535, -0.023], [0.055, -0.016], [0.055, 0.016], [0.0535, 0.023], [0.0485, 0.0262], [0.04, 0.0262], [0.031, 0.024]]
+  const prof = [[0.033, -0.028], [0.043, -0.0305], [0.0505, -0.0302], [0.0542, -0.0265], [0.0552, -0.019], [0.0552, 0.019], [0.0542, 0.0265], [0.0505, 0.0302], [0.043, 0.0305], [0.033, 0.028]]
     .map(([r, y]) => new THREE.Vector2(r, y));
   const tireGeo = new THREE.LatheGeometry(prof, 64);
   // the lathe's u runs around the wheel and v across the profile: tread pins wrap around the tire
@@ -113,49 +113,67 @@ export function hologram() {
   });
 }
 
-/** A coil spring of unit length along +y (scaled per frame), 1 cm across. */
+/** A coil spring of unit length along +y (scaled per frame), 2.8 cm across: a big-bore truggy shock's spring. */
 function helix() {
-  const pts = [], turns = 7, n = 140;
-  for (let i = 0; i <= n; i++) { const t = i / n, a = t * turns * Math.PI * 2; pts.push(new THREE.Vector3(0.0105 * Math.cos(a), t, 0.0105 * Math.sin(a))); }
-  return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 280, 0.0016, 5, false);
+  const pts = [], turns = 8, n = 200;
+  for (let i = 0; i <= n; i++) { const t = i / n, a = t * turns * Math.PI * 2; pts.push(new THREE.Vector3(0.0135 * Math.cos(a), t, 0.0135 * Math.sin(a))); }
+  return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 400, 0.0021, 6, false);
 }
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const Y_UP = V(0, 1, 0);
-/** A rod mesh spanning a -> b (unit-rod geometry: scale x/z = radius, y = length). */
+/** Point a +y-length-1 part from a to b: position at a, +y towards b, length scaled. */
 function setRod(m, a, b, r) {
   const d = b.clone().sub(a), len = d.length();
   m.position.copy(a);
   m.quaternion.setFromUnitVectors(Y_UP, d.divideScalar(len || 1));
   m.scale.set(r, len, r);
 }
+function aim(g, a, b) {
+  const d = b.clone().sub(a), len = d.length();
+  g.position.copy(a);
+  g.quaternion.setFromUnitVectors(Y_UP, d.divideScalar(len || 1));
+  return len;
+}
 function box(mat, sx, sy, sz, x, y, z, cast = true) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat);
   m.position.set(x, y, z); m.castShadow = cast;
   return m;
 }
+/** A flat plate from a 2D outline: 'xz' = (x, z) points, thickness along y centred on y0; 'yz' = (y, z) points at x = y0;
+ *  'xy' = (x, y) points at z = y0. */
+function plate(mat, pts, t, plane = 'xz', y0 = 0) {
+  const g = new THREE.ExtrudeGeometry(new THREE.Shape(pts.map(([a, b]) => new THREE.Vector2(a, b))), { depth: t, bevelEnabled: true, bevelThickness: 0.001, bevelSize: 0.001, bevelSegments: 1 });
+  if (plane === 'xz') { g.rotateX(Math.PI / 2); g.translate(0, y0 + t / 2, 0); }
+  else if (plane === 'yz') { g.rotateX(Math.PI / 2); g.rotateZ(Math.PI / 2); g.translate(y0 - t / 2, 0, 0); }
+  else g.translate(0, 0, y0 - t / 2);
+  const m = new THREE.Mesh(g, mat); m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
 
-/** The shell: cross-sections lofted along x, each a squared-off arch (superellipse) open at the bottom. */
+// The shell: a small truck cab on a narrow body (about half the car's width), lofted from cross-sections along x,
+// each a squared-off arch open at the bottom. The chassis, the front and rear ends and the shocks stay exposed.
+const SHELL = [  // x, half-width, bottom z, top z
+  [-0.135, 0.045, -0.02, 0.022], [-0.11, 0.054, -0.024, 0.036], [-0.075, 0.059, -0.026, 0.046], [-0.06, 0.06, -0.026, 0.094],
+  [-0.02, 0.06, -0.026, 0.104], [0.022, 0.059, -0.026, 0.101], [0.07, 0.057, -0.026, 0.052], [0.115, 0.053, -0.026, 0.04],
+  [0.16, 0.047, -0.024, 0.03], [0.2, 0.038, -0.02, 0.018], [0.222, 0.026, -0.014, 0.008]];
+const SX0 = SHELL[0][0], SX1 = SHELL[SHELL.length - 1][0];
 function shellGeometry() {
-  // x, half-width, bottom z, top z (body frame): rear deck, cab, windscreen, long sloping nose
-  const S = [[-0.215, 0.06, -0.012, 0.03], [-0.17, 0.072, -0.02, 0.04], [-0.105, 0.08, -0.025, 0.048], [-0.065, 0.082, -0.026, 0.076],
-    [-0.005, 0.083, -0.026, 0.088], [0.035, 0.081, -0.026, 0.083], [0.075, 0.077, -0.026, 0.058], [0.12, 0.071, -0.026, 0.042],
-    [0.17, 0.063, -0.026, 0.03], [0.215, 0.05, -0.022, 0.018], [0.245, 0.03, -0.012, 0.006]];
-  const nx = 60, na = 28, pos = [], uv = [], idx = [];
-  const lerp = (k, t) => S[k].map((v, i) => v + (S[k + 1][i] - v) * t);
+  const nx = 90, na = 36, pos = [], uv = [], idx = [];
+  const at = (f) => { const k = Math.min(SHELL.length - 2, Math.floor(f)), t = f - k; return SHELL[k].map((v, i) => v + (SHELL[k + 1][i] - v) * (t * t * (3 - 2 * t) * 0.35 + t * 0.65)); };
   for (let i = 0; i <= nx; i++) {
-    const f = (i / nx) * (S.length - 1), k = Math.min(S.length - 2, Math.floor(f));
-    const [x, w, z0, z1] = lerp(k, f - k);
+    const [x, w, z0, z1] = at((i / nx) * (SHELL.length - 1));
+    // texture u follows x; v follows arc length around the section, so the livery keeps its shape on sides and roof
+    const ring = [];
     for (let j = 0; j <= na; j++) {
       const a = (j / na) * Math.PI, c = Math.cos(a), s = Math.sin(a);
-      const y = w * Math.sign(c) * Math.pow(Math.abs(c), 0.55), z = z0 + (z1 - z0) * Math.pow(s, 0.45);
-      pos.push(x, y, z); uv.push(i / nx, j / na);
+      ring.push([w * Math.sign(c) * Math.pow(Math.abs(c), 0.3), z0 + (z1 - z0) * Math.pow(s, 0.25)]);
     }
+    const arc = [0];
+    for (let j = 1; j <= na; j++) arc.push(arc[j - 1] + Math.hypot(ring[j][0] - ring[j - 1][0], ring[j][1] - ring[j - 1][1]));
+    for (let j = 0; j <= na; j++) { pos.push(x, ring[j][0], ring[j][1]); uv.push((x - SX0) / (SX1 - SX0), arc[j] / arc[na]); }
   }
-  for (let i = 0; i < nx; i++) for (let j = 0; j < na; j++) {
-    const a = i * (na + 1) + j, b = a + na + 1;
-    idx.push(a, b, a + 1, b, b + 1, a + 1);
-  }
+  for (let i = 0; i < nx; i++) for (let j = 0; j < na; j++) { const a = i * (na + 1) + j, b = a + na + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
@@ -164,68 +182,106 @@ function shellGeometry() {
   return g;
 }
 
-/** Livery on the shell's (u along the car rear->nose, v across from the right side over the roof to the left). */
-function livery(color, accent, number) {
-  const col = '#' + new THREE.Color(color).getHexString(), acc = '#' + new THREE.Color(accent).getHexString();
-  const tex = canvasTexture(1024, 512, (g, W, H) => {
-    // canvas x: body x from rear (-0.215) to nose (0.245); canvas y: across, one side's skirt (top) over the roof to the other (bottom)
-    const U = (x) => ((x + 0.215) / 0.46) * W, Vy = (v) => v * H;
-    g.fillStyle = col; g.fillRect(0, 0, W, H);
-    for (const side of [0, 1]) {
-      const v = (t) => Vy(side ? 1 - t : t);
-      g.fillStyle = '#15161a'; g.fillRect(0, v(0), W, v(0.035) - v(0));                    // dark skirt
-      g.fillStyle = '#f3f1ea';                                                              // white wedge, widening to the nose
-      g.beginPath(); g.moveTo(U(-0.215), v(0.06)); g.lineTo(U(0.245), v(0.05)); g.lineTo(U(0.245), v(0.2)); g.lineTo(U(-0.215), v(0.09)); g.fill();
-      g.fillStyle = acc;
-      g.beginPath(); g.moveTo(U(-0.215), v(0.09)); g.lineTo(U(0.245), v(0.2)); g.lineTo(U(0.245), v(0.225)); g.lineTo(U(-0.215), v(0.105)); g.fill();
-      g.fillStyle = '#10151c';                                                              // side window
-      g.beginPath(); g.moveTo(U(-0.055), v(0.27)); g.lineTo(U(0.03), v(0.27)); g.lineTo(U(0.05), v(0.34)); g.lineTo(U(-0.065), v(0.34)); g.fill();
+/** Livery: a two-tone fade with flames licking back from the nose, a dark cab glasshouse and a race number.
+ *  Canvas x = body x (rear to nose); canvas y = across, one side's skirt (top) over the roof to the other (bottom). */
+function livery(scheme, number) {
+  const hex = (c) => '#' + new THREE.Color(c).getHexString();
+  const tex = canvasTexture(2048, 1024, (g, W, H) => {
+    const U = (x) => ((x - SX0) / (SX1 - SX0)) * W;
+    const fade = g.createLinearGradient(U(SX0), 0, U(SX1), 0);
+    fade.addColorStop(0, hex(scheme.b)); fade.addColorStop(0.45, hex(scheme.b)); fade.addColorStop(0.62, hex(scheme.a)); fade.addColorStop(1, hex(scheme.a));
+    g.fillStyle = fade; g.fillRect(0, 0, W, H);
+    // flames: tongues from the front quarter sweeping back along each side and over the hood
+    const flame = (y0, dir, n, len, amp) => {
+      for (let k = 0; k < n; k++) {
+        const yb = y0 + dir * k * amp * 0.55, tip = U(0.11) - len * (0.55 + 0.45 * Math.sin(k * 2.3 + 1)) * W, wav = amp * 0.6;
+        const grd = g.createLinearGradient(U(0.13), 0, tip, 0);
+        grd.addColorStop(0, hex(scheme.flame)); grd.addColorStop(0.7, hex(scheme.flame2)); grd.addColorStop(1, hex(scheme.flame2));
+        g.fillStyle = grd; g.strokeStyle = '#f6f4ee'; g.lineWidth = 6;
+        g.beginPath(); g.moveTo(U(0.13), yb - amp * 0.5);
+        g.bezierCurveTo((U(0.13) + tip) / 2, yb - amp * 0.9 - wav, (U(0.13) + tip) / 2, yb + wav, tip, yb + dir * amp * 0.25);
+        g.bezierCurveTo((U(0.13) + tip) / 2 + 40, yb + amp * 0.2, (U(0.13) + tip) / 2, yb + amp * 0.9, U(0.13), yb + amp * 0.5);
+        g.closePath(); g.stroke(); g.fill();
+      }
+    };
+    flame(H * 0.11, 1, 4, 0.42, H * 0.06);
+    flame(H * 0.89, -1, 4, 0.42, H * 0.06);
+    g.fillStyle = hex(scheme.flame);
+    g.fillRect(U(0.12), H * 0.3, U(SX1) - U(0.12), H * 0.4);                    // hood panel
+    g.fillStyle = hex(scheme.flame2); g.fillRect(U(0.12), H * 0.46, U(SX1) - U(0.12), H * 0.08);
+    // the glasshouse: windscreen, side windows, a rear window, with a black window line around them
+    g.fillStyle = '#0d1117'; g.strokeStyle = '#05070a'; g.lineWidth = 10;
+    g.beginPath(); g.moveTo(U(0.025), H * 0.31); g.lineTo(U(0.068), H * 0.35); g.lineTo(U(0.068), H * 0.65); g.lineTo(U(0.025), H * 0.69); g.closePath(); g.fill(); g.stroke();
+    for (const [a, b] of [[0.2, 0.3], [0.8, 0.7]]) {
+      g.beginPath(); g.moveTo(U(-0.052), H * a); g.lineTo(U(0.018), H * a); g.lineTo(U(0.04), H * b); g.lineTo(U(-0.052), H * b); g.closePath(); g.fill(); g.stroke();
     }
-    g.fillStyle = '#10151c';                                                                // windscreen
-    g.beginPath(); g.moveTo(U(0.03), Vy(0.3)); g.lineTo(U(0.072), Vy(0.25)); g.lineTo(U(0.072), Vy(0.75)); g.lineTo(U(0.03), Vy(0.7)); g.fill();
-    g.fillStyle = acc; g.fillRect(U(-0.215), Vy(0.46), U(0.03) - U(-0.215), Vy(0.08));     // roof stripe
-    g.fillRect(U(0.08), Vy(0.47), U(0.245) - U(0.08), Vy(0.06));
-    g.fillStyle = '#f3f1ea'; g.beginPath(); g.arc(U(-0.03), Vy(0.5), 30, 0, 7); g.fill();
-    g.fillStyle = '#15161a'; g.font = '700 46px "Barlow Condensed", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.save(); g.translate(U(-0.03), Vy(0.5)); g.rotate(Math.PI / 2); g.fillText(String(number), 0, 3); g.restore();
-    g.fillStyle = '#fff4c8'; for (const t of [0.4, 0.6]) { g.beginPath(); g.ellipse(U(0.232), Vy(t), 8, 14, 0, 0, 7); g.fill(); }
+    g.beginPath(); g.moveTo(U(-0.06), H * 0.36); g.lineTo(U(-0.05), H * 0.36); g.lineTo(U(-0.05), H * 0.64); g.lineTo(U(-0.06), H * 0.64); g.fill();
+    // skirt, door numbers and a roof number
+    g.fillStyle = '#121316'; g.fillRect(0, 0, W, H * 0.03); g.fillRect(0, H * 0.97, W, H * 0.03);
+    g.font = '800 120px "Barlow Condensed", Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (const [y, flip] of [[H * 0.14, true], [H * 0.86, false]]) {
+      g.save(); g.translate(U(-0.015), y); if (flip) g.scale(1, -1);
+      g.lineWidth = 12; g.strokeStyle = '#111'; g.strokeText(String(number), 0, 6); g.fillStyle = '#f6f4ee'; g.fillText(String(number), 0, 6); g.restore();
+    }
+    g.fillStyle = '#f6f4ee'; g.beginPath(); g.arc(U(-0.02), H * 0.5, 62, 0, 7); g.fill();
+    g.fillStyle = '#111'; g.save(); g.translate(U(-0.02), H * 0.5); g.rotate(Math.PI / 2); g.fillText(String(number), 0, 6); g.restore();
+    // headlights
+    g.fillStyle = '#fff6d0'; for (const v of [0.38, 0.62]) { g.beginPath(); g.ellipse(U(0.205), H * v, 14, 30, 0, 0, 7); g.fill(); }
   });
   tex.anisotropy = 8;
   return tex;
 }
 
-export function makeCar(color, { ghost = false, number = 1, wheelColor = 0xd9ee2c, accent = 0x15161a } = {}) {
+const SCHEMES = {
+  1: { a: 0x37d34b, b: 0x1d4fd8, flame: 0xff7418, flame2: 0xffc21a },     // main car: green to blue, orange flames
+  2: { a: 0xf3f1ea, b: 0xc81e2b, flame: 0x15161a, flame2: 0x4a4d55 },     // rival: white to red, black flames
+};
+
+export function makeCar(color, { ghost = false, number = 1, wheelColor = 0xf3f2ee, accent = 0x15161a } = {}) {
   const A = sharedAssets();
   const body = new THREE.Group();
   const ghostMat = ghost ? hologram() : null;
   const M = (m) => ghostMat ?? m;
-  const paint = ghostMat ?? new THREE.MeshPhysicalMaterial({ map: livery(color, accent, number), roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.06, envMapIntensity: 2.4, side: THREE.DoubleSide });
-  const wheelMat = M(new THREE.MeshStandardMaterial({ color: wheelColor, roughness: 0.45 }));
+  const scheme = SCHEMES[number] ?? SCHEMES[1];
+  const paint = ghostMat ?? new THREE.MeshPhysicalMaterial({ map: livery(scheme, number), roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 2.4, side: THREE.DoubleSide });
+  const wheelMat = M(new THREE.MeshStandardMaterial({ color: wheelColor, roughness: 0.42 }));
+  const grey = M(new THREE.MeshStandardMaterial({ color: 0x6c7077, roughness: 0.55, metalness: 0.15 }));   // composite towers, wing mount
 
   const shell = new THREE.Mesh(shellGeometry(), paint);
   shell.castShadow = !ghost;
   body.add(shell);
 
-  // wing: two uprights from the rear of the chassis to a flat wing with big endplates
-  const wingMat = M(new THREE.MeshStandardMaterial({ color: 0x141518, roughness: 0.4, side: THREE.DoubleSide }));
+  // chassis plate (long and narrow, exposed front and rear), front bumper and skid
+  body.add(plate(M(A.carbon), [[-0.245, -0.042], [0.17, -0.046], [0.235, -0.028], [0.235, 0.028], [0.17, 0.046], [-0.245, 0.042]], 0.004, 'xy', -0.036));
+  const bump = plate(M(A.plastic), [[0.215, -0.038], [0.268, -0.022], [0.274, -0.006], [0.266, -0.002], [0.222, -0.026]], 0.11, 'xz');
+  body.add(bump);
+  // shock towers: grey composite plates, wide at the top where the shocks mount
+  const tower = (x) => plate(grey, [[-0.05, -0.03], [0.05, -0.03], [0.082, 0.088], [0.074, 0.104], [0.05, 0.104], [0.022, 0.06], [-0.022, 0.06], [-0.05, 0.104], [-0.074, 0.104], [-0.082, 0.088]], 0.006, 'yz', x);
+  if (!ghost) {
+    const ft = tower(0.122), rt = tower(-0.122);
+    body.add(ft, rt);
+    // diff housings and a centre driveshaft, visible through the open chassis
+    for (const x of [0.15, -0.15]) body.add(box(A.gun, 0.05, 0.06, 0.04, x, 0, -0.016));
+    const cs = new THREE.Mesh(A.unitRod, A.alu); setRod(cs, V(0.125, 0, -0.02), V(-0.125, 0, -0.02), 0.004); body.add(cs);
+  }
+
+  // wing: a wide swept wing on a grey mount from the rear tower, white endplates
   const wing = new THREE.Group();
-  wing.add(box(wingMat, 0.11, 0.22, 0.004, 0, 0, 0));
-  wing.add(box(wingMat, 0.09, 0.2, 0.003, 0.005, 0, 0.022));       // the raised centre deck of a racing wing
+  const foil = new THREE.Shape([[0.06, 0], [0.02, 0.009], [-0.03, 0.01], [-0.06, 0.004], [-0.065, 0.016], [-0.069, 0.016], [-0.062, -0.001], [0.06, -0.003]].map(([x, z]) => new THREE.Vector2(x, z)));
+  const fg = new THREE.ExtrudeGeometry(foil, { depth: 0.25, bevelEnabled: false });
+  fg.rotateX(Math.PI / 2); fg.translate(0, 0.125, 0);
+  const wingMat = M(new THREE.MeshPhysicalMaterial({ color: 0x15171a, roughness: 0.25, clearcoat: 0.6, side: THREE.DoubleSide }));
+  const wm = new THREE.Mesh(fg, wingMat); wm.castShadow = !ghost; wing.add(wm);
   for (const sy of [1, -1]) {
-    const ep = box(M(new THREE.MeshStandardMaterial({ color: wheelColor, roughness: 0.5, side: THREE.DoubleSide })), 0.1, 0.003, 0.034, -0.008, sy * 0.111, 0.008);
+    const ep = plate(M(new THREE.MeshStandardMaterial({ color: 0xf3f2ee, roughness: 0.4 })), [[0.065, -0.02], [-0.07, -0.025], [-0.075, 0.03], [0.03, 0.022]], 0.0025, 'xz', sy * 0.126);
     wing.add(ep);
   }
-  wing.position.set(-0.235, 0, 0.135); wing.rotation.y = 0.1;
+  for (const y of [-0.06, 0.0, 0.06]) wing.add(box(wingMat, 0.1, 0.002, 0.008, -0.005, y, 0.013));
+  wing.position.set(-0.215, 0, 0.16); wing.rotation.y = 0.06;
   body.add(wing);
-  if (!ghost) for (const sy of [1, -1]) body.add(box(A.carbon, 0.022, 0.004, 0.11, -0.218, sy * 0.032, 0.08).rotateY(-0.18));
-
-  if (!ghost) {
-    // chassis plate, bumpers and shock towers
-    const plate = new THREE.Mesh(new THREE.ExtrudeGeometry(new THREE.Shape([[-0.22, -0.04], [0.17, -0.055], [0.235, -0.03], [0.235, 0.03], [0.17, 0.055], [-0.22, 0.04]].map(([x, y]) => new THREE.Vector2(x, y))), { depth: 0.004, bevelEnabled: false }), A.alu);
-    plate.position.z = -0.038; plate.castShadow = true; body.add(plate);
-    body.add(box(A.plastic, 0.03, 0.15, 0.022, 0.25, 0, -0.022));
-    body.add(box(A.plastic, 0.02, 0.12, 0.02, -0.232, 0, -0.022));
-    for (const sx of [0.15, -0.15]) body.add(box(A.carbon, 0.006, 0.2, 0.022, sx + (sx > 0 ? -0.03 : 0.03), 0, 0.036));
+  if (!ghost) for (const sy of [1, -1]) {
+    const strut = plate(grey, [[-0.118, 0.09], [-0.104, 0.09], [-0.2, 0.162], [-0.224, 0.162]], 0.005, 'xz', sy * 0.03);
+    body.add(strut);
   }
 
   // per corner: wheel (steered knuckle + spinning tire), lower and upper arms, driveshaft, shock
@@ -234,12 +290,12 @@ export function makeCar(color, { ghost = false, number = 1, wheelColor = 0xd9ee2
     const wheel = new THREE.Group(), spin = new THREE.Group();
     const tire = new THREE.Mesh(A.tireGeo, M(A.tireMat)); tire.castShadow = !ghost; spin.add(tire);
     if (!ghost) {
-      const rim = new THREE.Mesh(new THREE.CylinderGeometry(RIM_R, RIM_R, TIRE_W * 0.9, 28, 1, true), wheelMat); spin.add(rim);
-      const dish = new THREE.Mesh(new THREE.CircleGeometry(RIM_R, 32), new THREE.MeshStandardMaterial({ map: dishTexture(wheelColor), roughness: 0.4 }));
-      dish.position.y = sy * TIRE_W * 0.2; dish.rotation.x = sy * -Math.PI / 2; spin.add(dish);          // the outer face, set in
-      const hex = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.012, 6), A.gun);
-      hex.position.y = sy * (TIRE_W * 0.2 + 0.004); spin.add(hex);
-      const knuckle = box(A.gun, 0.02, 0.01, 0.03, 0, -sy * (0.14 - HUB_Y - 0.005), 0);
+      const rim = new THREE.Mesh(new THREE.CylinderGeometry(RIM_R, RIM_R, TIRE_W * 0.92, 32, 1, true), wheelMat); spin.add(rim);
+      const dish = new THREE.Mesh(new THREE.CircleGeometry(RIM_R, 32), new THREE.MeshStandardMaterial({ map: dishTexture(wheelColor), roughness: 0.38 }));
+      dish.position.y = sy * TIRE_W * 0.16; dish.rotation.x = sy * -Math.PI / 2; spin.add(dish);
+      const hex = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.012, 6), A.gun);
+      hex.position.y = sy * (TIRE_W * 0.16 + 0.004); spin.add(hex);
+      const knuckle = box(A.gun, 0.024, 0.012, 0.034, 0, -sy * (0.14 - HUB_Y - 0.004), 0);
       wheel.add(knuckle);
     }
     wheel.add(spin);
@@ -248,9 +304,17 @@ export function makeCar(color, { ghost = false, number = 1, wheelColor = 0xd9ee2
     if (!ghost) {
       part.lowerF = new THREE.Mesh(A.unitRod, A.plastic); part.lowerR = new THREE.Mesh(A.unitRod, A.plastic);
       part.upper = new THREE.Mesh(A.unitRod, A.gun); part.shaft = new THREE.Mesh(A.unitRod, A.alu);
-      part.shockBody = new THREE.Mesh(A.unitRod, A.shockBody); part.shockRod = new THREE.Mesh(A.unitRod, A.shaft);
-      part.spring = new THREE.Mesh(A.spring, new THREE.MeshStandardMaterial({ color: wheelColor, roughness: 0.4, metalness: 0.3 }));
-      for (const k of ['lowerF', 'lowerR', 'upper', 'shaft', 'shockBody', 'shockRod', 'spring']) { part[k].castShadow = true; body.add(part[k]); }
+      for (const k of ['lowerF', 'lowerR', 'upper', 'shaft']) { part[k].castShadow = true; body.add(part[k]); }
+      // the shock: a group aimed from the tower top to the arm, +y down the shock
+      const sh = part.shock = new THREE.Group();
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.0125, 0.0125, 0.008, 18).translate(0, 0.004, 0), A.gun);
+      const bodyC = new THREE.Mesh(new THREE.CylinderGeometry(0.0105, 0.0105, 0.052, 18).translate(0, 0.034, 0), A.shockBody);
+      const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.0155, 0.0155, 0.004, 18).translate(0, 0.012, 0), M(new THREE.MeshStandardMaterial({ color: accent === 0x15161a ? 0xff7418 : 0xc81e2b, roughness: 0.35, metalness: 0.7 })));
+      part.rod = new THREE.Mesh(A.unitRod, A.shaft);
+      part.spring = new THREE.Mesh(A.spring, M(new THREE.MeshStandardMaterial({ color: 0x1b1c20, roughness: 0.35, metalness: 0.6 })));
+      part.eye = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.01, 10), A.gun);
+      for (const m of [cap, bodyC, collar, part.rod, part.spring, part.eye]) { m.castShadow = true; sh.add(m); }
+      body.add(sh);
     }
     return part;
   });
@@ -271,21 +335,21 @@ export function setSuspension(car, susp, steer, spin) {
     if (car.ghost) continue;
     const sy = c.sy, hubY = sy * HUB_Y;
     // lower A-arm: two rods from the chassis pivots (front and rear of the arm) to the hub's lower ball
-    const ball = tmpA.set(c.cx, hubY, zc - 0.014);
-    setRod(c.lowerF, V(c.cx + 0.028, sy * 0.035, -0.034), ball, 0.0045);
-    setRod(c.lowerR, V(c.cx - 0.028, sy * 0.035, -0.034), ball, 0.0045);
+    const ball = tmpA.set(c.cx, hubY, zc - 0.015);
+    setRod(c.lowerF, V(c.cx + 0.03, sy * 0.032, -0.034), ball, 0.005);
+    setRod(c.lowerR, V(c.cx - 0.03, sy * 0.032, -0.034), ball, 0.005);
     // upper link (turnbuckle) to the top of the hub carrier
-    setRod(c.upper, V(c.cx, sy * 0.045, 0.018), tmpB.set(c.cx, hubY, zc + 0.022), 0.0025);
+    setRod(c.upper, V(c.cx + (c.front ? -0.02 : 0.02), sy * 0.04, 0.02), tmpB.set(c.cx, hubY, zc + 0.024), 0.0028);
     // driveshaft from the diff to the hub
-    setRod(c.shaft, V(c.cx, sy * 0.03, -0.022), tmpB.set(c.cx, hubY, zc), 0.0035);
-    // coil-over: from the shock tower to a mount 70% out along the lower arm
-    const top = V(c.cx + (c.front ? -0.03 : 0.03), sy * 0.09, 0.042);
-    const bot = tmpC.set(c.cx, sy * 0.035, -0.034).lerp(ball, 0.85);
-    const len = top.distanceTo(bot);
-    setRod(c.shockBody, top, top.clone().lerp(bot, Math.min(0.62, 0.046 / len)), 0.0085);
-    setRod(c.shockRod, bot, top.clone().lerp(bot, 0.3), 0.0026);
-    setRod(c.spring, top.clone().lerp(bot, 0.08), bot.clone().lerp(top, 0.06), 1);
-    c.spring.scale.x = c.spring.scale.z = 1;
+    setRod(c.shaft, V(c.cx, sy * 0.03, -0.016), tmpB.set(c.cx, hubY, zc), 0.0038);
+    // coil-over: from the top of the tower, leaning in, to a mount near the outer end of the lower arm
+    const top = V(c.cx + (c.front ? -0.028 : 0.028), sy * 0.068, 0.098);
+    const bot = tmpC.set(c.cx, sy * 0.032, -0.034).lerp(ball, 0.86);
+    const len = aim(c.shock, top, bot);
+    // body: fixed at the top (0..0.06); shaft: from the eyelet up into the body; spring: collar to eyelet
+    c.rod.position.set(0, 0.05, 0); c.rod.scale.set(0.0032, Math.max(0.001, len - 0.05), 0.0032);
+    c.spring.position.set(0, 0.014, 0); c.spring.quaternion.identity(); c.spring.scale.set(1, Math.max(0.01, len - 0.02), 1);
+    c.eye.position.set(0, len, 0); c.eye.rotation.set(0, 0, Math.PI / 2);
   }
 }
 

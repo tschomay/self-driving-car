@@ -127,9 +127,9 @@ async function loadLoop(idx) {
   S.R = prepRace(raw, c); S.R.L = c.length;
   S.rival = rawRival ? prepRace(rawRival, c) : null; if (S.rival) S.rival.L = c.length;
   for (const k of ['car', 'ghost', 'rivalCar']) if (S[k]) view.removeCar(S[k]);
-  S.car = view.addCar(CAR_COLOR, { number: 1, marks: true, wheelColor: 0xd9ee2c, accent: 0x15161a });
+  S.car = view.addCar(CAR_COLOR, { number: 1, marks: true, wheelColor: 0xf3f2ee, accent: 0x15161a });
   S.ghost = view.addCar(CAR_COLOR, { ghost: true });
-  S.rivalCar = S.rival ? view.addCar(RIVAL_COLOR, { number: 2, marks: true, wheelColor: 0xf1f1ec, accent: 0xf2c230 }) : null;
+  S.rivalCar = S.rival ? view.addCar(RIVAL_COLOR, { number: 2, marks: true, wheelColor: 0xe9d23a, accent: 0xc81e2b }) : null;
   S.t = 0; S.replay = null; S.recordAir = 0; S.replayedLaps.clear(); S.replayedCrashes.clear(); S.ended = false;
   view.camInit = false;
   buildTimeline();
@@ -184,6 +184,15 @@ function setPlaying(p) {
 $('speedbtn').addEventListener('click', () => { S.speed = SPEEDS[(SPEEDS.indexOf(S.speed) + 1) % SPEEDS.length]; $('speedbtn').textContent = `${S.speed}×`; });
 $('cambtn').addEventListener('click', () => { view.camMode = (view.camMode + 1) % CAMERAS.length; $('cambtn').textContent = CAMERAS[view.camMode]; view.camInit = false; });
 $('scrub').addEventListener('input', (e) => { S.t = +e.target.value; view.clearMarks(); S.replay = null; S.ended = false; $('card').hidden = true; view.camInit = false; });
+// skip: ends a replay (and a crash's countdown with it), or jumps to the end of the marshal's countdown
+$('skip').addEventListener('click', () => {
+  const R = S.R;
+  if (S.replay) { S.t = S.replay.resume; S.replay = null; }
+  const cr = R.crashes_.find((e) => S.t >= e.t && S.t < e.until);
+  if (cr) { S.t = cr.until; S.replayedCrashes.add(cr.t); }
+  view.camInit = false;
+  view.clearMarks();
+});
 $('menubtn').addEventListener('click', () => { $('sheet').hidden = !$('sheet').hidden; });
 $('close-sheet').addEventListener('click', () => { $('sheet').hidden = true; });
 seg($('ghost-seg'), [{ v: true, html: 'Best lap' }, { v: false, html: 'Off' }], true, (v) => { S.ghostOn = v; });
@@ -278,6 +287,9 @@ function hud(p, t) {
   // crash flag and the marshal's countdown
   const cr = R.crashes_.find((e) => t >= e.t && t < e.until);
   $('flag').hidden = !cr || !!S.replay;
+  const sk = $('skip');
+  sk.hidden = !(S.replay || cr);
+  if (!sk.hidden) sk.textContent = S.replay ? 'Skip replay ›' : 'Skip countdown ›';
   if (cr) {
     $('flag-h').textContent = { 'rolled over': 'Rolled over', 'off the lane': 'Off the lane', stuck: 'Stuck', 'spun round': 'Spun round' }[cr.reason] ?? cr.reason;
     $('flag-why').textContent = t - cr.t < 2 ? `Crash ${R.crashes_.indexOf(cr) + 1} · +${R.crash_s} s` : 'Marshal on the way';
@@ -352,13 +364,13 @@ function drawChart() {
   });
   if (rv) {
     const pts = rv.lap_times.map((v, k) => `${X(k)},${Y(v)}`).join(' ');
-    s += `<polyline points="${pts}" fill="none" stroke="#5b9cf0" stroke-width="3"/>`;
-    rv.lap_times.forEach((v, k) => { s += `<circle cx="${X(k)}" cy="${Y(v)}" r="4.5" fill="#5b9cf0"/>`; });
+    s += `<polyline points="${pts}" fill="none" stroke="#e5484d" stroke-width="3"/>`;
+    rv.lap_times.forEach((v, k) => { s += `<circle cx="${X(k)}" cy="${Y(v)}" r="4.5" fill="#e5484d"/>`; });
   }
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
   svg.innerHTML = s;
   $('legend').innerHTML = `<span><i style="background:#f2c230"></i>Lap time</span><span><i style="background:#86d993"></i>Best lap</span><span><i style="background:#ff7a4d"></i>Lap with a crash (+${R.crash_s} s; time on top if off the scale)</span>`
-    + (rv ? `<span><i style="background:#5b9cf0"></i>${S.man.cars[S.rivalName].short}</span>` : '') + '<span>Lap 1 starts from standstill.</span>';
+    + (rv ? `<span><i style="background:#e5484d"></i>${S.man.cars[S.rivalName].short}</span>` : '') + '<span>Lap 1 starts from standstill.</span>';
 }
 
 // auto quality: if frames are slow, drop ambient occlusion, then bloom and grading, then resolution

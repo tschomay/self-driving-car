@@ -16,7 +16,7 @@
   --warn: #ff7a4d;
   --good: #86d993;
   --ghost: #9fe6ff;
-  --rival: #5b9cf0;
+  --rival: #e5484d;
   --display: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
   --body: "Barlow", "Helvetica Neue", Arial, sans-serif;
   --gl: max(16px, env(safe-area-inset-left, 0px));
@@ -53,6 +53,9 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 #air { font: 700 44px/1 var(--display); color: var(--chalk); letter-spacing: 0.02em; opacity: 0; transition: opacity 0.25s; text-align: center; }
 #air small { display: block; font: 600 13px/1.2 var(--display); letter-spacing: 0.16em; color: var(--ink); text-transform: uppercase; }
 #air.show { opacity: 1; }
+.skip { pointer-events: auto; min-height: 40px; padding: 0 16px; background: color-mix(in srgb, var(--slate) 82%, transparent); border: 1px solid var(--chalk); color: var(--chalk);
+  font: 700 15px/1 var(--display); letter-spacing: 0.1em; text-transform: uppercase; text-shadow: none; -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+.skip:active { background: var(--chalk); color: #1b1a12; }
 #flag { padding: 10px 18px 12px; text-align: center; border-left: 4px solid var(--warn); }
 #flag h2 { margin: 0; font: 700 26px/1 var(--display); text-transform: uppercase; color: var(--warn); letter-spacing: 0.04em; }
 #flag p { margin: 4px 0 0; font: 600 16px/1.2 var(--display); }
@@ -161,6 +164,7 @@ details b { color: var(--ink); font-weight: 600; }
       <div id="flag" class="panel" hidden><h2 id="flag-h">Crash</h2><p id="flag-why"></p><span class="num" id="flag-n"></span></div>
       <div id="lapflash" class="panel" hidden></div>
       <div id="air"></div>
+      <button id="skip" class="skip" hidden>Skip ›</button>
     </div>
     <div class="inst">
       <div>

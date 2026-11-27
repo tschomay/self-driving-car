@@ -489,4 +489,13 @@ Same setup as E7 above: actor `runs/p48-e5-s0`, critic from the chosen racer, 9 
 - 2-pass race estimates: 600 s at start, 601 at 3M, 588 at 6M, 591 at 9M, 579 at 12M, 571 at 15M, 568 at 18M, 561 at 21.1M (chosen; `runs/p48-e7`).
 - **Result:** over 5 noisy passes, 362/750 finished (crash rate 51.7%), median lap 24.56 s, **race 563.6 s**: 19.2 s ahead of the teacher (582.8 s) and 23.5 s ahead of the E5-recipe cars (587.1 s). **A sensors-only car beats the teacher.**
 - It wins on pace: it laps 3.85 s faster than the teacher and as fast as the RL racer (24.96 s), but still crashes on half its laps (teacher 10%, racer 29%).
+- **Caveat: grip.** Each run draws its own grip (gate range, friction 0.55–1.25), so the 563.6 s averages over grip. Split by grip third (same formula), E7 wins at mid and high grip but loses badly at low grip:
+
+  | Grip (friction) | Teacher | RL racer | E7 |
+  |---|---|---|---|
+  | 0.55–0.79 | 593 s (crash 18%) | 565 s (38%) | 620 s (80%) |
+  | 0.79–0.96 | 582 s (9%) | 531 s (30%) | 552 s (43%) |
+  | 0.96–1.25 | 574 s (4%) | 521 s (20%) | 525 s (32%) |
+
+  The replay session's full 20-lap races (one grip for the whole race) agree: at grip 0.58–0.70, E7 crashed 38–65 times per race, the teacher 0–14. The formula also counts at most one crash per lap; in full races E7 sometimes crashed 3 times in one lap.
 - Weights on the `car-weights` branch: `runs/p48-e7` (and `runs/p48-e5-s0/s1`). Run with `SDC_REAL=truggy2`.

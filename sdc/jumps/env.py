@@ -98,6 +98,8 @@ class JumpCar:
                  real=(), sensors="ideal", dr=None, phys_seed=0, attitude=False, track_map=None, loop=False,
                  angled=False, turn_map=None, jump_notes=None, expo=0.0):
         self.real = rl.switches(real)
+        g = cr.geometry(self.real)                 # "size8": the full-size 1/8 truggy (car.GEOM)
+        self.wheel_r, self.bumper_x = g["wheel_r"], g["bumper_x"]
         # Phase 4.6 (owner, 2026-11-18): transmitter-style steering expo. The command a in [-1, 1] maps to the servo
         # as (1 - expo) * a + expo * a**3: the same full lock, but finer near centre (0.3 expo halves the steering a
         # small command gives at 0). The teacher inverts it (expo_inverse) so its steering angles are unchanged.
@@ -307,7 +309,7 @@ class JumpCar:
         sd = self.d.sensordata
         self.rays = cr.cast_rays(self.m, self.d, self.ray_sites)
         rays = self.rays / cr.RAY_CUTOFF
-        w = self.d.qvel[self.spin_dof] * cr.WHEEL_R / 10.0
+        w = self.d.qvel[self.spin_dof] * self.wheel_r / 10.0
         # accelerometer averaged over the 20 ms control step (a real IMU low-pass filters; a single
         # 2 ms sample was dominated by contact chatter): (dv/dt + gravity) in the body frame
         R = self.d.xmat[1].reshape(3, 3)
@@ -318,7 +320,7 @@ class JumpCar:
 
     # ---- realistic sensors and actuators (Phase 4.5) ----------------------------------
     def _mean_wheel_speed(self):
-        return float(self.d.qvel[self.spin_dof].mean() * cr.WHEEL_R)
+        return float(self.d.qvel[self.spin_dof].mean() * self.wheel_r)
 
     def _sample_imu(self):
         sd = self.d.sensordata
@@ -381,11 +383,11 @@ class JumpCar:
         if t >= self.tof_next - 1e-9:   # frames on a 15 Hz schedule (sample-and-hold between them)
             self.tof_next += 1.0 / rl.TOF_HZ
             r = self.phys.tof_range
-            z = rl.ranges(rng, self._cast((0.235, 0, 0.02), self.tof_dirs, r), r, k, rl.TOF_DROPOUT)
+            z = rl.ranges(rng, self._cast((self.bumper_x, 0, 0.02), self.tof_dirs, r), r, k, rl.TOF_DROPOUT)
             z[z >= r] = TOF_NORM
             self.tof = z
         tf_dir = np.array([[np.cos(np.deg2rad(3)), 0, -np.sin(np.deg2rad(3))]])
-        tf = rl.ranges(rng, self._cast((0.235, 0, 0.02), tf_dir, rl.TFMINI_MAX), rl.TFMINI_MAX, k)
+        tf = rl.ranges(rng, self._cast((self.bumper_x, 0, 0.02), tf_dir, rl.TFMINI_MAX), rl.TFMINI_MAX, k)
         side = rl.ranges(rng, self._cast((0, 0, 0.02), np.array([[0, 1.0, 0], [0, -1.0, 0]]), rl.SIDE_MAX),
                          rl.SIDE_MAX, k)
         att, mp = [], []
@@ -402,7 +404,7 @@ class JumpCar:
         ang = []
         if self.angled:
             c45 = np.cos(np.pi / 4)
-            ang = [rl.ranges(rng, self._cast((0.2, y, 0.02), np.array([[c45, sy * c45, 0.0]]), rl.SIDE_MAX),
+            ang = [rl.ranges(rng, self._cast((self.bumper_x - 0.035, y, 0.02), np.array([[c45, sy * c45, 0.0]]), rl.SIDE_MAX),
                              rl.SIDE_MAX, k)[0] / rl.SIDE_MAX for y, sy in ((0.08, 1.0), (-0.08, -1.0))]
         notes = self._notes() if self.jump_notes else []
         return np.concatenate([acc / 9.81, gyro / 5.0, [spd], tf / rl.TFMINI_MAX, self.tof / TOF_NORM,
@@ -480,7 +482,7 @@ class JumpCar:
             u *= self.phys.charge * (1.0 - self.phys.sag * abs(u))
         if "esc" in self.real:   # physics review: a hobby ESC's brake, not reverse torque (one motor: "drive")
             raw = float(self.applied[1])
-            w = float(self.d.qvel[self.spin_dof].mean()) * cr.WHEEL_R / cr.motor(self.real)[1]   # motor speed / top
+            w = float(self.d.qvel[self.spin_dof].mean()) * self.wheel_r / cr.motor(self.real)[1]   # motor speed / top
             if raw > 0.05:
                 u = u - w                                    # drive: torque falls with back-EMF, as the damper did
             elif raw < -0.05:
@@ -501,7 +503,7 @@ class JumpCar:
             mujoco.mj_objectVelocity(self.m, self.d, mujoco.mjtObj.mjOBJ_BODY, int(bid), res, 0)
             # res[3:6] + cross(res[0:3], (0, 0, -R)), written out (np.cross was a third of the sim's time); the same
             # floating-point operations, so results are bit-identical
-            out[k] = np.hypot(res[3] + (res[1] * -cr.WHEEL_R - res[2] * 0.0), res[4] + (res[2] * 0.0 - res[0] * -cr.WHEEL_R))
+            out[k] = np.hypot(res[3] + (res[1] * -self.wheel_r - res[2] * 0.0), res[4] + (res[2] * 0.0 - res[0] * -self.wheel_r))
         return out
 
     def _physics(self, a):
@@ -592,7 +594,7 @@ class JumpCar:
         if st["x"] >= (self.course.finish if self.loop else crs.FINISH_X):
             reason = "finished"
             reward += finish_bonus
-        elif st["up_z"] < 0.2:
+        elif st["up_z"] < 0.2 and not ("groundroll" in self.real and self.airborne):
             reason = "rolled over"
         elif abs(st["y"]) > crs.DRIVE_W / 2:     # centre past the lane edge: its outer wheels are on the bank
             reason = "off the lane"

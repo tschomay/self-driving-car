@@ -18,6 +18,7 @@ Writes model.pt and metrics.json (load with common.load_student).
 from __future__ import annotations
 
 import argparse
+import os
 import functools
 import json
 import pickle
@@ -70,6 +71,7 @@ def main():
     ap.add_argument("--train-map", default=TRAIN_MAP, help="out-lap maps of the practice loops (with --map)")
     ap.add_argument("--val-map", default=VAL_MAP, help="out-lap maps of the validation runs (with --map)")
     ap.add_argument("--teacher-racer", default=None, help="Phase 4.7: a privileged RL racer checkpoint as teacher")
+    ap.add_argument("--teacher-preview", type=float, default=None, help="Phase 4.7 E6: metres of track the racer sees")
     ap.add_argument("--teacher-json", default=None, help="JSON file of LoopExpert settings over the teacher's defaults")
     a = ap.parse_args()
     torch.set_num_threads(1)
@@ -83,7 +85,7 @@ def main():
         own = json.loads(Path(a.train_map).read_text())
         courses = [c for c in courses if own.get(f"{c}|0.00", {}).get("kappa")]
     mp = (a.train_map, a.val_map)
-    real = "truggy" if a.truggy else "all"
+    real = os.environ.get("SDC_REAL", "truggy") if a.truggy else "all"   # SDC_REAL=truggy2: air-control physics
     env = student_env(a.map, real=real, expo=a.expo, notes=a.notes, maps=mp)
     bc_rnn.ENV.clear()
     bc_rnn.ENV.update(env, steer_cost=0.03, jump_bonus=10.0, courses=courses)
@@ -96,8 +98,9 @@ def main():
         tkw.update({k: v for k, v in json.loads(Path(a.teacher_json).read_text()).items() if not k.startswith("_")})
     teacher = LoopExpert(use_turn_map=a.map, **tkw)
     if a.teacher_racer:
-        from sdc.phase47.racer import ExpoDriver
-        teacher, tkw = ExpoDriver(a.teacher_racer), dict(racer=a.teacher_racer)
+        from sdc.phase47 import racer as _racer
+        _racer.PREVIEW = a.teacher_preview                       # read by forked workers; must match how it was trained
+        teacher, tkw = _racer.ExpoDriver(a.teacher_racer), dict(racer=a.teacher_racer, preview=a.teacher_preview)
     ref = pickle.load(open(REF_TRUGGY if a.truggy else REF, "rb"))
     ref1 = ref[::len(dr_starts)]                        # start 0 only (prun orders by course, then start)
     val_env = student_env(a.map, val=True, real=real, expo=a.expo, notes=a.notes, maps=mp)

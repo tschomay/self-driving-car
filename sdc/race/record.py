@@ -87,10 +87,12 @@ def _reset_at(c, seed, total, phys):
     c.x_prev = total
 
 
-def race(car, seed, phys_seed=0, laps=LAPS, log=print):
+def race(car, seed, phys_seed=0, laps=LAPS, log=print, dr="keep"):
     pol, env, label = driver(car)
     torch.set_num_threads(1)
     env = dict(env, phys_seed=phys_seed)
+    if dr != "keep":   # e.g. None: nominal physics (normal grip, average car) instead of one random draw
+        env["dr"] = dr
     b = je.JumpBatch(1, courses=[seed], **{**env, "max_steps": 10**9})
     c = b.cars[0]
     b._obs = np.zeros((1, b.obs_dim), np.float32)
@@ -163,6 +165,7 @@ def race(car, seed, phys_seed=0, laps=LAPS, log=print):
         if term or trunc:
             crashes += 1
             wrong = 0
+            was_air, takeoff = False, None    # a crash mid-air ends that jump (no airtime through the penalty)
             total = far
             events.append(dict(t=round(t_race, 3), type="crash", reason=reason, s=round(total % L, 2),
                                lap=len(lap_marks), until=round(t_race + CRASH_S, 3)))
@@ -198,7 +201,7 @@ def race(car, seed, phys_seed=0, laps=LAPS, log=print):
     geom = (cr.geometry(c.real) if hasattr(cr, "geometry")         # the full-size truggy ("size8") and later sims
             else dict(wheel_r=cr.WHEEL_R, corner_x=0.15, corner_y=0.14, mount_z=cr.MOUNT_Z, box=(0.23, 0.09, 0.035)))
     geom = {k: geom[k] for k in ("wheel_r", "corner_x", "corner_y", "mount_z", "box")}
-    return dict(car=label, loop=seed, phys_seed=phys_seed, geom=geom, real=sorted(c.real), phys={k: round(v, 4) for k, v in vars(phys).items()},
+    return dict(car=label, loop=seed, phys_seed=phys_seed, dr=env.get("dr"), geom=geom, real=sorted(c.real), phys={k: round(v, 4) for k, v in vars(phys).items()},
                 laps=laps, crash_s=CRASH_S, fps=FPS, n=len(frames), race_time=round(t_race, 3),
                 lap_times=lap_times, best_lap=min(lap_times) if lap_times else None, crashes=crashes, dnf=dnf,
                 scales=COLS, cols=cols, events=events)
@@ -241,13 +244,14 @@ def main():
     ap.add_argument("--laps", type=int, default=LAPS)
     ap.add_argument("--phys-seed", type=int, default=0)
     ap.add_argument("--out", default="runs/race")
+    ap.add_argument("--dr", default="keep", help="physics range: keep the car's own (gate), or nominal / train / gate")
     a = ap.parse_args()
     out = Path(a.out)
     for seed in a.loops:
         tp = out / f"track-{seed}.json.gz"
         if not tp.exists():
             _save(track(seed), tp)
-        r = race(a.car, seed, a.phys_seed, a.laps)
+        r = race(a.car, seed, a.phys_seed, a.laps, dr=None if a.dr == "nominal" else a.dr)
         name = a.name or r["car"]
         r["car"] = name
         _save(r, out / f"{name}-{seed}.json.gz")

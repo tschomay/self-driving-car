@@ -11,7 +11,7 @@ python -m sdc.race.record --car runs/p47-e5-s0 runs/p47-e5-s1 --name e5   # any 
 
 # build (from viewer/): dist/race.html + dist/data/
 npm install
-node build.mjs --data ../runs/race --main e5      # --serve: local preview on http://localhost:8124
+node build.mjs --data ../runs/race --main e7      # --serve: local preview on http://localhost:8124
 ```
 
 The main car is `--main`. Every other car recorded on all the loops can be picked as the rival. Car labels live in

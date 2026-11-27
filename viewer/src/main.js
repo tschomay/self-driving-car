@@ -51,7 +51,7 @@ function prepRace(raw, c) {
   }
   R.bestLap = best;
   R.crashes_ = R.events.filter((e) => e.type === 'crash');
-  R.jumps_ = R.events.filter((e) => e.type === 'jump');
+  R.jumps_ = R.events.filter((e) => e.type === 'jump' && !R.crashes_.some((c) => c.t >= e.t && c.t <= e.t + e.air));   // a crash mid-air is not a jump
   R.crashLaps = new Set(R.crashes_.map((e) => e.lap - 1));
   return R;
 }

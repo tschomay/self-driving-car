@@ -478,6 +478,7 @@ Race over 5 noisy passes of the 150 selection runs (`python -m sdc.phase47.where
 | Teacher | 672/750 | 10.4% | 28.41 s | 582.8 s |
 | RL racer (privileged) | 531/750 | 29.2% | 24.96 s | 540.1 s |
 | Sensor cars (E5 recipe) | 335/750 | 55.3% | 25.48 s | 587.1 s |
+| E7 (RL on the sensor car, below) | 362/750 | 51.7% | 24.56 s | **563.6 s** |
 
 The sensor cars lose to the teacher by 4.3 s. They lap only 0.5 s slower than the racer but crash almost twice as often (55% against 29%). On the old car the gap was 39–48% against 11–17%.
 
@@ -485,4 +486,7 @@ The sensor cars lose to the teacher by 4.3 s. They lap only 0.5 s slower than th
 
 Same setup as E7 above: actor `runs/p48-e5-s0`, critic from the chosen racer, 9 h.
 
-- **Result:** _running_
+- 2-pass race estimates: 600 s at start, 601 at 3M, 588 at 6M, 591 at 9M, 579 at 12M, 571 at 15M, 568 at 18M, 561 at 21.1M (chosen; `runs/p48-e7`).
+- **Result:** over 5 noisy passes, 362/750 finished (crash rate 51.7%), median lap 24.56 s, **race 563.6 s**: 19.2 s ahead of the teacher (582.8 s) and 23.5 s ahead of the E5-recipe cars (587.1 s). **A sensors-only car beats the teacher.**
+- It wins on pace: it laps 3.85 s faster than the teacher and as fast as the RL racer (24.96 s), but still crashes on half its laps (teacher 10%, racer 29%).
+- Weights on the `car-weights` branch: `runs/p48-e7` (and `runs/p48-e5-s0/s1`). Run with `SDC_REAL=truggy2`.

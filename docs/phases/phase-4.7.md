@@ -518,7 +518,15 @@ What the code says about grip:
 - **Setup:** two E7 runs from `runs/p48-e5-s0`, 12 h, 2 workers each, new chassis. `runs/p48-e7b`: `grip_coef=1.0`, a head on the actor's memory predicts the episode's true grip and its squared error joins the loss. `runs/p48-e7c`: control, the same head trained on a detached memory (a probe: does the memory already know grip?).
 - **Prediction (owner):** "Intuitively, grip sensing is important and will help a lot. If E7b doesn't win over the control, I think it means we are still missing something. So I hope it does win, but I feel like we've tried similar enough things in the past that I'm not convinced it'll help."
 - **Teacher on the new chassis** (5 passes): 671/750 finished, median lap 27.50 s, **race 564.7 s** (was 582.8 s on the old chassis): the new bar.
-- **Result:** _running_
+- **Result at 3M steps (2 noisy passes):**
+
+| Run | Finished /150 | Lap | Race estimate | Grip error (MSE) |
+|---|---|---|---|---|
+| Both at step 0 | 59.5 / 56.5 | 24.22 / 24.54 s | ~569 s | — |
+| E7b (grip head trained) | 34.0 | 24.95 s | ~608 s | 0.040 |
+| E7c (control, probe only) | 53.0 | 24.30 s | ~577 s | 0.147 (still falling) |
+
+  Guessing the average grip every time gives an MSE of 0.041 (the variance of grip drawn evenly from 0.55–1.25). E7b reached 0.040, so its memory learned no grip at all; only the head's bias moved. Making the memory carry that target cost driving: finishes fell from 59.5 to 34. E7b was stopped at 3M to give E7c the CPU. E7c's probe is still above the average-guess level, so it shows no grip in the memory either.
 
 ### Owner on racing lines (2026-11-28)
 

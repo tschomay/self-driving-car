@@ -1,5 +1,6 @@
 // Parity with the training sim: the same scripted commands on the same loop, compared with a trajectory recorded
-// from sdc.jumps.env (real="truggy", nominal physics, no command delay). Usage: node test/parity.mjs <py_traj.json> [seed]
+// from sdc.jumps.env (the champion sim, nominal physics, no command delay) by tools/py_parity.py. Usage:
+//   python web/game/tools/py_parity.py > /tmp/py.json && node test/parity.mjs /tmp/py.json [seed]   (also tests/test_export.py)
 import fs from 'fs';
 import loadMujoco from '@mujoco/mujoco';
 import { LoopCourse, START_X } from '../src/loop.js';

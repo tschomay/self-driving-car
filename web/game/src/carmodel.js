@@ -13,25 +13,27 @@
 // Differences, none of which change how one car drives: several cars share one world (names get a c<i>_ prefix);
 // chassis boxes also collide with each other (collision bit 2); no cameras, rays, textures or lights.
 import { BOX, N, ZMAX } from './loop.js';
+import SIM from '../../shared/generated/sim.json' with { type: 'json' };   // python -m sdc.export: the sim's numbers
 
-export const TIMESTEP = 0.002;
-export const SUBSTEPS = 10;            // 50 Hz control
+// Every number below comes from the sim via web/shared/generated/sim.json (car.GEOM, car.motor, car.LSD, ...).
+const C = SIM.car;
+export const TIMESTEP = C.timestep;
+export const SUBSTEPS = C.substeps;    // 50 Hz control
 export const DT = TIMESTEP * SUBSTEPS;
-// car.GEOM["size8"]
-export const WHEEL_R = 0.0715;
-export const TAU_MAX = 1.25;           // N·m per wheel ("power" on size8)
-export const TOP_SPEED = 18.0;         // m/s no-load
-export const STEER_MAX = 0.4;          // rad
+export const WHEEL_R = C.wheel_r;
+export const TAU_MAX = C.tau_max;      // N·m per wheel
+export const TOP_SPEED = C.top_speed;  // m/s no-load
+export const STEER_MAX = C.steer_max;  // rad
 export const WHEELS = ['fl', 'fr', 'rl', 'rr'];
-export const CORNER = { fl: [0.19, 0.178], fr: [0.19, -0.178], rl: [-0.19, 0.178], rr: [-0.19, -0.178] };
-export const MOUNT_Z = 0.0085;
-export const TIRE_W = 0.03;
-export const SOFT_K = 296.0, SOFT_C = 26.0;
-export const CHASSIS_M = 2.9, BATTERY_M = 0.6, BATTERY_Z = 0.0;
-export const CORNER_M = 0.08, WHEEL_M = 0.2, AXLE_I = 6.5e-4;
-export const LSD = { centre: 0.03, front: 0.002, rear: 0.001 };
-export const WHEEL_ARMATURE = 1.5e-4;
-export const CHASSIS_HALF = [0.29, 0.10, 0.035];
+export const CORNER = { fl: [C.corner_x, C.corner_y], fr: [C.corner_x, -C.corner_y], rl: [-C.corner_x, C.corner_y], rr: [-C.corner_x, -C.corner_y] };
+export const MOUNT_Z = C.mount_z;
+export const TIRE_W = C.tire_w;
+export const SOFT_K = C.spring_k, SOFT_C = C.spring_c;
+export const CHASSIS_M = C.chassis_m, BATTERY_M = C.battery_m, BATTERY_Z = C.battery_z;
+export const CORNER_M = C.corner_m, WHEEL_M = C.wheel_m, AXLE_I = C.axle_i;
+export const LSD = C.lsd;
+export const WHEEL_ARMATURE = C.wheel_armature;
+export const CHASSIS_HALF = C.box;
 
 function carXml(i) {
   const p = `c${i}_`;

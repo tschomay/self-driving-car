@@ -87,7 +87,14 @@ Keeping them in sync:
 - **Drive a stored car in its own sim:** use `metrics.json["env46"]`, not `SDC_REAL`.
 - **Car geometry reaches the viewer through the recordings** (`record.py` writes it). After changing the car's
   size or suspension in `sdc/jumps/car.py`, re-record before republishing the replay.
-- **The game ports the sim by hand for now** (`web/game/src/carmodel.js`, `sim.js`, `driver.js`; see
-  `web/game/docs/physics.md`). A PR that changes `sdc/jumps/` physics or the teacher updates the game in the same PR,
-  or says in its description that the game is behind. Loops: `python web/game/tools/export_loops.py`.
+- **The game takes its numbers from the sim.** `python -m sdc.export` writes `web/shared/generated/sim.json`: the
+  champion car's physics (size, springs, motor, diffs, grip model), actuator settings, physics ranges, teacher and race
+  rules. The game reads every number from it. A PR that changes any of those in `sdc/` reruns the export in the same PR;
+  `tests/test_export.py` fails while the file is stale, and checks that the game's MuJoCo drives like the sim for the
+  first second (it needs `npm install` in `web/`, else it is skipped).
+- **Structure is still ported by hand:** a new physics switch, joint, tendon or actuator model in `sdc/jumps/` also needs
+  `web/game/src/carmodel.js` or `sim.js` changed (see `web/game/docs/physics.md`), or the PR says the game is behind.
+- **Loops:** after changing `sdc/jumps/loop.py`, rerun `python web/game/tools/export_loops.py --out web/game/loops`
+  (from `web/game`: `--out loops`) and `node test/loops.mjs`.
+- **A new champion in `models/`** (or a new sim for it) changes the export: rerun `python -m sdc.export`.
 - **One renderer:** visual changes go in `web/shared/`, never in a copy inside an app.

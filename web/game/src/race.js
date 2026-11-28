@@ -7,6 +7,7 @@ import { World, TRAIN_RANGE } from './sim.js';
 import { LoopExpert, TRUGGY, MIDDLE, RACER } from './driver.js';
 import { DRIVE_W, START_X } from './loop.js';
 import * as cm from './carmodel.js';
+import SIM from '../../shared/generated/sim.json' with { type: 'json' };   // python -m sdc.export: the sim's numbers
 
 export const GRIPS = [
   { name: 'Hard-pack', grip: 1.0, note: 'the sim’s nominal grip' },
@@ -18,7 +19,7 @@ export const RIVALS = [
   { name: 'Teacher+', preset: MIDDLE, offset: -0.4, what: 'the teacher with corners at 3.0 m/s²' },
   { name: 'Teacher', preset: TRUGGY, offset: 0.2, what: 'the re-tuned teacher the sensor cars copy (teacher.TRUGGY)' },
 ];
-const SPUN_DEG = 120, SPUN_S = 0.5, RUNUP_M = 9.0, PAUSE_S = 1.0;
+const SPUN_DEG = SIM.race.spun_deg, SPUN_S = SIM.race.spun_s, RUNUP_M = SIM.race.runup_m, PAUSE_S = 1.0;
 
 function rng32(seed) {
   let a = (seed >>> 0) || 1;

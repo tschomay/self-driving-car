@@ -60,6 +60,12 @@ TRUGGY_SWITCHES = ("esc", "lsd", "power", "heavy", "elliptic", "slide")
 #               wheels) and 10k-oil centre-diff damping 0.04 (docs/research/truggy-diffs.md). Opt-in, not in truggy2.
 # "truggy2" = "truggy" plus these four.
 AIR_SWITCHES = ("wheels", "groundroll", "size8", "skid")
+# A worn track (docs/phases/surface-plan.md, sdc/jumps/surface.py; owner, 2026-11-28):
+#   groove   per-tyre grip from the loop's grip map: a groove along a racing line, loose dirt off it, marbles
+#            outside corner exits; how strong depends on the loop's track state (loam .. blue groove)
+#   bbumps   braking bumps, corner-exit acceleration bumps and touchdown dishes after landings, on the race line
+# "truggy3" = "truggy2" plus "rotor" and these two.
+SURFACE_SWITCHES = ("groove", "bbumps")
 
 
 def switches(real):
@@ -69,8 +75,10 @@ def switches(real):
         return frozenset(PHYS_SWITCHES + TRUGGY_SWITCHES)
     if real in ("truggy2", ("truggy2",), ["truggy2"]):
         return frozenset(PHYS_SWITCHES + TRUGGY_SWITCHES + AIR_SWITCHES)
+    if real in ("truggy3", ("truggy3",), ["truggy3"]):
+        return frozenset(PHYS_SWITCHES + TRUGGY_SWITCHES + AIR_SWITCHES + ("rotor",) + SURFACE_SWITCHES)
     real = frozenset([real] if isinstance(real, str) else (real or ()))
-    bad = real - set(PHYS_SWITCHES + TRUGGY_SWITCHES + AIR_SWITCHES + ("rotor",))
+    bad = real - set(PHYS_SWITCHES + TRUGGY_SWITCHES + AIR_SWITCHES + ("rotor",) + SURFACE_SWITCHES)
     assert not bad, f"unknown physics switches {bad}"
     return real
 

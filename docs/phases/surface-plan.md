@@ -87,3 +87,17 @@ Adopted:
 - **Implementation:** heights computed at the grid nodes, not splatted (splatting errs by up to 9 mm), and the landing-snag check rerun on the new surface.
 
 Deferred (scope): ruts and lips on the kicker face, a weak inside line, and the groove coming in or the track drying over a race.
+
+## Built (2026-11-28)
+
+`sdc/jumps/surface.py`, switches `groove` and `bbumps`, preset `truggy3` = `truggy2` + `rotor` + `groove` + `bbumps`. `truggy2` is unchanged.
+
+- **Race line:** minimises bending energy (Σκ²ds, L-BFGS on the true curvature) within ±1.0 m, apex 0.75 m later, plus a wander of 0.15 m RMS on a 25 m wavelength. A 10 m wavelength made the straights curvy.
+  - On three loops the line uses the full width (±1.1 m with the wander) and sits 0.7 m to the inside in corners.
+  - Built in 2–5 s per loop and cached per loop.
+- **Speed profile** for placing the bumps: 7 m/s² cornering, 6 m/s² braking, 4 m/s² drive, 12 m/s top speed. It brakes over about 20–25% of a lap.
+- **Grip map:** rasterised on the hfield grid and looked up under each wheel every physics step, multiplied into the `slide` friction write. Marbles follow the centreline's curvature, not the line's, which has small kinks.
+  - On loop 100187 (track state 0.45), the teacher's tyres saw 0.55–1.08 × the run's grip (the low end includes `slide`), with a median of 0.92: the centre line is mostly off the groove.
+- **Bumps** are computed at the grid nodes from an exact local projection. On loop 10001 (track state 0.57) they are about 1.3 cm peak-to-peak, with touchdown dishes after landings.
+- **Picture:** loop 10001's grip map and bumps, in [surface-10001.png](surface-10001.png).
+- **Smoke test:** the teacher finishes loop 100187 from all 3 starts on `truggy3` (23.3–23.7 s, against 23.3–23.6 s on `truggy2`).

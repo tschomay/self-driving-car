@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CHAMPION = ROOT / "models" / "e7"
+CHAMPION = ROOT / "models" / "e7c"
 OUT = ROOT / "web" / "shared" / "generated" / "sim.json"
 
 

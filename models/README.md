@@ -10,6 +10,8 @@ scored in; tools that drive the car use it rather than `SDC_REAL`. `metrics.json
 
 | Car | What | Sim | Race (20 laps, 7 s per crash) |
 |---|---|---|---|
-| `e7` | Phase 4.7 E7: sensors-only student of the privileged RL racer, then RL on its own | full-size truggy (`truggy2`) | 563.6 s estimated (teacher 582.8 s) |
+| `e7c` | Phase 4.7 E7c: sensors-only student of the privileged RL racer, then RL on its own; the first sensor car to beat the teacher | full-size truggy (`truggy2`, skid chassis) | 542.8 s estimated (teacher 564.7 s) |
 
-Use: `Ensemble(("models/e7",))` (`sdc.phase46.ensemble`), or `python -m sdc.race.record --car models/e7`.
+Previous champions stay on the `car-weights` branch (E7: `runs/p48-e7`, the old chassis).
+
+Use: `Ensemble(("models/e7c",))` (`sdc.phase46.ensemble`), or `python -m sdc.race.record --car models/e7c`.

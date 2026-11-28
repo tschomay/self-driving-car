@@ -59,10 +59,11 @@
  },
  "wall_s": 7104.2,
  "champion": {
-  "phase": "4.7 E7",
-  "source": "runs/p48-e7 on branch car-weights (commit d6a576d)",
-  "sim": "SDC_REAL=truggy2 (full-size 1/8 truggy)",
-  "race_s": 563.6,
-  "race_note": "20-lap race estimate, 5 noisy passes of the 150 selection runs (sdc.phase47.where p48), grip drawn per run"
+  "phase": "4.7 E7c",
+  "source": "runs/p48-e7c on branch car-weights (commit f0e8ad0), 15M checkpoint",
+  "sim": "SDC_REAL=truggy2 (full-size 1/8 truggy, skid chassis)",
+  "race_s": 542.8,
+  "teacher_race_s": 564.7,
+  "race_note": "20-lap race estimate, 5 noisy passes of the 150 selection runs (sdc.phase47.where p48), grip drawn per run. First sensor car to beat the teacher."
  }
 }

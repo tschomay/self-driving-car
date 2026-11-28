@@ -17,6 +17,7 @@ const CARS = {
   teacher: { label: 'Teacher', short: 'Teacher', what: 'the rule-based driver the sensor cars learn from. It reads the sim\'s true state (its place on the track, speed, attitude), which a real car can\'t.' },
   base: { label: 'Base sensor car', short: 'Base', what: 'Phase 4.6\'s sensor-only students (two GRU networks, averaged), driving from the car\'s own sensors.' },
   e4: { label: 'E4 sensor car', short: 'E4', what: 'Phase 4.7 E4\'s sensor-only students (two GRU networks, averaged), copying the re-tuned teacher.' },
+  e7c: { label: 'E7c sensor car', short: 'E7c', what: 'the champion: a sensors-only student of the privileged RL racer, trained further with RL on its own (Phase 4.7 E7c), on the full-size truggy with the skid chassis. The first sensor car to beat the teacher.' },
   e7: { label: 'E7 sensor car', short: 'E7', what: 'the final car: a sensors-only student of the privileged RL racer, then trained further with RL on its own (Phase 4.7 E7), on the full-size truggy.' },
   e5: { label: 'E5 sensor car', short: 'E5', what: 'Phase 4.7 E5\'s sensor-only students (two GRU networks, averaged), copying the privileged RL racer.' },
 };

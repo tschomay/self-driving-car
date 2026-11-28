@@ -14,6 +14,11 @@ copying, not in what the teacher can see. E7 trains the copy itself on its own d
           memory it actually had (as sdc/phase4/train_rnn.py).
   env     the student's: truggy physics, sensors, steering expo 0.4, training-range physics, E2's train loops.
   score   every eval_every steps: the 150 selection runs, gate range, tiny action noise, 2 passes.
+  grip    grip_coef > 0 (owner, 2026-11-28, option B: "let's try B"): a small head reads the actor's memory and
+          predicts the episode's true grip (the critic's friction input); grip_coef x its squared error joins the
+          loss, so the memory learns to track grip from what the sensors feel. The car drives from the same memory;
+          the head itself is used only in training (saved in resume.pt, not in the checkpoints). With grip_coef 0 the
+          head is trained on a detached memory: a probe of how much grip the memory already knows (logged grip_mse).
 """
 
 from __future__ import annotations
@@ -41,8 +46,9 @@ from sdc.phase47.train_residual import env_kw
 
 CFG = dict(workers=4, cars=32, n_steps=256, n_seq_batch=64, n_epochs=4, lr=3e-5, critic_lr=1e-4, gamma=0.995,
            lam=0.95, clip=0.2, max_grad_norm=0.5, std=0.15, critic_warmup=1_000_000, eval_every=3_000_000,
-           crash_pen=200.0, finish_bonus=50.0, actor="runs/p47-e5-s0", critic="runs/p47-racer-s1/ckpt/3014656.pt")
+           crash_pen=200.0, finish_bonus=50.0, grip_coef=0.0, actor="runs/p47-e5-s0", critic="runs/p47-racer-s1/ckpt/3014656.pt")
 CRASH_PEN, FINISH_BONUS = 200.0, 50.0
+GRIP_I = -3                                          # rc.priv_obs ends with friction, mass, motor
 
 
 def _t(x):
@@ -151,7 +157,9 @@ def train(out, seed=7, hours=9.0, **over):
     critic.load_state_dict(rnet.critic.state_dict())
     with torch.no_grad():
         net.log_std.fill_(float(np.log(cfg["std"])))
+    grip = nn.Linear(net.H, 1)                       # memory -> the episode's grip (friction), training only
     a_params = list(net.cells[0].parameters()) + list(net.actor.parameters()) + [net.log_std]
+    a_params += list(grip.parameters())
     opt = torch.optim.Adam([dict(params=a_params, lr=cfg["lr"]),
                             dict(params=critic.parameters(), lr=cfg["critic_lr"])], eps=1e-5)
     log = dict(cfg=cfg, seed=seed, obs_dim=obs_dim, evals=[], updates=[])
@@ -160,13 +168,15 @@ def train(out, seed=7, hours=9.0, **over):
         r = torch.load(out / "resume.pt", weights_only=False)
         net.load_state_dict(r["net"])
         critic.load_state_dict(r["critic"])
+        if "grip" in r:
+            grip.load_state_dict(r["grip"])
         opt.load_state_dict(r["opt"])
         log, steps, next_eval = r["log"], r["steps"], r["next_eval"]
         t0 -= r["wall"]
         print("resumed", steps, flush=True)
 
     def save():
-        torch.save(dict(net=net.state_dict(), critic=critic.state_dict(), opt=opt.state_dict(), log=log, steps=steps,
+        torch.save(dict(net=net.state_dict(), critic=critic.state_dict(), grip=grip.state_dict(), opt=opt.state_dict(), log=log, steps=steps,
                         next_eval=next_eval, wall=time.perf_counter() - t0), out / "resume.pt")
         (out / "log.json").write_text(json.dumps(log, default=float))
 
@@ -216,6 +226,7 @@ def train(out, seed=7, hours=9.0, **over):
         Hs = torch.stack(buf["h"])                                                         # (T, n_mem, B, H)
         warm = steps <= cfg["critic_warmup"]
         seqs = [(c, i) for c in range(T // L) for i in range(B)]
+        grip_mse = []
         for _ in range(cfg["n_epochs"]):
             perm = np.random.permutation(len(seqs))
             for s in range(0, len(seqs), cfg["n_seq_batch"]):
@@ -227,16 +238,21 @@ def train(out, seed=7, hours=9.0, **over):
                 loss = 0.5 * owner.value_loss(critic(P[tt, i2]).squeeze(-1), ret[tt, i2])           # owner
                 if not warm:
                     hh = Hs[cs * L, :, ii].transpose(0, 1)
-                    logps = []
+                    logps, g_err = [], []
                     for t in range(L):
                         tk = cs * L + t
                         mu, hh = actor_step(net, O[tk, ii], hh, ST[tk, ii])
                         d = torch.distributions.Normal(mu, net.log_std.exp())
                         logps.append(d.log_prob(A[tk, ii]).sum(-1))
+                        g_in = hh[0] if cfg["grip_coef"] > 0 else hh[0].detach()   # 0: a probe of what the memory knows
+                        g_err.append(grip(g_in).squeeze(-1) - P[tk, ii, GRIP_I])
+                    g_mse = torch.stack(g_err).pow(2).mean()
+                    grip_mse.append(float(g_mse))
                     a = adv[tt, i2]
                     a = (a - a.mean()) / (a.std() + 1e-8)
                     loss = loss + owner.policy_loss(torch.stack(logps, 1).reshape(-1), LP[tt, i2], a,
                                                     cfg["clip"])                                    # owner
+                    loss = loss + (cfg["grip_coef"] or 1.0) * g_mse   # with grip_coef 0 only the probe learns
                 opt.zero_grad()
                 loss.backward()
                 nn.utils.clip_grad_norm_(a_params + list(critic.parameters()), cfg["max_grad_norm"])
@@ -247,7 +263,8 @@ def train(out, seed=7, hours=9.0, **over):
         log["updates"].append(dict(steps=steps, wall_s=round(time.perf_counter() - t0), warm=warm,
                                    finished=round(float(np.mean([e["finished"] for e in recent])), 3) if recent else None,
                                    lap_s=round(float(np.median([e["l"] for e in recent if e["finished"]] or [0])) * 0.02, 2),
-                                   std=round(float(net.log_std.exp().mean()), 3)))
+                                   std=round(float(net.log_std.exp().mean()), 3),
+                                   grip_mse=round(float(np.mean(grip_mse)), 4) if grip_mse else None))
         ep_hist = ep_hist[-400:]
         if len(log["updates"]) % 5 == 0:
             print("update", log["updates"][-1], flush=True)

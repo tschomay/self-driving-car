@@ -52,8 +52,12 @@ TRUGGY_SWITCHES = ("esc", "lsd", "power", "heavy", "elliptic", "slide")
 #   groundroll  "rolled over" ends a run only on the ground (a flip in the air can still land)
 #   size8       the full-size 1/8 truggy (owner, 2026-11-26): 380 mm wheelbase, 143 mm tyres, 4.0 kg, 34 mm ride
 #               height (car.GEOM, docs/phases/truggy-size.md)
-# "truggy2" = "truggy" plus these three.
-AIR_SWITCHES = ("wheels", "groundroll", "size8")
+#   skid        the chassis touches the ground through three rounded skids (capsules along the box) with plastic-on-dirt
+#               friction 0.4, not the box itself with tyre grip 1.0. The box caught the heightfield's prism walls and
+#               stopped the car dead from 7 m/s in 40 ms (owner, 2026-11-28: "any ground contact from the chassis
+#               give an immediate stop... momentum means it will slide").
+# "truggy2" = "truggy" plus these four.
+AIR_SWITCHES = ("wheels", "groundroll", "size8", "skid")
 
 
 def switches(real):

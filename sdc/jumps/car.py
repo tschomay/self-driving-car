@@ -72,11 +72,12 @@ def _site_zaxis(direction):
 #   tires: wide tires (a 3 cm tread with rounded shoulders: a capsule along the axle) instead of spheres
 #   susp:  soft suspension (about 30% sag, about critically damped) and a higher centre of mass (battery on top)
 #   drive: one motor through open differentials (equal torque to the wheels; back-EMF on the mean wheel speed)
-MODEL_SWITCHES = ("tires", "susp", "drive", "esc", "lsd", "power", "heavy", "elliptic", "wheels", "size8")
+MODEL_SWITCHES = ("tires", "susp", "drive", "esc", "lsd", "power", "heavy", "elliptic", "wheels", "size8", "skid")
 TIRE_W = 0.03         # m, flat part of the tread (capsule segment)
 SOFT_K = 185.0          # N/m per corner: 4.4 N static load per corner / 2.4 cm sag (30% of 8 cm travel)
 SOFT_C = 18.0           # N·s/m per corner: about critically damped with the 0.45 kg corner load. At 0.4 the springs
                         # rebounded off the kicker lips (a pogo kick) and the expert landed 51%.
+SKID_MU = 0.4           # "skid": plastic chassis and body sliding on dirt (scaled with the episode's grip)
 BATTERY_M, BATTERY_Z = 0.4, 0.05   # moved from the chassis box to a pack on top (centre of mass about 1 cm higher)
 
 
@@ -192,6 +193,14 @@ def model_xml(real=(), terrain=None) -> str:
                                                    f'pos="0 0 {bz}" size="0.07 0.035 0.015" mass="{bm}" rgba=".2 .2 .2 1"/>')
     else:
         chassis_m, battery = g["chassis_m"], ""
+    hx, hy, hz = g["box"]
+    chassis_ct, skids = "1", ""
+    if "skid" in real:   # the box collides through rounded skids: a box on the heightfield caught prism walls
+        chassis_ct = "0"
+        skids = "".join(f'\n      <geom name="chassis_skid{i}" type="capsule" group="3" contype="1" conaffinity="0" '
+                        f'fromto="{-(hx - hz):.4f} {y:.4f} 0 {hx - hz:.4f} {y:.4f} 0" size="{hz}" mass="0.001" '
+                        f'friction="{SKID_MU} 0.005 0.0001" priority="2"/>'
+                        for i, y in enumerate((-(hy - hz), 0.0, hy - hz)))
     return f'''<mujoco model="rc-buggy">
   <compiler angle="radian"/>
   <option timestep="{TIMESTEP}" integrator="implicitfast"{' cone="elliptic"' if "elliptic" in real else ""}/>
@@ -210,7 +219,7 @@ def model_xml(real=(), terrain=None) -> str:
     <body name="car" pos="{crs.START_X} 0 0.25">
       <freejoint name="root"/>
       <camera name="chase" mode="trackcom" pos="-1.6 -1.6 0.9" xyaxes="0.707 -0.707 0 0.25 0.25 0.935" fovy="50"/>
-      <geom name="chassis" type="box" group="1" contype="1" conaffinity="0" size="{g['box'][0]} {g['box'][1]} {g['box'][2]}" mass="{chassis_m}" rgba=".12 .44 .92 1"/>{battery}
+      <geom name="chassis" type="box" group="1" contype="{chassis_ct}" conaffinity="0" size="{g['box'][0]} {g['box'][1]} {g['box'][2]}" mass="{chassis_m}" rgba=".12 .44 .92 1"/>{battery}{skids}
       <site name="imu" pos="0 0 0" size=".01"/>
       {"".join(rays)}
       {"".join(corners)}

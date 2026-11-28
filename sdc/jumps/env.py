@@ -144,7 +144,8 @@ class JumpCar:
         self._wheel_bodies = np.array([self.m.body(f"{w}_wheel").id for w in cr.WHEELS])
         if "slide" in self.real:   # the tire's own (changing) friction decides the contact, not the max with ground
             self.m.geom_priority[self.tires] = 1
-        self.chassis = g("chassis").id
+        self.chassis = np.array([i for i in range(self.m.ngeom) if (self.m.geom(i).name or "").startswith("chassis")
+                                 and self.m.geom_contype[i]])   # the box, or its skids ("skid")
         self.spin_dof = np.array([self.m.jnt_dofadr[self.m.joint(f"{w}_spin").id] for w in cr.WHEELS])
         s = {self.m.sensor(i).name: (self.m.sensor_adr[i], self.m.sensor_dim[i]) for i in range(self.m.nsensor)}
         self.s_accel, self.s_gyro = s["accel"][0], s["gyro"][0]
@@ -176,7 +177,7 @@ class JumpCar:
         m.geom_friction[:] = b["geom_friction"]
         # MuJoCo uses the larger of the two geoms' friction, so scale the ground too (review, 2026-11-14:
         # scaling only the tires could raise grip but never lower it)
-        sel = np.append(self.tires, self.ground)
+        sel = np.concatenate([self.tires, [self.ground], self.chassis if "skid" in self.real else []]).astype(int)
         m.geom_friction[sel, 0] = b["geom_friction"][sel, 0] * p.friction
         m.jnt_stiffness[:] = b["jnt_stiffness"]
         m.jnt_stiffness[self.susp_j] = b["jnt_stiffness"][self.susp_j] * p.spring
@@ -269,13 +270,13 @@ class JumpCar:
         c = self.d.contact
         n = self.d.ncon
         g1, g2 = c.geom1[:n], c.geom2[:n]
-        body = bool(np.any(((g1 == self.chassis) & (g2 == self.ground)) | ((g2 == self.chassis) & (g1 == self.ground))))
+        body = bool(np.any((np.isin(g1, self.chassis) & (g2 == self.ground)) | (np.isin(g2, self.chassis) & (g1 == self.ground))))
         return wheels, body
 
     def _chassis_contact(self):
         n = self.d.ncon
         g1, g2 = self.d.contact.geom1[:n], self.d.contact.geom2[:n]
-        return bool(np.any(((g1 == self.chassis) & (g2 == self.ground)) | ((g2 == self.chassis) & (g1 == self.ground))))
+        return bool(np.any((np.isin(g1, self.chassis) & (g2 == self.ground)) | (np.isin(g2, self.chassis) & (g1 == self.ground))))
 
     def state(self):
         """Oracle state (experts, scoring, rendering; never in the policy's obs)."""

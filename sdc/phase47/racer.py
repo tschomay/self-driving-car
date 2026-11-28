@@ -53,7 +53,7 @@ PREVIEW = None      # E6a: metres of track ahead the driver sees (None: all 30 m
 MARGIN = 0.0        # per-step cost for running near the lane edge (|y| > 1.0 m of the 1.5 m half-width)
 # E4's re-tuned teacher with 3.5 m/s^2 corners (headroom.py: 2.6 s a lap faster for about the same finishes)
 TEACHER = dict(TRUGGY, jump_v={"double": 7.4}, a_lat=3.5, a_brake=3.5)
-if __import__("sdc.phase47.train_residual", fromlist=["REAL"]).REAL == "truggy2":   # full-size truggy: air_teacher.py
+if __import__("sdc.phase47.train_residual", fromlist=["REAL"]).REAL in ("truggy2", "truggy3"):   # full-size truggy: air_teacher.py
     TEACHER = dict(TEACHER, jump_v={"double": 7.8})
 CFG = dict(workers=4, cars=32, n_steps=256, batch_size=4096, n_epochs=5, lr=1e-4, gamma=0.995, lam=0.95, clip=0.2,
            vf_coef=0.5, max_grad_norm=0.5, std=0.15, hidden=(256, 256), bc_rounds=4, bc_steps=200_000,

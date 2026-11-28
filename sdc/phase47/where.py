@@ -54,6 +54,7 @@ E6_CAR = ("runs/p47-e6-s0", "runs/p47-e6-s1")       # E6: sensors-only students 
 P48_RACER = "runs/p48-racer/ckpt/best.pt"            # full-size truggy (SDC_REAL=truggy2): RL racer, best checkpoint
 P48_E5_CAR = ("runs/p48-e5-s0", "runs/p48-e5-s1")   # full-size truggy: sensors-only students copying it
 P48_E7_CAR = ("runs/p48-e7",)                        # full-size truggy: E7 (RL on the sensor student)
+P48_E7C_CAR = ("runs/p48-e7c",)                      # E7 rerun on the skid chassis (the grip-head control)
 
 
 def _driver(who):
@@ -76,8 +77,8 @@ def _driver(who):
     if who == "p48teacher":                           # the full-size truggy's teacher (racer.TEACHER under truggy2)
         from sdc.phase47.racer import TEACHER
         return LoopExpert(**TEACHER), {k: v for k, v in env.items() if k != "expo"}
-    if who in ("p48e5", "p48e7"):
-        return Ensemble(P48_E5_CAR if who == "p48e5" else P48_E7_CAR), env
+    if who in ("p48e5", "p48e7", "p48e7c"):
+        return Ensemble(dict(p48e5=P48_E5_CAR, p48e7=P48_E7_CAR, p48e7c=P48_E7C_CAR)[who]), env
     if who.startswith("e4cap"):                       # E4 students with forward throttle scaled to e4capNN percent
         return Capped(Ensemble(E4_CAR), int(who[5:]) / 100), env
     if who in ("teacher", "mapteacher", "teacher_plus"):
@@ -104,7 +105,7 @@ class Capped:
 
 
 WHO_ID = dict(base=0, teacher=1, map=2, mapteacher=3, map_full=4, teacher_plus=5, e4=6, e4cap95=7, e4cap90=8, racer=9, e5=10, e6=11,
-              p48teacher=12, p48racer=13, p48e5=14, p48e7=15)
+              p48teacher=12, p48racer=13, p48e5=14, p48e7=15, p48e7c=16)
 
 
 def _drive(who, rep, course):
@@ -368,12 +369,13 @@ def main():
             collect(("e6",), pk)
         analyse((OUT, pk), Path("runs/p47-e6-where.json"))
     elif cmd == "p48":                          # full-size truggy (SDC_REAL=truggy2): python -m ... p48 who [who ...]
-        assert env_kw(True)["real"] == "truggy2", "set SDC_REAL=truggy2"
+        assert env_kw(True)["real"] in ("truggy2", "truggy3"), "set SDC_REAL=truggy2 or truggy3"
+        tag = "" if env_kw(True)["real"] == "truggy2" else "-" + env_kw(True)["real"]   # truggy3: its own files
         for who in sys.argv[2:]:
-            pk = Path(f"runs/p48-where-{who}.pkl")
+            pk = Path(f"runs/p48{tag}-where-{who}.pkl")
             if not pk.exists():
                 collect((who,), pk)
-        race(sorted(Path("runs").glob("p48-where-*.pkl")), Path("runs/p48-race.json"))
+        race(sorted(Path("runs").glob(f"p48{tag}-where-*.pkl")), Path(f"runs/p48{tag}-race.json"))
     elif cmd == "e4cap":                        # after E4: does a lower speed limit trade the lap time back for finishes?
         pk = Path("runs/p47-e4cap-where.pkl")
         if not pk.exists():

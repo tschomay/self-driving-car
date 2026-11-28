@@ -46,6 +46,7 @@ from sdc.jumps import car as cr
 from sdc.jumps import course as crs
 from sdc.jumps import loop as lp
 from sdc.jumps import real as rl
+from sdc.jumps import surface as sf
 
 OBS_DIM = 20
 PARTS_DIM = 6 + 1 + 1 + 64 + 2 + 2   # sensors="parts": IMU, motor speed, TFmini, 8x8 ToF, side ToF x2, last action
@@ -200,7 +201,12 @@ class JumpCar:
             self.course = lp.make(course_seed, kinds=self.kinds if "double" in self.kinds else lp.KINDS, size=self.size)
         else:
             self.course = crs.make(course_seed, kinds=self.kinds, size=self.size)
-        self.m.hfield_data[:] = self.course.hfield().ravel()
+        self.surface = None
+        if self.loop and ("groove" in self.real or "bbumps" in self.real):   # a worn track (surface.py)
+            self.surface = sf.get(self.course)
+            self.m.hfield_data[:] = sf.terrain(self.course, self.real).ravel()
+        else:
+            self.m.hfield_data[:] = self.course.hfield().ravel()
         if not self.legacy:   # physics and sensor noise drawn from (course, start, phys_seed): batching-independent
             self.prng = np.random.default_rng([int(course_seed), int(round(x0 * 1000)) + 10_000, int(self.phys_seed)])
             self.phys = rl.draw(self.dr, self.prng)
@@ -493,7 +499,11 @@ class JumpCar:
             u = float(np.clip(u, -1.0, 1.0))
         if "slide" in self.real:   # traction review: grip drops once a tire's contact patch slides
             f = np.clip((self._slip_speeds() - SLIDE_S0) / (SLIDE_S1 - SLIDE_S0), 0.0, 1.0)
-            self.m.geom_friction[self.tires, 0] = self._mu0 * (1.0 - SLIDE_DROP * f)
+            mu = self._mu0 * (1.0 - SLIDE_DROP * f)
+            if "groove" in self.real and self.surface is not None:   # the grip map under each wheel
+                xy = self.d.xpos[self._wheel_bodies]
+                mu = mu * self.surface.grip_at(xy[:, 0], xy[:, 1])
+            self.m.geom_friction[self.tires, 0] = mu
         self.d.ctrl[:self.n_motor] = u
         self.d.ctrl[self.n_motor:self.n_motor + 2] = self.servo_set
 

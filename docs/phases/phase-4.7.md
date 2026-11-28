@@ -527,6 +527,7 @@ What the code says about grip:
 | E7c (control, probe only) | 53.0 | 24.30 s | ~577 s | 0.147 (still falling) |
 | E7c at 6M | 58.5 | 23.46 s | ~555 s | 0.052 |
 | E7c at 9M | 65.5 | 24.08 s | ~560 s | 0.034 (below the 0.041 average guess) |
+| E7c at 12M | 72.5 | 23.72 s | ~547 s | 0.025 |
 
 Owner, on how a driver senses grip: "I get grip info throughout. Moreso at the start and less later. But I know how the car should handle from previous driving and pretty quickly realize when it fits that and when it doesn't."
 
@@ -556,6 +557,27 @@ Both tests read grip up to about 1.0, then saturate: the brake (capped at 0.65 o
 
   Guessing the average grip every time gives an MSE of 0.041 (the variance of grip drawn evenly from 0.55–1.25). E7b reached 0.040, so its memory learned no grip at all; only the head's bias moved. Making the memory carry that target cost driving: finishes fell from 59.5 to 34. E7b was stopped at 3M to give E7c the CPU. E7c's probe is still above the average-guess level, so it shows no grip in the memory either.
 
+**E7c, 5-pass score** (`where p48 p48e7c`, the 15M checkpoint, picked by its 2-pass race estimate of 533 s; 750 runs):
+
+| Driver | Finished /750 | Crash rate | Median lap | Race time |
+|---|---|---|---|---|
+| Teacher | 671 | 10.5% | 27.50 s | 564.7 s |
+| **E7c** | 390 | 48.0% | 23.78 s | **542.8 s** |
+
+E7c beats the teacher: the first sensor car to do it on `truggy2`. It is 3.7 s a lap faster and crashes about half the time.
+
+By grip (run friction; low ≤ 0.78, high > 1.02):
+
+| Grip | Runs | Teacher crash / race | E7c crash / race |
+|---|---|---|---|
+| Low | 245 | 19% / 577.1 s | 74% / 587.7 s |
+| Mid | 320 | 8% / 561.3 s | 39% / 532.6 s |
+| High | 185 | 4% / 553.1 s | 30% / 507.2 s |
+
+It wins on mid and high grip and loses on low grip, where it crashes three times in four: it doesn't slow down enough when grip is low.
+
+**Worn-track bar** (`truggy3`, teacher, 5 passes): 607/750 finished, 19.1% crashes, 27.64 s lap, **579.5 s**, against 564.7 s on `truggy2`. The worn track costs the teacher mostly in crashes (low grip 31%, mid 16%, high 8%).
+
 ### Owner on racing lines (2026-11-28)
 
 "Watching the replay I see two behaviors that mean I could race better than this car. First, it seems to aim for the center line. Sometimes it makes big corrections to get there. I think that's what the teacher does and it makes sense because it maximizes buffer of track space. But a human driver would aim for more of a racing line - enter corners wide, turn early, hit the apex, etc. Rarely do I actually aim for the the center line. I almost always want to be near an edge. Perhaps related, I see the car turning late instead of early. Like it's well into the corner and goes oh crap I'd better turn! My hope was that the teacher would teach it to get around the track and use its controls. And then RL would get it finding these tricks for how to really race. I don't think we've gotten there. Although I did say that it finally looks more like racing. I think that's because there are corners where I see it slide and counter steer. And it appears to be attacking the track a little more."
@@ -575,3 +597,19 @@ Owner, on how far ahead they look: "I think I setup for the next corner immediat
 Owner, on surfaces (2026-11-28): "On a real track, grip is mostly uniform apart from two things - areas that are bumpy and areas where cars have either made the dirt smooth or loose. We added some bumps already, but maybe need more right surface through out to be realistic? And we don't model track wear. Any ideas to add that? Or is it too complex and we should just cheat with a little grip noise rate than a map"
 
 Ideas offered: a per-tyre grip field (groove +10% on the common line, loose −15% off it and outside corners; each tyre's grip is already set every step for `slide`), braking bumps before corners and after landings, track wear over laps (later). Owner, on where the groove comes from: "The RL racer's line, since it's actually faster and where cars will race. But the ideal racing line plus some noise would work, too."
+
+**Prediction (owner, before the surface change):** "Grooves will add bumps for both cars, but they should interfere more with the RL car. However, traction should help the RL car more. I think the net effect will benefit the RL car. And I think that's true to reality - the track can work against you if you get off line." Go-ahead given, with an independent realism review first. Plan: [surface-plan.md](surface-plan.md).
+
+### Owner: drills for car control, RL for racing (2026-11-28)
+
+"While that's running I have a wild idea that I'm curious about.  we've talked about changing the teacher to follow a good racing line but I'm wondering if we're thinking about that wrong and we should be leveraging the teacher to generally train the car how to drive but using reinforcement learning to train it how to race on a track.  maybe that means the teacher is doing certain skills and drills or something like that and the RL learner is applying that basic driving capability to the track. What do you think, is there a way to apply some scheme like that so the what fixed is teaching at the controls of the car but what's variable is teaching it how to apply those the situation it finds itself in. Is there a steam like that that might work and might even do better than having the teacher sit on the actual track?"
+
+Scheme offered: two layers. A lower layer learns car control on drills over a range of known grips, taking orders like target speed and turn rate. An upper layer learns to race the track with RL by giving those orders, plus small direct corrections so it can still ask for a slide. First test: the lower layer alone, driven by the pure-pursuit teacher's targets.
+
+Owner's drills: "given an open area, I would typically use a wishbone course to test out a new car. So there's some acceleration and braking in the straights, and then tight corners, short tight corners, and a little bit more of sustained corners along the wishbone. That gives a feel for all of the control. My alternate track is just 4 cones in a straight line, where you do a straightaway on one side of the cones, and then wrap the end, weave back through the next cone, and then past the next 2 before turning around again into the straightaway. Same thing, you get some longer corners and some tighter corners with a back and forth in there, and a straightaway as well. And you have plenty of space on the outside corners of the straightaway to feel the grip and cornering ability. The entrance to it, you're going slower and can feel kind of a slide while you're under throttle entering the straightaway. And the back end of the straight, you're braking and can feel cornering coming down from a high speed."
+
+Go-ahead: run it after the current queue, on whichever car and setup gives the best read for the cost. Chosen: `truggy2` (the drill pad is cheap; earlier setups lack the 4WD, skid and grip range; the bars are on `truggy2`).
+
+Owner's correction: "It's probably called a dog bone rather than a wishbone, but I think you understood anyway."
+
+**Prediction (owner, before the two-layer test):** "My prediction is that this is a better way to teach it, but our first attempt won't be so successful. I think we're going to need some tweaking because of the handoff between skills and racing. And so the RL learner might not pick up enough off the bat. This seems like we're asking a lot from it, and every time we've done that, we lose driving capability. So my prediction is the first pass will not work very well, but we'll get some ideas to make it better, and this will be the way forward."

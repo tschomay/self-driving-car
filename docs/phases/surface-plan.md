@@ -71,3 +71,19 @@ Already built (opt-in): the motor's rotor inertia plus 10k centre-diff damping (
 - Are the braking-bump wavelength and depth right for 1/8 scale cars at these speeds (5–12 m/s)?
 - Is a minimum-curvature line with wander a fair stand-in for where a groove forms?
 - Is there anything else that defines a real worn track and is missing here?
+
+## Revisions after the realism review ([review](../research/surface-plan-review.md))
+
+Adopted:
+- **Track state per loop**, drawn from loam to blue groove. It sets the groove gain (+3 to +15%), the off-line loss everywhere (−3 to −15%), marbles on corner exits (−10 to −30%) and bump size, which is larger on loam.
+- **Smooth grip everywhere.** Blends replace both the step at 1.0 m from the line and the corner-threshold switch. Folded into the existing `slide` friction write. Grip is rasterised on the hfield grid once per loop and sampled at the four tyres. The total range is clipped, and the low end is checked to be drivable.
+- **Groove shape:** apex later than the minimum-curvature line, and wider in corners.
+- **Bumps:**
+  - Amplitude is peak-to-peak, 0.8–2 cm.
+  - Wavelength scales with the race-line speed, 0.25–0.55 m.
+  - Placement follows the race-line speed profile: where it brakes hard, plus acceleration bumps on corner exits.
+  - Ridges are skewed up to ±15°.
+  - A touchdown dish replaces the ripples after landings.
+- **Implementation:** heights computed at the grid nodes, not splatted (splatting errs by up to 9 mm), and the landing-snag check rerun on the new surface.
+
+Deferred (scope): ruts and lips on the kicker face, a weak inside line, and the groove coming in or the track drying over a race.

@@ -527,6 +527,7 @@ What the code says about grip:
 | E7c (control, probe only) | 53.0 | 24.30 s | ~577 s | 0.147 (still falling) |
 | E7c at 6M | 58.5 | 23.46 s | ~555 s | 0.052 |
 | E7c at 9M | 65.5 | 24.08 s | ~560 s | 0.034 (below the 0.041 average guess) |
+| E7c at 12M | 72.5 | 23.72 s | ~547 s | 0.025 |
 
 Owner, on how a driver senses grip: "I get grip info throughout. Moreso at the start and less later. But I know how the car should handle from previous driving and pretty quickly realize when it fits that and when it doesn't."
 

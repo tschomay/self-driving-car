@@ -557,6 +557,27 @@ Both tests read grip up to about 1.0, then saturate: the brake (capped at 0.65 o
 
   Guessing the average grip every time gives an MSE of 0.041 (the variance of grip drawn evenly from 0.55–1.25). E7b reached 0.040, so its memory learned no grip at all; only the head's bias moved. Making the memory carry that target cost driving: finishes fell from 59.5 to 34. E7b was stopped at 3M to give E7c the CPU. E7c's probe is still above the average-guess level, so it shows no grip in the memory either.
 
+**E7c, 5-pass score** (`where p48 p48e7c`, the 15M checkpoint, picked by its 2-pass race estimate of 533 s; 750 runs):
+
+| Driver | Finished /750 | Crash rate | Median lap | Race time |
+|---|---|---|---|---|
+| Teacher | 671 | 10.5% | 27.50 s | 564.7 s |
+| **E7c** | 390 | 48.0% | 23.78 s | **542.8 s** |
+
+E7c beats the teacher: the first sensor car to do it on `truggy2`. It is 3.7 s a lap faster and crashes about half the time.
+
+By grip (run friction; low ≤ 0.78, high > 1.02):
+
+| Grip | Runs | Teacher crash / race | E7c crash / race |
+|---|---|---|---|
+| Low | 245 | 19% / 577.1 s | 74% / 587.7 s |
+| Mid | 320 | 8% / 561.3 s | 39% / 532.6 s |
+| High | 185 | 4% / 553.1 s | 30% / 507.2 s |
+
+It wins on mid and high grip and loses on low grip, where it crashes three times in four: it doesn't slow down enough when grip is low.
+
+**Worn-track bar** (`truggy3`, teacher, 5 passes): 607/750 finished, 19.1% crashes, 27.64 s lap, **579.5 s**, against 564.7 s on `truggy2`. The worn track costs the teacher mostly in crashes (low grip 31%, mid 16%, high 8%).
+
 ### Owner on racing lines (2026-11-28)
 
 "Watching the replay I see two behaviors that mean I could race better than this car. First, it seems to aim for the center line. Sometimes it makes big corrections to get there. I think that's what the teacher does and it makes sense because it maximizes buffer of track space. But a human driver would aim for more of a racing line - enter corners wide, turn early, hit the apex, etc. Rarely do I actually aim for the the center line. I almost always want to be near an edge. Perhaps related, I see the car turning late instead of early. Like it's well into the corner and goes oh crap I'd better turn! My hope was that the teacher would teach it to get around the track and use its controls. And then RL would get it finding these tricks for how to really race. I don't think we've gotten there. Although I did say that it finally looks more like racing. I think that's because there are corners where I see it slide and counter steer. And it appears to be attacking the track a little more."

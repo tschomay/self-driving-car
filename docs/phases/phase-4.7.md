@@ -489,4 +489,87 @@ Same setup as E7 above: actor `runs/p48-e5-s0`, critic from the chosen racer, 9 
 - 2-pass race estimates: 600 s at start, 601 at 3M, 588 at 6M, 591 at 9M, 579 at 12M, 571 at 15M, 568 at 18M, 561 at 21.1M (chosen; `runs/p48-e7`).
 - **Result:** over 5 noisy passes, 362/750 finished (crash rate 51.7%), median lap 24.56 s, **race 563.6 s**: 19.2 s ahead of the teacher (582.8 s) and 23.5 s ahead of the E5-recipe cars (587.1 s). **A sensors-only car beats the teacher.**
 - It wins on pace: it laps 3.85 s faster than the teacher and as fast as the RL racer (24.96 s), but still crashes on half its laps (teacher 10%, racer 29%).
+- **Caveat: grip.** Each run draws its own grip (gate range, friction 0.55–1.25), so the 563.6 s averages over grip. Split by grip third (same formula), E7 wins at mid and high grip but loses badly at low grip:
+
+  | Grip (friction) | Teacher | RL racer | E7 |
+  |---|---|---|---|
+  | 0.55–0.79 | 593 s (crash 18%) | 565 s (38%) | 620 s (80%) |
+  | 0.79–0.96 | 582 s (9%) | 531 s (30%) | 552 s (43%) |
+  | 0.96–1.25 | 574 s (4%) | 521 s (20%) | 525 s (32%) |
+
+  The replay session's full 20-lap races (one grip for the whole race) agree: at grip 0.58–0.70, E7 crashed 38–65 times per race, the teacher 0–14. The formula also counts at most one crash per lap; in full races E7 sometimes crashed 3 times in one lap.
 - Weights on the `car-weights` branch: `runs/p48-e7` (and `runs/p48-e5-s0/s1`). Run with `SDC_REAL=truggy2`.
+
+### Owner's answers after E7 (2026-11-28)
+
+- "it's being less safe because crashes don't cost much time. If it can crash on half the laps and still beat the teacher, maybe 7 seconds isn't long enough for the corner marshall."
+- "I'm up for trying the gate after we address the traction issue. We could tweak all day but it appears we finally succeeded in using RL to improve the driving."
+- "Probably win on average is sufficient, but we should think more about of there's a way to adapt to the conditions."
+- "is the car still estimating traction? Or does it just drive for some average condition. It might not be responding to grip because it doesn't sense it at all"
+
+What the code says about grip:
+- **Sensor car (E5, E7 actor):** no grip input. It gets the IMU, gyro, front and rear wheel speeds, rays and its last action. Grip could only be inferred from slip (wheel speed against what the IMU says the car is doing), through the GRU's memory. Nothing in training asks for that.
+- **RL racer and E7's critic:** see the true friction (`priv_obs` ends with friction, mass, motor). So the racer can drive faster on high grip and slower on low grip, and the student copies the result without the cause.
+- **Teacher:** doesn't know grip either (`teacher.py`: "A_LAT is one fixed number, not the car's true grip"). It survives low grip because its corner budget (3.5 m/s²) is cautious for every grip.
+
+### E7b — E7 with a grip head (option B), against a control (owner, 2026-11-28: "We already tried C and it didn't help. A seems similar, so let's try B.")
+
+- **Physics change first (owner: "any ground contact from the chassis give an immediate stop. That's not realistic - momentum means it will slide"):** the chassis box caught the heightfield's prism walls and had tyre grip (1.0), so a slam stopped the car from 7 m/s in 40 ms. New switch `skid` (in `truggy2`): the box collides through three rounded capsules with plastic-on-dirt friction 0.4 (scaled with the episode's grip). A 5 m/s slam now keeps about 3 m/s and slides on. All earlier full-size scores were on the old chassis (`runs/old-chassis/`).
+- **Setup:** two E7 runs from `runs/p48-e5-s0`, 12 h, 2 workers each, new chassis. `runs/p48-e7b`: `grip_coef=1.0`, a head on the actor's memory predicts the episode's true grip and its squared error joins the loss. `runs/p48-e7c`: control, the same head trained on a detached memory (a probe: does the memory already know grip?).
+- **Prediction (owner):** "Intuitively, grip sensing is important and will help a lot. If E7b doesn't win over the control, I think it means we are still missing something. So I hope it does win, but I feel like we've tried similar enough things in the past that I'm not convinced it'll help."
+- **Teacher on the new chassis** (5 passes): 671/750 finished, median lap 27.50 s, **race 564.7 s** (was 582.8 s on the old chassis): the new bar.
+- **Result at 3M steps (2 noisy passes):**
+
+| Run | Finished /150 | Lap | Race estimate | Grip error (MSE) |
+|---|---|---|---|---|
+| Both at step 0 | 59.5 / 56.5 | 24.22 / 24.54 s | ~569 s | — |
+| E7b (grip head trained) | 34.0 | 24.95 s | ~608 s | 0.040 |
+| E7c (control, probe only) | 53.0 | 24.30 s | ~577 s | 0.147 (still falling) |
+| E7c at 6M | 58.5 | 23.46 s | ~555 s | 0.052 |
+| E7c at 9M | 65.5 | 24.08 s | ~560 s | 0.034 (below the 0.041 average guess) |
+
+Owner, on how a driver senses grip: "I get grip info throughout. Moreso at the start and less later. But I know how the car should handle from previous driving and pretty quickly realize when it fits that and when it doesn't."
+
+Correction (owner caught it): the truggy is 4WD, not rear-drive. One motor drives all four wheels through limited-slip diffs (`car.py`: `drive`, `lsd`), so front and rear wheel speeds give almost no slip contrast.
+
+Owner, on testing grip: "I do kind of goose the throttle early. So I'll start with a slower lap but add some throttle kicks to see how it responds while still leaving room to recover. Later in the race I tune that understanding based on how it slides when driven at the limit and on feedback from going too hard and crashing."
+
+4WD check (`truggy2`, full throttle from rest, flat ground): the one `motor` actuator puts the same torque on all four wheels (0.91 N·m each at 0.1 s, 0.48 at 1.2 s). At 1.2 s the car does 5.9 m/s while the wheels turn at 8.1–8.8 m/s: full throttle spins all four. Simplification: the motor gives each wheel equal torque whatever the others do. In a real open diff a wheel in the air takes almost no torque and its partner loses drive too; here the grounded wheels keep theirs (closer to a heavily oiled diff, as racing truggies run).
+
+Correction after research ([truggy diffs](../research/truggy-diffs.md)): equal torque to every wheel, with motor speed = mean wheel speed, is exactly three ideal open diffs, so the claim above was wrong. In a real car a lifted wheel starves the others only through the motor: back-EMF (modelled) and rotor inertia (missing). Stock 1/8 truggy oils are about 10k front, 10k centre, 5k rear (Tekno 20k/20k/10k, Associated 10k/10k/5k). Estimated wheel-referred damping: axle diffs about 0.002 N·m·s/rad (nearly open; our 0.002/0.001 match), centre about 0.04 (ours 0.03), stiffer because it sits behind the 4.4:1 ring and pinion. New opt-in switch `rotor`: the motor's rotor as a body about the long axis, 14:1 to the mean wheel speed (1.5e-3 kg·m² at the wheels, replacing `heavy`'s per-wheel drivetrain armature), centre damping 0.04. Check: the ratio holds at 14.00; same acceleration (5.86 m/s at 1.2 s against 5.85); the wheels spin up more slowly off the line (4.4 against 5.6 m/s at 0.2 s). Not in `truggy2` yet, so running experiments stay comparable.
+
+Owner, on the test method: "I prefer the throttle test of you think it could work. Earlier we measured acceleration, but when I do this test the throttle is just meant to make the wheels slide but my feedback comes from how the car responds along with how easy it was to make them slide (because I have a reference for how hard it should be). Maybe that give us a method - drive the car on a few known surfaces (or roughly known) as part of training and build that expectation into memories. Or just simulate that from knowing torque and friction coefficients"
+
+Owner, on surfaces: "grip requires a grip map since it isn't uniform through the track. I'm not sure we ever fully settled that". In the Phase 4+ jump sim, grip is one number per run (`dr="gate"`: friction 0.55–1.25); Phase 3.5's dirt patches were not carried over.
+
+Straight-line tests on `truggy2` (flat, one run per grip). Brake: full brake from 7 m/s. Throttle: full throttle for 0.3 s from 3 m/s; wheelspin = wheel speed − car speed at the end.
+
+| Grip | Brake decel | Throttle accel | Wheelspin after kick |
+|---|---|---|---|
+| 0.55 | 4.3 m/s² | 4.0 m/s² | 3.9 m/s |
+| 0.75 | 6.0 | 6.1 | 1.2 |
+| 0.90 | 7.0 | 6.6 | 0.5 |
+| 1.05 | 7.1 | 6.8 | 0.2 |
+| 1.25 | 7.2 | 6.9 | 0.2 |
+
+Both tests read grip up to about 1.0, then saturate: the brake (capped at 0.65 of motor torque) and the motor can't break the tyres loose any more. Wheelspin is the clearest reading (20× from 0.55 to 0.9), the owner's "how easy it was to make them slide".
+
+  Guessing the average grip every time gives an MSE of 0.041 (the variance of grip drawn evenly from 0.55–1.25). E7b reached 0.040, so its memory learned no grip at all; only the head's bias moved. Making the memory carry that target cost driving: finishes fell from 59.5 to 34. E7b was stopped at 3M to give E7c the CPU. E7c's probe is still above the average-guess level, so it shows no grip in the memory either.
+
+### Owner on racing lines (2026-11-28)
+
+"Watching the replay I see two behaviors that mean I could race better than this car. First, it seems to aim for the center line. Sometimes it makes big corrections to get there. I think that's what the teacher does and it makes sense because it maximizes buffer of track space. But a human driver would aim for more of a racing line - enter corners wide, turn early, hit the apex, etc. Rarely do I actually aim for the the center line. I almost always want to be near an edge. Perhaps related, I see the car turning late instead of early. Like it's well into the corner and goes oh crap I'd better turn! My hope was that the teacher would teach it to get around the track and use its controls. And then RL would get it finding these tricks for how to really race. I don't think we've gotten there. Although I did say that it finally looks more like racing. I think that's because there are corners where I see it slide and counter steer. And it appears to be attacking the track a little more."
+
+Measured on the old-chassis traces (first 300 runs each; lane is 3 m wide; "inside" = offset toward the corner's centre where |curvature| > 0.1/m; steering lag = the shift that best lines steering up with the track's curvature at the car):
+
+| Driver | Mean distance from centre line | Inside offset in corners | Steering vs curvature |
+|---|---|---|---|
+| Teacher | 0.07 m | −0.03 m | 0.1 s early |
+| RL racer | 0.39 m | −0.02 m | on time |
+| E7 | 0.35 m | −0.09 m | 0.1 s late |
+
+The teacher holds the centre line. RL moves off it, but not into a racing line: no inside bias in corners (slightly outside). E7 turns 0.1 s after the curve starts.
+
+Owner, on how far ahead they look: "I think I setup for the next corner immediately after leaving the previous one. But sensors can't see well for a long distance. 6m might be all we can hope for"
+
+Owner, on surfaces (2026-11-28): "On a real track, grip is mostly uniform apart from two things - areas that are bumpy and areas where cars have either made the dirt smooth or loose. We added some bumps already, but maybe need more right surface through out to be realistic? And we don't model track wear. Any ideas to add that? Or is it too complex and we should just cheat with a little grip noise rate than a map"

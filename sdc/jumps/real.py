@@ -56,6 +56,8 @@ TRUGGY_SWITCHES = ("esc", "lsd", "power", "heavy", "elliptic", "slide")
 #               friction 0.4, not the box itself with tyre grip 1.0. The box caught the heightfield's prism walls and
 #               stopped the car dead from 7 m/s in 40 ms (owner, 2026-11-28: "any ground contact from the chassis
 #               give an immediate stop... momentum means it will slide").
+#   rotor       the motor's rotor as a body (about the long axis, 14:1 to the mean wheel speed, 1.5e-3 kg·m² at the
+#               wheels) and 10k-oil centre-diff damping 0.04 (docs/research/truggy-diffs.md). Opt-in, not in truggy2.
 # "truggy2" = "truggy" plus these four.
 AIR_SWITCHES = ("wheels", "groundroll", "size8", "skid")
 
@@ -68,7 +70,7 @@ def switches(real):
     if real in ("truggy2", ("truggy2",), ["truggy2"]):
         return frozenset(PHYS_SWITCHES + TRUGGY_SWITCHES + AIR_SWITCHES)
     real = frozenset([real] if isinstance(real, str) else (real or ()))
-    bad = real - set(PHYS_SWITCHES + TRUGGY_SWITCHES + AIR_SWITCHES)
+    bad = real - set(PHYS_SWITCHES + TRUGGY_SWITCHES + AIR_SWITCHES + ("rotor",))
     assert not bad, f"unknown physics switches {bad}"
     return real
 

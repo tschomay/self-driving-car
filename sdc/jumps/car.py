@@ -72,7 +72,7 @@ def _site_zaxis(direction):
 #   tires: wide tires (a 3 cm tread with rounded shoulders: a capsule along the axle) instead of spheres
 #   susp:  soft suspension (about 30% sag, about critically damped) and a higher centre of mass (battery on top)
 #   drive: one motor through open differentials (equal torque to the wheels; back-EMF on the mean wheel speed)
-MODEL_SWITCHES = ("tires", "susp", "drive", "esc", "lsd", "power", "heavy", "elliptic", "wheels", "size8", "skid")
+MODEL_SWITCHES = ("tires", "susp", "drive", "esc", "lsd", "power", "heavy", "elliptic", "wheels", "size8", "skid", "rotor")
 TIRE_W = 0.03         # m, flat part of the tread (capsule segment)
 SOFT_K = 185.0          # N/m per corner: 4.4 N static load per corner / 2.4 cm sag (30% of 8 cm travel)
 SOFT_C = 18.0           # N·s/m per corner: about critically damped with the 0.45 kg corner load. At 0.4 the springs
@@ -106,6 +106,11 @@ def motor(real=()):
 
 
 LSD = dict(centre=0.03, front=0.002, rear=0.001)   # limited-slip diff damping, N·m·s/rad (physics review)
+# "rotor" (docs/research/truggy-diffs.md): the motor's rotor as a body spinning about the chassis' long axis, geared
+# ROTOR_RATIO:1 to the mean wheel speed, and centre-diff damping from typical 10k oil (axle diffs unchanged).
+ROTOR_RATIO = 14.0
+ROTOR_I_WHEEL = 1.5e-3                             # rotor inertia seen at the mean wheel speed, kg·m² (estimate)
+LSD_ROTOR = dict(centre=0.04, front=0.002, rear=0.001)
 WHEEL_ARMATURE = 1.5e-4                            # "heavy": extra spin inertia per wheel, kg·m²
 WHEEL_AXLE_I = 3.4e-4                              # "wheels": coupled spin inertia per wheel, kg·m² (air-control.md)
 
@@ -147,7 +152,8 @@ def model_xml(real=(), terrain=None) -> str:
     # back-EMF drag: per wheel (one motor each), or on the single motor's speed (the mean wheel speed, via a tendon)
     tau_max, top_speed = motor(real)
     spin_damp = 1e-5 if "drive" in real else tau_max / (top_speed / wheel_r)
-    arm = f' armature="{WHEEL_ARMATURE}"' if "heavy" in real else ""
+    # "rotor" carries the drivetrain inertia that "heavy" lumped onto each wheel
+    arm = f' armature="{WHEEL_ARMATURE}"' if "heavy" in real and "rotor" not in real else ""
     ai = g["axle_i"]
     w_in = (f'<inertial pos="0 0 0" mass="{g["wheel_m"]}" diaginertia="{ai / 2} {ai} {ai / 2}"/>'
             if "wheels" in real else "")
@@ -173,26 +179,38 @@ def model_xml(real=(), terrain=None) -> str:
     tendon = ""
     if "drive" in real:   # one motor: equal torque to every wheel (open diffs), drag on the mean wheel speed
         motors = f'<motor name="motor" tendon="drive" gear="{4 * tau_max}" ctrlrange="-1 1"/>'
+        if "rotor" in real:   # the same torque at the wheels, applied to the rotor through the gearing
+            motors = f'<motor name="motor" joint="rotor" gear="{4 * tau_max / ROTOR_RATIO:.6f}" ctrlrange="-1 1"/>'
         # "esc": back-EMF is computed with the brake in env.JumpCar._actuate instead of this tendon damper
         emf = 0.0 if "esc" in real else 4 * tau_max / (top_speed / wheel_r)
         diffs = ""
         if "lsd" in real:
-            diffs = (f'<fixed name="dfront" damping="{LSD["front"]}"><joint joint="fl_spin" coef="1"/>'
+            lsd = LSD_ROTOR if "rotor" in real else LSD
+            diffs = (f'<fixed name="dfront" damping="{lsd["front"]}"><joint joint="fl_spin" coef="1"/>'
                      f'<joint joint="fr_spin" coef="-1"/></fixed>'
-                     f'<fixed name="drear" damping="{LSD["rear"]}"><joint joint="rl_spin" coef="1"/>'
+                     f'<fixed name="drear" damping="{lsd["rear"]}"><joint joint="rl_spin" coef="1"/>'
                      f'<joint joint="rr_spin" coef="-1"/></fixed>'
-                     f'<fixed name="dcentre" damping="{LSD["centre"]}"><joint joint="fl_spin" coef="0.5"/>'
+                     f'<fixed name="dcentre" damping="{lsd["centre"]}"><joint joint="fl_spin" coef="0.5"/>'
                      f'<joint joint="fr_spin" coef="0.5"/><joint joint="rl_spin" coef="-0.5"/>'
                      f'<joint joint="rr_spin" coef="-0.5"/></fixed>')
         tendon = ('\n  <tendon><fixed name="drive" damping="' + f"{emf:.6f}" + '">'
                   + "".join(f'<joint joint="{w}_spin" coef="0.25"/>' for w in WHEELS) + '</fixed>' + diffs
+                  + (f'<fixed name="rotor_t"><joint joint="rotor" coef="1"/></fixed>' if "rotor" in real else "")
                   + '</tendon>')
+        if "rotor" in real:   # rotor speed = ROTOR_RATIO x mean wheel speed (a tendon equality, research note)
+            tendon += (f'\n  <equality><tendon tendon1="rotor_t" tendon2="drive" polycoef="0 {ROTOR_RATIO} 0 0 0" '
+                       f'solref="0.004 1"/></equality>')
     if "susp" in real:
         bm, bz = g["battery"]
         chassis_m, battery = g["chassis_m"] - bm, (f'\n      <geom name="battery" type="box" group="1" contype="0" conaffinity="0" '
                                                    f'pos="0 0 {bz}" size="0.07 0.035 0.015" mass="{bm}" rgba=".2 .2 .2 1"/>')
     else:
         chassis_m, battery = g["chassis_m"], ""
+    rotor = ""
+    if "rotor" in real:
+        ri = ROTOR_I_WHEEL / ROTOR_RATIO ** 2
+        rotor = (f'\n      <body name="rotor" pos="0 0 0"><joint name="rotor" type="hinge" axis="1 0 0"/>'
+                 f'<inertial pos="0 0 0" mass="0.05" diaginertia="{ri:.3e} {ri:.3e} {ri:.3e}"/></body>')
     hx, hy, hz = g["box"]
     chassis_ct, skids = "1", ""
     if "skid" in real:   # the box collides through rounded skids: a box on the heightfield caught prism walls
@@ -222,7 +240,7 @@ def model_xml(real=(), terrain=None) -> str:
       <geom name="chassis" type="box" group="1" contype="{chassis_ct}" conaffinity="0" size="{g['box'][0]} {g['box'][1]} {g['box'][2]}" mass="{chassis_m}" rgba=".12 .44 .92 1"/>{battery}{skids}
       <site name="imu" pos="0 0 0" size=".01"/>
       {"".join(rays)}
-      {"".join(corners)}
+      {"".join(corners)}{rotor}
     </body>
   </worldbody>
   <actuator>

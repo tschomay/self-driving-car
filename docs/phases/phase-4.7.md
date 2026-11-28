@@ -525,6 +525,7 @@ What the code says about grip:
 | Both at step 0 | 59.5 / 56.5 | 24.22 / 24.54 s | ~569 s | — |
 | E7b (grip head trained) | 34.0 | 24.95 s | ~608 s | 0.040 |
 | E7c (control, probe only) | 53.0 | 24.30 s | ~577 s | 0.147 (still falling) |
+| E7c at 6M | 58.5 | 23.46 s | ~555 s | 0.052 |
 
   Guessing the average grip every time gives an MSE of 0.041 (the variance of grip drawn evenly from 0.55–1.25). E7b reached 0.040, so its memory learned no grip at all; only the head's bias moved. Making the memory carry that target cost driving: finishes fell from 59.5 to 34. E7b was stopped at 3M to give E7c the CPU. E7c's probe is still above the average-guess level, so it shows no grip in the memory either.
 

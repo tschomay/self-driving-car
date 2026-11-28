@@ -64,3 +64,22 @@ Before merging:
 Don't ask "should I open a PR / merge?" in these cases. Just do it and report the merged PR.
 
 PRs are squash-merged, so afterwards bring `main` into the working branch with `git merge origin/main` (not rebase plus force-push, which the session's permissions block).
+
+## Repo layout: sim, champion cars, replay viewer
+
+One repo for the sim and everything built on it, so a change lands on all of them at once (owner, 2026-11-28).
+
+- `sdc/`: the Python sim and training. It is the source of truth for the car, physics and tracks.
+- `models/`: the champion cars, kept in git (about 350 KB each; see `models/README.md`). Weights for everything
+  else stay out of git (`runs/` is ignored; the `car-weights` branch holds history).
+- `viewer/`: the 3D race replay (issue #86). It plays recordings made by `sdc/race/record.py`. It is not in the
+  Python tests: `cd viewer && npm install && node build.mjs --data ../runs/race`.
+
+Keeping them in sync:
+
+- **A new leading car goes into `models/` in the same PR that adopts it.** Copy `model.pt`, and a `metrics.json`
+  without the per-episode lists, with a `champion` entry (source run, sim, race time), and update the table in
+  `models/README.md`. `tests/test_models.py` checks every champion loads and drives in its stored sim.
+- **Drive a stored car in its own sim:** use `metrics.json["env46"]`, not `SDC_REAL`.
+- **Car geometry reaches the viewer through the recordings** (`record.py` writes it). After changing the car's
+  size or suspension in `sdc/jumps/car.py`, re-record before republishing the replay.

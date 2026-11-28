@@ -1,0 +1,68 @@
+{
+ "label": "GRU copy of the loop teacher",
+ "seed": 0,
+ "map": false,
+ "teacher": {
+  "racer": "runs/p48-racer/ckpt/best.pt",
+  "preview": null
+ },
+ "obs_dim": 80,
+ "gru": {
+  "hidden": 64,
+  "where": "beside",
+  "shared": false,
+  "seq_len": 64
+ },
+ "env46": {
+  "real": "truggy2",
+  "sensors": "parts",
+  "attitude": true,
+  "loop": true,
+  "max_steps": 3000,
+  "angled": true,
+  "dr": "gate",
+  "expo": 0.4
+ },
+ "train_env": {
+  "real": "truggy2",
+  "sensors": "parts",
+  "attitude": true,
+  "loop": true,
+  "max_steps": 3000,
+  "angled": true,
+  "dr": "train",
+  "expo": 0.4
+ },
+ "final": {
+  "landed": 17,
+  "jumps": 180,
+  "rate": 0.094,
+  "finished": 0.433,
+  "mean_air": 0.585,
+  "missed": 50,
+  "by_kind": {
+   "double": "12/81",
+   "table": "5/45",
+   "drop": "0/54"
+  },
+  "reasons": {
+   "rolled over": 2,
+   "off the lane": 23,
+   "finished": 26,
+   "stuck": 9
+  },
+  "finished_n": 26,
+  "runs": 60,
+  "lap_s": 25.43,
+  "in_time_n": 26,
+  "in_time": 0.433
+ },
+ "wall_s": 7104.2,
+ "champion": {
+  "phase": "4.7 E7",
+  "source": "runs/p48-e7 on branch car-weights (commit d6a576d)",
+  "sim": "SDC_REAL=truggy2 (full-size 1/8 truggy)",
+  "race_s": 563.6,
+  "race_note": "20-lap race estimate, 5 noisy passes of the 150 selection runs (sdc.phase47.where p48), grip drawn per run"
+ }
+}

@@ -517,6 +517,7 @@ What the code says about grip:
 - **Physics change first (owner: "any ground contact from the chassis give an immediate stop. That's not realistic - momentum means it will slide"):** the chassis box caught the heightfield's prism walls and had tyre grip (1.0), so a slam stopped the car from 7 m/s in 40 ms. New switch `skid` (in `truggy2`): the box collides through three rounded capsules with plastic-on-dirt friction 0.4 (scaled with the episode's grip). A 5 m/s slam now keeps about 3 m/s and slides on. All earlier full-size scores were on the old chassis (`runs/old-chassis/`).
 - **Setup:** two E7 runs from `runs/p48-e5-s0`, 12 h, 2 workers each, new chassis. `runs/p48-e7b`: `grip_coef=1.0`, a head on the actor's memory predicts the episode's true grip and its squared error joins the loss. `runs/p48-e7c`: control, the same head trained on a detached memory (a probe: does the memory already know grip?).
 - **Prediction (owner):** "Intuitively, grip sensing is important and will help a lot. If E7b doesn't win over the control, I think it means we are still missing something. So I hope it does win, but I feel like we've tried similar enough things in the past that I'm not convinced it'll help."
+- **Teacher on the new chassis** (5 passes): 671/750 finished, median lap 27.50 s, **race 564.7 s** (was 582.8 s on the old chassis): the new bar.
 - **Result:** _running_
 
 ### Owner on racing lines (2026-11-28)

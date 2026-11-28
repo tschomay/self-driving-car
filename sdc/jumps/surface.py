@@ -228,3 +228,13 @@ def get(c) -> Surface:
             _CACHE.clear()
         _CACHE[key] = build(c)
     return _CACHE[key]
+
+
+def terrain(c, real=("groove", "bbumps")):
+    """The heightfield the car drives on, as (N, N) elevations in [0, 1] x loop.ZMAX: course.hfield() plus the
+    braking bumps and landing dishes when "bbumps" is in `real` (env.reset uses this; replays and the game should too).
+    The grip map is get(c).grip on the same grid (loop.D spacing, centred on the origin, rows along Y)."""
+    hf = c.hfield()
+    if "bbumps" in set(real):
+        hf = np.clip(hf + get(c).bump / lp.ZMAX, 0.0, 1.0).astype(np.float32)
+    return hf

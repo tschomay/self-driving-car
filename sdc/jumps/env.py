@@ -201,13 +201,12 @@ class JumpCar:
             self.course = lp.make(course_seed, kinds=self.kinds if "double" in self.kinds else lp.KINDS, size=self.size)
         else:
             self.course = crs.make(course_seed, kinds=self.kinds, size=self.size)
-        hf = self.course.hfield()
         self.surface = None
         if self.loop and ("groove" in self.real or "bbumps" in self.real):   # a worn track (surface.py)
             self.surface = sf.get(self.course)
-            if "bbumps" in self.real:
-                hf = np.clip(hf + self.surface.bump / lp.ZMAX, 0.0, 1.0)
-        self.m.hfield_data[:] = hf.ravel()
+            self.m.hfield_data[:] = sf.terrain(self.course, self.real).ravel()
+        else:
+            self.m.hfield_data[:] = self.course.hfield().ravel()
         if not self.legacy:   # physics and sensor noise drawn from (course, start, phys_seed): batching-independent
             self.prng = np.random.default_rng([int(course_seed), int(round(x0 * 1000)) + 10_000, int(self.phys_seed)])
             self.phys = rl.draw(self.dr, self.prng)

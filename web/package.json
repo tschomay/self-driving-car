@@ -1,0 +1,13 @@
+{
+  "name": "sdc-web",
+  "private": true,
+  "type": "module",
+  "description": "Browser apps on the self-driving-car sim: the race replay viewer and the rc-racer game, with a shared three.js renderer",
+  "scripts": {
+    "build:viewer": "cd viewer && node build.mjs",
+    "build:game": "cd game && node build.mjs",
+    "test:game": "cd game && node test/loops.mjs && node test/race.mjs"
+  },
+  "dependencies": { "@mujoco/mujoco": "4.0.1", "three": "0.180.0" },
+  "devDependencies": { "esbuild": "0.28.2" }
+}

@@ -1,7 +1,7 @@
 // Race replay: plays back a recorded 20-lap race (sdc/race/record.py) in 3D, with a ghost of the best lap so far,
 // an optional rival car (another recording on the same loop), timing, slow-motion replays and an end card.
-import { View, CAMERAS } from './render.js';
-import { makeTrack, decodeRace } from './track.js';
+import { View, CAMERAS } from '../../shared/render.js';
+import { makeTrack, decodeRace } from '../../shared/track.js';
 
 const $ = (id) => document.getElementById(id);
 const CAR_COLOR = 0xe8431a, RIVAL_COLOR = 0x1f6fd6;

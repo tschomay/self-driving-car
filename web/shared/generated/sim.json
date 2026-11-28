@@ -28,6 +28,7 @@
    "rear": 0.001
   },
   "mount_z": 0.0085,
+  "skid_mu": 0.4,
   "spring_c": 26.0,
   "spring_k": 296.0,
   "steer_max": 0.4,

@@ -4,21 +4,17 @@
 // brake at neutral, no reverse), and the sliding-grip drop. Track coordinates follow env.JumpCar.state(loop=True).
 import * as cm from './carmodel.js';
 import { START_X } from './loop.js';
+import SIM from '../../shared/generated/sim.json' with { type: 'json' };   // python -m sdc.export: the sim's numbers
 
 // real.Phys, nominal
-export const NOMINAL = {
-  mass: 1.0, friction: 1.0, spring: 1.0, damping: 1.0, motor: 1.0, charge: 0.95, sag: 0.07,
-  servo_s60: 0.12, deadband: 0.01, delay: 0.015,
-};
+const pick = (o, ks) => Object.fromEntries(ks.map((k) => [k, o[k]]));
+export const NOMINAL = pick(SIM.phys.nominal, ['mass', 'friction', 'spring', 'damping', 'motor', 'charge', 'sag', 'servo_s60', 'deadband', 'delay']);
 // real.RANGES["train"] (friction is the surface choice, shared)
-export const TRAIN_RANGE = {
-  mass: [0.85, 1.15], spring: [0.8, 1.25], damping: [0.7, 1.4], motor: [0.85, 1.1],
-  charge: [0.85, 1.0], servo_s60: [0.08, 0.16], delay: [0.005, 0.03],
-};
-export const BRAKE_CAP = 0.65;                            // env.BRAKE_CAP
-export const SLIDE_S0 = 0.3, SLIDE_S1 = 1.5, SLIDE_DROP = 0.25;
-export const EXPO = 0.4;                                  // steering expo of the Phase 4.6 gate car and after
-const ON_GROUND = 0.01;                                   // env.ON_GROUND
+export const TRAIN_RANGE = pick(SIM.phys.train, ['mass', 'spring', 'damping', 'motor', 'charge', 'servo_s60', 'delay']);
+export const BRAKE_CAP = SIM.actuators.brake_cap;         // env.BRAKE_CAP
+export const SLIDE_S0 = SIM.actuators.slide_s0, SLIDE_S1 = SIM.actuators.slide_s1, SLIDE_DROP = SIM.actuators.slide_drop;
+export const EXPO = SIM.actuators.expo;                   // the champion car's steering expo
+const ON_GROUND = SIM.actuators.on_ground;                // env.ON_GROUND
 
 export class Car {
   constructor(world, i) {

@@ -6,11 +6,12 @@
 // Presets: TRUGGY is the re-tuned teacher (teacher.TRUGGY); RACER is Phase 4.7's faster teacher (racer.TEACHER).
 // The game adds a lane offset so the AI cars don't all queue on the centreline (0 near jumps).
 import * as cm from './carmodel.js';
+import SIM from '../../shared/generated/sim.json' with { type: 'json' };   // python -m sdc.export: the sim's numbers
 
 const G = 9.81, WHEELBASE = 0.30;
 
-export const TRUGGY = { a_lat: 2.5, a_brake: 2.5, tc: 0.5, v_target: 6.8, v_cruise: 7.4, k_rate: 0.3, kp: 6.0 };
-export const RACER = { ...TRUGGY, jump_v: { double: 7.8 }, a_lat: 3.5, a_brake: 3.5 };   // racer.TEACHER on truggy2
+export const TRUGGY = SIM.teacher.truggy;
+export const RACER = SIM.teacher.racer;                      // racer.TEACHER in the champion's sim
 export const MIDDLE = { ...TRUGGY, a_lat: 3.0, a_brake: 3.0 };
 
 /** The command a whose expo-curved steering (1 - e) a + e a^3 equals s (env.expo_inverse). */

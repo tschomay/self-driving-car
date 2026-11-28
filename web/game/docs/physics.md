@@ -1,5 +1,8 @@
 # Physics: what is shared with the self-driving-car sim
 
+Numbers: `web/shared/generated/sim.json`, written by `python -m sdc.export` from the champion car's sim (`models/`).
+The structure below is ported by hand; `tests/test_export.py` checks the port drives like the sim for the first second.
+
 Source of truth: `tschomay/self-driving-car` branch `ccr-e2fca4fb-g9rode` at `7b1cd69` (the full-size truggy, not yet
 on main; loops and teacher logic as on main `0cc4e42`). Renderer: `web/shared/`, the same code as the race replay viewer;
 each car is drawn at the physics car's geometry (`main.js` GEOM).

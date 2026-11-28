@@ -49,7 +49,8 @@ def build() -> dict:
             wheel_r=g["wheel_r"], corner_x=g["corner_x"], corner_y=g["corner_y"], mount_z=g["mount_z"],
             box=list(g["box"]), chassis_m=g["chassis_m"], battery_m=g["battery"][0], battery_z=g["battery"][1],
             corner_m=g["corner_m"], wheel_m=g["wheel_m"], axle_i=g["axle_i"], spring_k=g["k"], spring_c=g["c"],
-            tau_max=tau_max, top_speed=top_speed, lsd=dict(cr.LSD), wheel_armature=cr.WHEEL_ARMATURE),
+            tau_max=tau_max, top_speed=top_speed, lsd=dict(cr.LSD), wheel_armature=cr.WHEEL_ARMATURE,
+            skid_mu=getattr(cr, "SKID_MU", None)),   # "skid": chassis skids' friction (x the grip)
         "actuators": dict(expo=env46.get("expo", 0.0), brake_cap=je.BRAKE_CAP, slide_s0=je.SLIDE_S0,
                           slide_s1=je.SLIDE_S1, slide_drop=je.SLIDE_DROP, on_ground=je.ON_GROUND, min_air=je.MIN_AIR),
         "phys": dict(nominal={k: r6(v) for k, v in dataclasses.asdict(rl.Phys()).items()},

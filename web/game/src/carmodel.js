@@ -10,6 +10,7 @@
 //   wheels  each wheel's spin inertia about its axle set explicitly (a tyre carries its mass at the tread)
 //   groundroll (race.js) "rolled over" counts only on the ground
 //   size8   the full-size 1/8 truggy: 380 mm wheelbase, 143 mm tyres, 4.0 kg, 34 mm ride height (car.GEOM["size8"])
+//   skid    the chassis meets the ground through three rounded skids, plastic on dirt (car.SKID_MU x the grip)
 // Differences, none of which change how one car drives: several cars share one world (names get a c<i>_ prefix);
 // chassis boxes also collide with each other (collision bit 2); no cameras, rays, textures or lights.
 import { BOX, N, ZMAX } from './loop.js';
@@ -34,6 +35,17 @@ export const CORNER_M = C.corner_m, WHEEL_M = C.wheel_m, AXLE_I = C.axle_i;
 export const LSD = C.lsd;
 export const WHEEL_ARMATURE = C.wheel_armature;
 export const CHASSIS_HALF = C.box;
+export const SKID = SIM.switches.includes('skid');   // the chassis meets the ground through three rounded skids
+export const SKID_MU = C.skid_mu;
+
+// "skid" (car.py): with it the box only meets other cars (bit 2); the ground meets three capsules along the box
+// (a box on the heightfield caught the grid's prism walls and stopped dead), plastic on dirt (SKID_MU x the grip).
+function skids(p) {
+  if (!SKID) return '';
+  const [hx, hy, hz] = CHASSIS_HALF, ax = (hx - hz).toFixed(4);
+  return [-(hy - hz), 0, hy - hz].map((y, i) => `
+      <geom name="${p}chassis_skid${i}" type="capsule" contype="1" conaffinity="0" fromto="-${ax} ${y.toFixed(4)} 0 ${ax} ${y.toFixed(4)} 0" size="${hz}" mass="0.001" friction="${SKID_MU} 0.005 0.0001" priority="2"/>`).join('');
+}
 
 function carXml(i) {
   const p = `c${i}_`;
@@ -56,7 +68,7 @@ function carXml(i) {
   const body = `
     <body name="${p}car" pos="${i * 2} 0 1">
       <freejoint name="${p}root"/>
-      <geom name="${p}chassis" type="box" contype="3" conaffinity="2" size="${CHASSIS_HALF.join(' ')}" mass="${CHASSIS_M - BATTERY_M}"/>
+      <geom name="${p}chassis" type="box" contype="${SKID ? 2 : 3}" conaffinity="2" size="${CHASSIS_HALF.join(' ')}" mass="${CHASSIS_M - BATTERY_M}"/>${skids(p)}
       <geom name="${p}battery" type="box" contype="0" conaffinity="0" pos="0 0 ${BATTERY_Z}" size="0.07 0.035 0.015" mass="${BATTERY_M}"/>
       ${corners}
     </body>`;

@@ -27,6 +27,9 @@ each car is drawn at the physics car's geometry (`main.js` GEOM).
   `racer.TEACHER` on truggy2 (Racer: doubles at 7.8 m/s). The game adds a lane offset away from jumps so the three
   don't queue on the centreline.
 
+- **Chassis skids** (`skid`): the chassis box only meets other cars; the ground meets three capsules along its
+  bottom with plastic-on-dirt friction (`SKID_MU`, scaled with the grip like the tyres).
+
 ## Checked against the training sim
 
 `tools/py_feel.py` (Python, the sim itself) and `test/feel.mjs` (this port) run the same tests on flat ground, mean

@@ -38,6 +38,7 @@ export class Car {
     this.steerDof = ['fl', 'fr'].map((w) => m.jnt_dofadr[id(O.mjOBJ_JOINT, `${w}_steer`)]);
     this.tires = cm.WHEELS.map((w) => id(O.mjOBJ_GEOM, `${w}_tire`));
     this.chassis = id(O.mjOBJ_GEOM, 'chassis');
+    this.skids = cm.SKID ? [0, 1, 2].map((k) => id(O.mjOBJ_GEOM, `chassis_skid${k}`)) : [];
     this.ctrl = id(O.mjOBJ_ACTUATOR, 'motor');          // motor, fl_servo, fr_servo are consecutive
     this.bodies = [this.body];
     for (let b = 0; b < m.nbody; b++) if (m.body_rootid[b] === this.body && b !== this.body) this.bodies.push(b);
@@ -202,6 +203,7 @@ export class World {
       for (const j of car.suspDof) m.dof_damping[j] = base.dof_damping[j] * p.damping;
       m.actuator_gear[6 * car.ctrl] = base.actuator_gear[6 * car.ctrl] * p.motor;
       car.tires.forEach((g, k) => { m.geom_friction[3 * g] = base.geom_friction[3 * g] * grip; car.mu0[k] = m.geom_friction[3 * g]; });
+      for (const g of car.skids) m.geom_friction[3 * g] = base.geom_friction[3 * g] * grip;   // env._apply_phys: skids scale with grip
     });
     m.geom_friction[3 * this.ground] = base.geom_friction[3 * this.ground] * grip;
     this.grip = grip;

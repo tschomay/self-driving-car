@@ -499,3 +499,15 @@ Same setup as E7 above: actor `runs/p48-e5-s0`, critic from the chosen racer, 9 
 
   The replay session's full 20-lap races (one grip for the whole race) agree: at grip 0.58–0.70, E7 crashed 38–65 times per race, the teacher 0–14. The formula also counts at most one crash per lap; in full races E7 sometimes crashed 3 times in one lap.
 - Weights on the `car-weights` branch: `runs/p48-e7` (and `runs/p48-e5-s0/s1`). Run with `SDC_REAL=truggy2`.
+
+### Owner's answers after E7 (2026-11-28)
+
+- "it's being less safe because crashes don't cost much time. If it can crash on half the laps and still beat the teacher, maybe 7 seconds isn't long enough for the corner marshall."
+- "I'm up for trying the gate after we address the traction issue. We could tweak all day but it appears we finally succeeded in using RL to improve the driving."
+- "Probably win on average is sufficient, but we should think more about of there's a way to adapt to the conditions."
+- "is the car still estimating traction? Or does it just drive for some average condition. It might not be responding to grip because it doesn't sense it at all"
+
+What the code says about grip:
+- **Sensor car (E5, E7 actor):** no grip input. It gets the IMU, gyro, front and rear wheel speeds, rays and its last action. Grip could only be inferred from slip (wheel speed against what the IMU says the car is doing), through the GRU's memory. Nothing in training asks for that.
+- **RL racer and E7's critic:** see the true friction (`priv_obs` ends with friction, mass, motor). So the racer can drive faster on high grip and slower on low grip, and the student copies the result without the cause.
+- **Teacher:** doesn't know grip either (`teacher.py`: "A_LAT is one fixed number, not the car's true grip"). It survives low grip because its corner budget (3.5 m/s²) is cautious for every grip.

@@ -533,3 +533,5 @@ Measured on the old-chassis traces (first 300 runs each; lane is 3 m wide; "insi
 | E7 | 0.35 m | −0.09 m | 0.1 s late |
 
 The teacher holds the centre line. RL moves off it, but not into a racing line: no inside bias in corners (slightly outside). E7 turns 0.1 s after the curve starts.
+
+Owner, on how far ahead they look: "I think I setup for the next corner immediately after leaving the previous one. But sensors can't see well for a long distance. 6m might be all we can hope for"

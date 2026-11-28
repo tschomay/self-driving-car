@@ -527,6 +527,10 @@ What the code says about grip:
 | E7c (control, probe only) | 53.0 | 24.30 s | ~577 s | 0.147 (still falling) |
 | E7c at 6M | 58.5 | 23.46 s | ~555 s | 0.052 |
 
+Owner, on how a driver senses grip: "I get grip info throughout. Moreso at the start and less later. But I know how the car should handle from previous driving and pretty quickly realize when it fits that and when it doesn't."
+
+Correction (owner caught it): the truggy is 4WD, not rear-drive. One motor drives all four wheels through limited-slip diffs (`car.py`: `drive`, `lsd`), so front and rear wheel speeds give almost no slip contrast.
+
   Guessing the average grip every time gives an MSE of 0.041 (the variance of grip drawn evenly from 0.55–1.25). E7b reached 0.040, so its memory learned no grip at all; only the head's bias moved. Making the memory carry that target cost driving: finishes fell from 59.5 to 34. E7b was stopped at 3M to give E7c the CPU. E7c's probe is still above the average-guess level, so it shows no grip in the memory either.
 
 ### Owner on racing lines (2026-11-28)

@@ -584,6 +584,10 @@ Owner, on what tells them to back off before crashing on a slick day: "Other dri
 
 Owner's pick: "Practice lap, free, with memory carried into the race. But we've tried that before. What makes it successful now? Let's also keep the other two on deck - they seem like reasonable hints" (the other two: a noisy track report from other drivers, and a rough look at the surface).
 
+Owner, on practice laps and notes: "I'd even be fine with 10 practice laps if that helps. Racers never hit a track cold. And we make mental notes like "hit the big table a little outside because the lip is better there". We've tried similar memory before, but this only requires jump count, not an actual map."
+
+**Prediction (owner, before the practice-lap test):** "I think it should help. If it hurts high grip then we need to train better to learn the difference"
+
 ### Owner on racing lines (2026-11-28)
 
 "Watching the replay I see two behaviors that mean I could race better than this car. First, it seems to aim for the center line. Sometimes it makes big corrections to get there. I think that's what the teacher does and it makes sense because it maximizes buffer of track space. But a human driver would aim for more of a racing line - enter corners wide, turn early, hit the apex, etc. Rarely do I actually aim for the the center line. I almost always want to be near an edge. Perhaps related, I see the car turning late instead of early. Like it's well into the corner and goes oh crap I'd better turn! My hope was that the teacher would teach it to get around the track and use its controls. And then RL would get it finding these tricks for how to really race. I don't think we've gotten there. Although I did say that it finally looks more like racing. I think that's because there are corners where I see it slide and counter steer. And it appears to be attacking the track a little more."

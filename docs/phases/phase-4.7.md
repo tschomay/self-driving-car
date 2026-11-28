@@ -531,6 +531,10 @@ Owner, on how a driver senses grip: "I get grip info throughout. Moreso at the s
 
 Correction (owner caught it): the truggy is 4WD, not rear-drive. One motor drives all four wheels through limited-slip diffs (`car.py`: `drive`, `lsd`), so front and rear wheel speeds give almost no slip contrast.
 
+Owner, on testing grip: "I do kind of goose the throttle early. So I'll start with a slower lap but add some throttle kicks to see how it responds while still leaving room to recover. Later in the race I tune that understanding based on how it slides when driven at the limit and on feedback from going too hard and crashing."
+
+4WD check (`truggy2`, full throttle from rest, flat ground): the one `motor` actuator puts the same torque on all four wheels (0.91 N·m each at 0.1 s, 0.48 at 1.2 s). At 1.2 s the car does 5.9 m/s while the wheels turn at 8.1–8.8 m/s: full throttle spins all four. Simplification: the motor gives each wheel equal torque whatever the others do. In a real open diff a wheel in the air takes almost no torque and its partner loses drive too; here the grounded wheels keep theirs (closer to a heavily oiled diff, as racing truggies run).
+
   Guessing the average grip every time gives an MSE of 0.041 (the variance of grip drawn evenly from 0.55–1.25). E7b reached 0.040, so its memory learned no grip at all; only the head's bias moved. Making the memory carry that target cost driving: finishes fell from 59.5 to 34. E7b was stopped at 3M to give E7c the CPU. E7c's probe is still above the average-guess level, so it shows no grip in the memory either.
 
 ### Owner on racing lines (2026-11-28)

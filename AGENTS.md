@@ -65,15 +65,19 @@ Don't ask "should I open a PR / merge?" in these cases. Just do it and report th
 
 PRs are squash-merged, so afterwards bring `main` into the working branch with `git merge origin/main` (not rebase plus force-push, which the session's permissions block).
 
-## Repo layout: sim, champion cars, replay viewer
+## Repo layout: sim, champion cars, replay viewer, game
 
 One repo for the sim and everything built on it, so a change lands on all of them at once (owner, 2026-11-28).
 
 - `sdc/`: the Python sim and training. It is the source of truth for the car, physics and tracks.
 - `models/`: the champion cars, kept in git (about 350 KB each; see `models/README.md`). Weights for everything
   else stay out of git (`runs/` is ignored; the `car-weights` branch holds history).
-- `viewer/`: the 3D race replay (issue #86). It plays recordings made by `sdc/race/record.py`. It is not in the
-  Python tests: `cd viewer && npm install && node build.mjs --data ../runs/race`.
+- `web/`: the browser apps, one `npm install` in `web/` for all of them.
+  - `web/shared/`: the three.js renderer (track, truggy, cameras, post-processing), used by both apps.
+  - `web/viewer/`: the 3D race replay (issue #86), playing recordings from `sdc/race/record.py`.
+  - `web/game/`: rc-racer, the playable game (moved from the `sandbox` repo): MuJoCo in the browser on the sim's car
+    and loops, AI cars from the teacher.
+  - Checks (not in pytest): `cd web && npm run build:viewer && npm run build:game && npm run test:game`.
 
 Keeping them in sync:
 
@@ -83,3 +87,7 @@ Keeping them in sync:
 - **Drive a stored car in its own sim:** use `metrics.json["env46"]`, not `SDC_REAL`.
 - **Car geometry reaches the viewer through the recordings** (`record.py` writes it). After changing the car's
   size or suspension in `sdc/jumps/car.py`, re-record before republishing the replay.
+- **The game ports the sim by hand for now** (`web/game/src/carmodel.js`, `sim.js`, `driver.js`; see
+  `web/game/docs/physics.md`). A PR that changes `sdc/jumps/` physics or the teacher updates the game in the same PR,
+  or says in its description that the game is behind. Loops: `python web/game/tools/export_loops.py`.
+- **One renderer:** visual changes go in `web/shared/`, never in a copy inside an app.

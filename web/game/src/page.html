@@ -1,0 +1,226 @@
+<title>RC Dirt Circuit</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: the 3D track fills the screen; a pit-board panel (bottom sheet on a phone, side panel when wide)
+   holds the menu; the HUD is a timing strip along the top and instruments along the bottom. */
+:root {
+  color-scheme: dark;
+  --slate: #1b221e;        /* pit-board green-black */
+  --slate-2: #29332c;
+  --line: #3d4a40;
+  --ink: #f1ecdd;          /* chalk white */
+  --dim: #aeb3a2;
+  --chalk: #f2c230;        /* pit-board yellow */
+  --warn: #ff7a4d;
+  --good: #86d993;
+  --map-track: #7d8775;
+  --map-whoops: #d08a52;
+  --display: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --body: "Barlow", "Helvetica Neue", Arial, sans-serif;
+  --gl: max(16px, env(safe-area-inset-left, 0px));
+  --gr: max(16px, env(safe-area-inset-right, 0px));
+}
+html, body { height: 100%; }
+body { background: var(--slate); color: var(--ink); font: 400 15px/1.45 var(--body); overflow: hidden; overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+#app { position: relative; height: 100%; overflow: hidden; }
+#view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+#touch { position: absolute; inset: 0; touch-action: none; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+button:focus-visible { outline: 2px solid var(--chalk); outline-offset: 2px; }
+h1, h2 { font-family: var(--display); font-weight: 700; margin: 0; text-wrap: balance; letter-spacing: 0.01em; }
+.num { font-family: var(--display); font-variant-numeric: tabular-nums; }
+.label { font: 600 11px/1 var(--display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+
+/* ---- menu ---- */
+#menu { position: absolute; left: 0; right: 0; bottom: 0; max-height: 74%; overflow-y: auto; background: color-mix(in srgb, var(--slate) 93%, transparent);
+  border-top: 2px solid var(--chalk); padding-block: 14px calc(14px + env(safe-area-inset-bottom, 0px)); padding-left: var(--gl); padding-right: var(--gr);
+  display: flex; flex-direction: column; gap: 12px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+#menu h1 { font-size: 30px; line-height: 1; text-transform: uppercase; }
+#menu h1 span { color: var(--chalk); }
+.sub { color: var(--dim); font-size: 13px; margin: 2px 0 0; }
+.track { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; align-items: center; }
+#menu-map { width: 112px; height: 92px; background: var(--slate-2); border: 1px solid var(--line); }
+.track-pick { display: flex; align-items: center; gap: 8px; }
+.track-pick { flex-wrap: wrap; }
+.track-pick .num { font-size: 30px; font-weight: 700; line-height: 1; min-width: 5ch; }
+.track-pick .label { margin-right: 2px; }
+.sq { width: 40px; height: 40px; border: 1px solid var(--line); background: var(--slate-2); font: 600 20px/1 var(--display); display: grid; place-items: center; }
+.sq:active, .seg button:active { background: var(--line); }
+#track-stats { font-size: 13px; margin: 6px 0 0; }
+#track-best { font-size: 13px; color: var(--chalk); margin: 2px 0 0; }
+.row { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 10px; align-items: center; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { flex: 1 1 auto; min-height: 38px; padding: 0 12px; border: 1px solid var(--line); background: var(--slate-2); font: 600 15px/1 var(--display); letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--chalk); border-color: var(--chalk); color: #1b1a12; }
+.note { color: var(--dim); font-size: 12.5px; margin: 0; }
+#start { min-height: 52px; background: var(--chalk); color: #1b1a12; font: 700 22px/1 var(--display); letter-spacing: 0.08em; text-transform: uppercase; }
+#start:active { filter: brightness(0.9); }
+.foot { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; justify-content: space-between; }
+.link { color: var(--ink); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; min-height: 32px; }
+details { font-size: 13px; color: var(--dim); }
+details summary { color: var(--ink); cursor: pointer; min-height: 30px; display: flex; align-items: center; }
+details p { margin: 4px 0 8px; max-width: 62ch; }
+details b { color: var(--ink); font-weight: 600; }
+details code { font-size: 12px; color: var(--ink); }
+#rivals { list-style: none; margin: 4px 0 8px; padding: 0; display: grid; gap: 4px; max-width: 62ch; }
+#rivals i { display: inline-block; width: 9px; height: 9px; margin-right: 6px; }
+#track-set { margin: 4px 0 0; }
+@media (min-width: 760px) and (orientation: landscape) {
+  #menu { top: 0; right: auto; width: 400px; max-height: none; border-top: 0; border-right: 2px solid var(--chalk); padding-block: calc(20px + env(safe-area-inset-top, 0px)) 20px; gap: 14px; }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  #menu { top: 0; right: auto; width: min(430px, 56%); max-height: none; border-top: 0; border-right: 2px solid var(--chalk); padding-block: calc(10px + env(safe-area-inset-top, 0px)) 10px; gap: 8px; }
+  #menu h1 { font-size: 22px; } .sub { display: none; } #menu-map { height: 70px; } #start { min-height: 44px; }
+}
+
+/* ---- HUD ---- */
+#hud { position: absolute; inset: 0; pointer-events: none; padding-top: calc(8px + env(safe-area-inset-top, 0px)); padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); padding-left: var(--gl); padding-right: var(--gr);
+  display: grid; grid-template-rows: auto 1fr auto; text-shadow: 0 1px 2px rgba(10, 14, 11, 0.75); }
+.top { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: start; gap: 8px; }
+.boxes { display: flex; gap: 6px; }
+.box { background: color-mix(in srgb, var(--slate) 78%, transparent); padding: 5px 9px 6px; min-width: 50px; }
+.box .num { display: block; font-size: 24px; font-weight: 700; line-height: 1; margin-top: 3px; }
+.clock { text-align: center; }
+#lap-time { font-size: 44px; font-weight: 700; line-height: 0.95; }
+.clock small { display: block; font: 500 14px/1.25 var(--display); letter-spacing: 0.04em; color: var(--ink); }
+#best { color: var(--chalk); }
+.btns { display: flex; gap: 6px; justify-content: flex-end; pointer-events: auto; }
+.btns button { width: 44px; height: 44px; background: color-mix(in srgb, var(--slate) 78%, transparent); display: grid; place-items: center; }
+.btns svg { width: 22px; height: 22px; stroke: var(--ink); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mid { display: grid; place-items: center; align-content: start; padding-top: 6vh; }
+.msg { font: 700 26px/1.1 var(--display); letter-spacing: 0.04em; text-transform: uppercase; text-align: center; min-height: 1.2em; }
+.msg.big { font-size: 96px; }
+.msg.good { color: var(--chalk); }
+.msg.warn { color: var(--warn); }
+.bottom { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 8px; }
+#hud-map { width: 104px; height: 84px; background: color-mix(in srgb, var(--slate) 62%, transparent); }
+.speedo { text-align: center; }
+#speed { font-size: 40px; font-weight: 700; line-height: 0.9; }
+.sticks { justify-self: end; display: flex; gap: 10px; align-items: end; }
+.steer-track { width: 64px; height: 6px; background: color-mix(in srgb, var(--slate) 70%, transparent); position: relative; }
+#steer-dot { position: absolute; left: 27px; top: -3px; width: 10px; height: 12px; background: var(--ink); }
+.thr-track { width: 8px; height: 46px; background: color-mix(in srgb, var(--slate) 70%, transparent); display: flex; align-items: flex-end; }
+#thr-bar { width: 100%; height: 100%; background: var(--chalk); transform-origin: bottom; transform: scaleY(0); }
+#thr-bar[data-neg="true"] { background: var(--warn); }
+.ring { position: absolute; width: 0; height: 0; pointer-events: none; }
+.ring::before { content: ""; position: absolute; border: 2px solid color-mix(in srgb, var(--ink) 45%, transparent); }
+#ring-steer::before { left: -70px; top: -22px; width: 140px; height: 44px; border-radius: 22px; }
+#ring-throttle::before { left: -22px; top: -80px; width: 44px; height: 160px; border-radius: 22px; }
+.ring i { position: absolute; left: -19px; top: -19px; width: 38px; height: 38px; border-radius: 50%; background: color-mix(in srgb, var(--ink) 55%, transparent); }
+
+/* ---- overlays ---- */
+.sheet { position: absolute; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--slate) 72%, transparent); padding-left: var(--gl); padding-right: var(--gr); }
+.card { width: min(340px, 100%); background: var(--slate); border-top: 2px solid var(--chalk); padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+.card h2 { font-size: 28px; text-transform: uppercase; }
+.card button { min-height: 46px; border: 1px solid var(--line); background: var(--slate-2); font: 600 17px/1 var(--display); letter-spacing: 0.06em; text-transform: uppercase; }
+.card button.primary { background: var(--chalk); border-color: var(--chalk); color: #1b1a12; }
+#finish-body { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+#finish-body li { display: flex; justify-content: space-between; font: 500 17px/1.5 var(--display); font-variant-numeric: tabular-nums; border-bottom: 1px solid var(--line); }
+#finish-body li.best b { color: var(--chalk); }
+#loading { position: absolute; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--slate) 80%, transparent); font: 600 20px/1.2 var(--display); letter-spacing: 0.06em; text-transform: uppercase; text-align: center; padding-left: var(--gl); padding-right: var(--gr); }
+</style>
+
+<div id="app">
+  <canvas id="view"></canvas>
+  <div id="touch" hidden></div>
+
+  <div id="hud" hidden>
+    <div class="top">
+      <div class="boxes">
+        <div class="box"><span class="label">Lap</span><span class="num" id="lap-no">1</span></div>
+        <div class="box" id="pos-box"><span class="label">Pos</span><span class="num" id="pos">1/4</span></div>
+      </div>
+      <div class="clock"><span class="num" id="lap-time">0.00</span><small id="best">Best –</small><small id="last"></small></div>
+      <div class="btns">
+        <button id="btn-cam" aria-label="Change camera"><svg viewBox="0 0 24 24"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+        <button id="btn-reset" aria-label="Call the marshal"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 4v5h5"/></svg></button>
+        <button id="btn-pause" aria-label="Pause"><svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg></button>
+      </div>
+    </div>
+    <div class="mid"><div class="msg" id="hud-msg" role="status"></div></div>
+    <div class="bottom">
+      <canvas id="hud-map"></canvas>
+      <div class="speedo"><span class="num" id="speed">0</span><span class="label">km/h</span></div>
+      <div class="sticks">
+        <div class="steer-track"><div id="steer-dot"></div></div>
+        <div class="thr-track"><div id="thr-bar"></div></div>
+      </div>
+    </div>
+    <div class="ring" id="ring-steer" hidden><i></i></div>
+    <div class="ring" id="ring-throttle" hidden><i></i></div>
+  </div>
+
+  <div id="menu" hidden>
+    <div>
+      <h1>RC Dirt <span>Circuit</span></h1>
+      <p class="sub">The self-driving-car project's truggy, on its own MuJoCo physics and Phase 4.6 loops.</p>
+    </div>
+    <div class="track">
+      <canvas id="menu-map"></canvas>
+      <div>
+        <div class="track-pick">
+          <span class="label">Loop</span><span class="num" id="track-no">10001</span>
+          <button class="sq" id="prev" aria-label="Previous loop">‹</button>
+          <button class="sq" id="next" aria-label="Next loop">›</button>
+          <button class="sq" id="shuffle" aria-label="Random loop">?</button>
+        </div>
+        <p id="track-set" class="note">&nbsp;</p>
+        <p id="track-stats">&nbsp;</p>
+        <p id="track-best">&nbsp;</p>
+      </div>
+    </div>
+    <div class="row"><span class="label">Mode</span>
+      <div class="seg"><button data-mode="trial">Time trial</button><button data-mode="race">Race 3 AI cars</button></div></div>
+    <div class="row" id="laps-row"><span class="label">Laps</span>
+      <div class="seg"><button data-laps="3">3</button><button data-laps="5">5</button><button data-laps="8">8</button></div></div>
+    <div class="row"><span class="label">Surface</span>
+      <div class="seg"><button data-grip="0">Hard-pack</button><button data-grip="1">Loose</button><button data-grip="2">Dusty</button></div></div>
+    <p class="note" id="grip-note"></p>
+    <div class="row"><span class="label">Graphics</span>
+      <div class="seg"><button data-gfx="2">High</button><button data-gfx="1">Medium</button><button data-gfx="0">Fast</button></div></div>
+    <button id="start">Start</button>
+    <p class="note" id="pad-status"></p>
+    <details>
+      <summary>Controls</summary>
+      <p><b>Controller:</b> left stick steers. Right trigger drives, left trigger brakes. Or use the right stick like a stick radio: up to drive, down to brake. X calls the marshal, Y changes camera, Start pauses, A starts.</p>
+      <p><b>Touch:</b> left thumb slides sideways to steer, right thumb slides up to drive and down to brake. Each stick centres where your thumb lands.</p>
+      <p><b>Keyboard:</b> arrows or WASD, R for the marshal, C for camera, Esc to pause.</p>
+      <p><b>No reverse:</b> the car has a racing ESC, as in the sim. The brake only stops the wheels, and letting off is a light drag brake. If you get stuck, call the marshal.</p>
+      <p><b>In the air:</b> throttle lifts the nose, brake drops it. The spinning wheels react against the chassis, as on a real car.</p>
+    </details>
+    <details>
+      <summary>What is simulated</summary>
+      <p>The training sim's own car and tracks: MuJoCo 4.0.1 at 2 ms steps, the <b>truggy physics</b> (<code>real="truggy"</code>): soft suspension with 30% sag, one 0.6 N·m-per-wheel motor through limited-slip diffs, heavy wheels, an ESC brake with no reverse, the elliptic friction cone, and tires that lose a quarter of their grip once they slide. The servo takes 0.12 s per 60°, steering has the gate car's 0.4 expo, the battery sags, and 15 ms pass between your command and the wheels.</p>
+      <p>The loops are Phase 4.6's validation (10000–10019) and practice (100000–100019) loops, rebuilt from the sim's heightfield. The test loops are left out.</p>
+    </details>
+    <details>
+      <summary>The AI cars</summary>
+      <p>Ports of the project's hand-coded teacher, reading the sim's true state. Each draws its physics from the training range; yours is nominal.</p>
+      <ul id="rivals"></ul>
+    </details>
+    <div class="foot"><button class="link" id="sound-btn">Sound on</button></div>
+  </div>
+
+  <div class="sheet" id="pause" hidden>
+    <div class="card">
+      <h2>Paused</h2>
+      <button class="primary" id="resume">Resume</button>
+      <button id="restart">Restart</button>
+      <button id="pause-cam">Camera: <span id="cam-name">Chase</span></button>
+      <button id="pause-sound">Sound on</button>
+      <button id="to-menu">Change loop</button>
+    </div>
+  </div>
+  <div class="sheet" id="finish" hidden>
+    <div class="card">
+      <h2 id="finish-title">Finished</h2>
+      <ol id="finish-body"></ol>
+      <p class="note" id="finish-total"></p>
+      <button class="primary" id="again">Race again</button>
+      <button id="to-menu2">Change loop</button>
+    </div>
+  </div>
+  <div id="loading"><span id="loading-text">Loading…</span></div>
+</div>
+<script type="module" src="game.js"></script>

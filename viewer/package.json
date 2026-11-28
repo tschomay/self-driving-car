@@ -1,8 +1,0 @@
-{
-  "name": "race-replay",
-  "private": true,
-  "type": "module",
-  "description": "3D replay of a recorded race (issue #86). Build: npm install && node build.mjs",
-  "scripts": { "build": "node build.mjs", "serve": "node build.mjs --serve" },
-  "devDependencies": { "esbuild": "0.28.2", "three": "0.180.0" }
-}

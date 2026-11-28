@@ -9,7 +9,7 @@ import zlib from 'zlib';
 import http from 'http';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
-const DATA = arg('--data', '../runs/race');
+const DATA = arg('--data', '../../runs/race');
 const THREE_VER = '0.180.0';
 
 // what each recorded car is (keys: the recording's name)

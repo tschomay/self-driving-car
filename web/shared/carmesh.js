@@ -239,6 +239,8 @@ function livery(scheme, number) {
 const SCHEMES = {
   1: { a: 0x37d34b, b: 0x1d4fd8, flame: 0xff7418, flame2: 0xffc21a },     // main car: green to blue, orange flames
   2: { a: 0xf3f1ea, b: 0xc81e2b, flame: 0x15161a, flame2: 0x4a4d55 },     // rival: white to red, black flames
+  3: { a: 0xf2c230, b: 0x15161a, flame: 0xe8431a, flame2: 0xf3f1ea },     // the game's third car: yellow to black, red flames
+  4: { a: 0xf3f1ea, b: 0x7a3fd0, flame: 0x2fd3c4, flame2: 0xf3f1ea },     // fourth: white to purple, teal flames
 };
 
 /** The sim's car geometry (record.py writes it into each recording): the old 1/10-size car by default. */

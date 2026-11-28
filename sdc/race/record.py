@@ -71,7 +71,9 @@ def driver(car):
     if car in (["teacher"], ["base"], ["e4"]):
         pol, env = where._driver(car[0])
         return pol, env, car[0]
-    pol, env = Ensemble(tuple(car)), where.env_kw(val=True)
+    pol = Ensemble(tuple(car))
+    meta = json.loads((Path(car[0]) / "metrics.json").read_text())
+    env = meta.get("env46") or where.env_kw(val=True)     # the car's own sim (e.g. the full-size truggy), not SDC_REAL
     return pol, env, Path(car[0]).name.rsplit("-s", 1)[0]
 
 
@@ -244,8 +246,12 @@ def main():
     ap.add_argument("--laps", type=int, default=LAPS)
     ap.add_argument("--phys-seed", type=int, default=0)
     ap.add_argument("--out", default="runs/race")
+    ap.add_argument("--sim", default=None, help="SDC_REAL for drivers without a stored env (the teacher), e.g. truggy2")
     ap.add_argument("--dr", default="keep", help="physics range: keep the car's own (gate), or nominal / train / gate")
     a = ap.parse_args()
+    if a.sim:
+        import os
+        os.environ["SDC_REAL"] = a.sim      # read when the drivers' modules are first imported (in driver())
     out = Path(a.out)
     for seed in a.loops:
         tp = out / f"track-{seed}.json.gz"

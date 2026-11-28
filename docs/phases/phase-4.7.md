@@ -571,3 +571,5 @@ Measured on the old-chassis traces (first 300 runs each; lane is 3 m wide; "insi
 The teacher holds the centre line. RL moves off it, but not into a racing line: no inside bias in corners (slightly outside). E7 turns 0.1 s after the curve starts.
 
 Owner, on how far ahead they look: "I think I setup for the next corner immediately after leaving the previous one. But sensors can't see well for a long distance. 6m might be all we can hope for"
+
+Owner, on surfaces (2026-11-28): "On a real track, grip is mostly uniform apart from two things - areas that are bumpy and areas where cars have either made the dirt smooth or loose. We added some bumps already, but maybe need more right surface through out to be realistic? And we don't model track wear. Any ideas to add that? Or is it too complex and we should just cheat with a little grip noise rate than a map"

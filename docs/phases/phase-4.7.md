@@ -578,6 +578,10 @@ It wins on mid and high grip and loses on low grip, where it crashes three times
 
 **Worn-track bar** (`truggy3`, teacher, 5 passes): 607/750 finished, 19.1% crashes, 27.64 s lap, **579.5 s**, against 564.7 s on `truggy2`. The worn track costs the teacher mostly in crashes (low grip 31%, mid 16%, high 8%).
 
+Replay session, 20-lap races at nominal physics: E7c's clean laps are 3–4 s faster than the teacher's, but it leaves the lane at the same few corners about once every 2–3 laps (loop 10001: 12 crashes, 10003: 10, 10002: 2; the teacher had none).
+
+Owner, on what tells them to back off before crashing on a slick day: "Other drivers saying "wow it's slick out there". Observations (e.g. the track looks smooth and hard pack or has gravel/mud balls on the surface). A slow practice lap. Or maybe an accidentally fast one where I crash but it doesn't count for anything"
+
 ### Owner on racing lines (2026-11-28)
 
 "Watching the replay I see two behaviors that mean I could race better than this car. First, it seems to aim for the center line. Sometimes it makes big corrections to get there. I think that's what the teacher does and it makes sense because it maximizes buffer of track space. But a human driver would aim for more of a racing line - enter corners wide, turn early, hit the apex, etc. Rarely do I actually aim for the the center line. I almost always want to be near an edge. Perhaps related, I see the car turning late instead of early. Like it's well into the corner and goes oh crap I'd better turn! My hope was that the teacher would teach it to get around the track and use its controls. And then RL would get it finding these tricks for how to really race. I don't think we've gotten there. Although I did say that it finally looks more like racing. I think that's because there are corners where I see it slide and counter steer. And it appears to be attacking the track a little more."

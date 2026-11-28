@@ -511,3 +511,24 @@ What the code says about grip:
 - **Sensor car (E5, E7 actor):** no grip input. It gets the IMU, gyro, front and rear wheel speeds, rays and its last action. Grip could only be inferred from slip (wheel speed against what the IMU says the car is doing), through the GRU's memory. Nothing in training asks for that.
 - **RL racer and E7's critic:** see the true friction (`priv_obs` ends with friction, mass, motor). So the racer can drive faster on high grip and slower on low grip, and the student copies the result without the cause.
 - **Teacher:** doesn't know grip either (`teacher.py`: "A_LAT is one fixed number, not the car's true grip"). It survives low grip because its corner budget (3.5 m/s²) is cautious for every grip.
+
+### E7b — E7 with a grip head (option B), against a control (owner, 2026-11-28: "We already tried C and it didn't help. A seems similar, so let's try B.")
+
+- **Physics change first (owner: "any ground contact from the chassis give an immediate stop. That's not realistic - momentum means it will slide"):** the chassis box caught the heightfield's prism walls and had tyre grip (1.0), so a slam stopped the car from 7 m/s in 40 ms. New switch `skid` (in `truggy2`): the box collides through three rounded capsules with plastic-on-dirt friction 0.4 (scaled with the episode's grip). A 5 m/s slam now keeps about 3 m/s and slides on. All earlier full-size scores were on the old chassis (`runs/old-chassis/`).
+- **Setup:** two E7 runs from `runs/p48-e5-s0`, 12 h, 2 workers each, new chassis. `runs/p48-e7b`: `grip_coef=1.0`, a head on the actor's memory predicts the episode's true grip and its squared error joins the loss. `runs/p48-e7c`: control, the same head trained on a detached memory (a probe: does the memory already know grip?).
+- **Prediction (owner):** "Intuitively, grip sensing is important and will help a lot. If E7b doesn't win over the control, I think it means we are still missing something. So I hope it does win, but I feel like we've tried similar enough things in the past that I'm not convinced it'll help."
+- **Result:** _running_
+
+### Owner on racing lines (2026-11-28)
+
+"Watching the replay I see two behaviors that mean I could race better than this car. First, it seems to aim for the center line. Sometimes it makes big corrections to get there. I think that's what the teacher does and it makes sense because it maximizes buffer of track space. But a human driver would aim for more of a racing line - enter corners wide, turn early, hit the apex, etc. Rarely do I actually aim for the the center line. I almost always want to be near an edge. Perhaps related, I see the car turning late instead of early. Like it's well into the corner and goes oh crap I'd better turn! My hope was that the teacher would teach it to get around the track and use its controls. And then RL would get it finding these tricks for how to really race. I don't think we've gotten there. Although I did say that it finally looks more like racing. I think that's because there are corners where I see it slide and counter steer. And it appears to be attacking the track a little more."
+
+Measured on the old-chassis traces (first 300 runs each; lane is 3 m wide; "inside" = offset toward the corner's centre where |curvature| > 0.1/m; steering lag = the shift that best lines steering up with the track's curvature at the car):
+
+| Driver | Mean distance from centre line | Inside offset in corners | Steering vs curvature |
+|---|---|---|---|
+| Teacher | 0.07 m | −0.03 m | 0.1 s early |
+| RL racer | 0.39 m | −0.02 m | on time |
+| E7 | 0.35 m | −0.09 m | 0.1 s late |
+
+The teacher holds the centre line. RL moves off it, but not into a racing line: no inside bias in corners (slightly outside). E7 turns 0.1 s after the curve starts.

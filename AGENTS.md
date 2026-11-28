@@ -64,3 +64,37 @@ Before merging:
 Don't ask "should I open a PR / merge?" in these cases. Just do it and report the merged PR.
 
 PRs are squash-merged, so afterwards bring `main` into the working branch with `git merge origin/main` (not rebase plus force-push, which the session's permissions block).
+
+## Repo layout: sim, champion cars, replay viewer, game
+
+One repo for the sim and everything built on it, so a change lands on all of them at once (owner, 2026-11-28).
+
+- `sdc/`: the Python sim and training. It is the source of truth for the car, physics and tracks.
+- `models/`: the champion cars, kept in git (about 350 KB each; see `models/README.md`). Weights for everything
+  else stay out of git (`runs/` is ignored; the `car-weights` branch holds history).
+- `web/`: the browser apps, one `npm install` in `web/` for all of them.
+  - `web/shared/`: the three.js renderer (track, truggy, cameras, post-processing), used by both apps.
+  - `web/viewer/`: the 3D race replay (issue #86), playing recordings from `sdc/race/record.py`.
+  - `web/game/`: rc-racer, the playable game (moved from the `sandbox` repo): MuJoCo in the browser on the sim's car
+    and loops, AI cars from the teacher.
+  - Checks (not in pytest): `cd web && npm run build:viewer && npm run build:game && npm run test:game`.
+
+Keeping them in sync:
+
+- **A new leading car goes into `models/` in the same PR that adopts it.** Copy `model.pt`, and a `metrics.json`
+  without the per-episode lists, with a `champion` entry (source run, sim, race time), and update the table in
+  `models/README.md`. `tests/test_models.py` checks every champion loads and drives in its stored sim.
+- **Drive a stored car in its own sim:** use `metrics.json["env46"]`, not `SDC_REAL`.
+- **Car geometry reaches the viewer through the recordings** (`record.py` writes it). After changing the car's
+  size or suspension in `sdc/jumps/car.py`, re-record before republishing the replay.
+- **The game takes its numbers from the sim.** `python -m sdc.export` writes `web/shared/generated/sim.json`: the
+  champion car's physics (size, springs, motor, diffs, grip model), actuator settings, physics ranges, teacher and race
+  rules. The game reads every number from it. A PR that changes any of those in `sdc/` reruns the export in the same PR;
+  `tests/test_export.py` fails while the file is stale, and checks that the game's MuJoCo drives like the sim for the
+  first second (it needs `npm install` in `web/`, else it is skipped).
+- **Structure is still ported by hand:** a new physics switch, joint, tendon or actuator model in `sdc/jumps/` also needs
+  `web/game/src/carmodel.js` or `sim.js` changed (see `web/game/docs/physics.md`), or the PR says the game is behind.
+- **Loops:** after changing `sdc/jumps/loop.py`, rerun `python web/game/tools/export_loops.py --out web/game/loops`
+  (from `web/game`: `--out loops`) and `node test/loops.mjs`.
+- **A new champion in `models/`** (or a new sim for it) changes the export: rerun `python -m sdc.export`.
+- **One renderer:** visual changes go in `web/shared/`, never in a copy inside an app.

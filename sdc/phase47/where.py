@@ -48,6 +48,12 @@ FULL_MAP = "runs/p47-maps-select-full.json"          # after E3: every failed ou
 E3B_CAR = ("runs/p47-e3b-s0", "runs/p47-e3b-s1")    # E3b: map students trained on complete maps
 E4_CAR = ("runs/p47-e4-s0", "runs/p47-e4-s1")       # E4: sensors-only students copying the re-tuned teacher
 E4_TEACHER = "runs/p47-e4-teacher.json"              # e4_tune.py's chosen settings over TRUGGY
+E5_CAR = ("runs/p47-e5-s0", "runs/p47-e5-s1")       # E5: sensors-only students copying the privileged RL racer
+E5_RACER = "runs/p47-racer-s1/ckpt/3014656.pt"       # the racer they copy (crash price 200, 3M steps)
+E6_CAR = ("runs/p47-e6-s0", "runs/p47-e6-s1")       # E6: sensors-only students copying E6a (racer that sees 4 m)
+P48_RACER = "runs/p48-racer/ckpt/best.pt"            # full-size truggy (SDC_REAL=truggy2): RL racer, best checkpoint
+P48_E5_CAR = ("runs/p48-e5-s0", "runs/p48-e5-s1")   # full-size truggy: sensors-only students copying it
+P48_E7_CAR = ("runs/p48-e7",)                        # full-size truggy: E7 (RL on the sensor student)
 
 
 def _driver(who):
@@ -60,6 +66,20 @@ def _driver(who):
         return Ensemble(E3B_CAR), dict(env, turn_map=FULL_MAP)
     if who == "e4":
         return Ensemble(E4_CAR), env
+    if who == "e5":
+        return Ensemble(E5_CAR), env
+    if who == "e6":
+        return Ensemble(E6_CAR), env
+    if who in ("racer", "p48racer"):                  # privileged, so scored like the teachers: no expo
+        from sdc.phase47.racer import Driver
+        return Driver(E5_RACER if who == "racer" else P48_RACER), {k: v for k, v in env.items() if k != "expo"}
+    if who == "p48teacher":                           # the full-size truggy's teacher (racer.TEACHER under truggy2)
+        from sdc.phase47.racer import TEACHER
+        return LoopExpert(**TEACHER), {k: v for k, v in env.items() if k != "expo"}
+    if who in ("p48e5", "p48e7"):
+        return Ensemble(P48_E5_CAR if who == "p48e5" else P48_E7_CAR), env
+    if who.startswith("e4cap"):                       # E4 students with forward throttle scaled to e4capNN percent
+        return Capped(Ensemble(E4_CAR), int(who[5:]) / 100), env
     if who in ("teacher", "mapteacher", "teacher_plus"):
         env = {k: v for k, v in env.items() if k != "expo"}
         over = {}
@@ -69,7 +89,22 @@ def _driver(who):
     return Ensemble(MAP_CAR if who == "map" else BASE), env
 
 
-WHO_ID = dict(base=0, teacher=1, map=2, mapteacher=3, map_full=4, teacher_plus=5, e4=6)
+class Capped:
+    """Scales the positive (forward) throttle by k; braking and steering untouched. A crude speed limit."""
+    def __init__(self, pol, k):
+        self.pol, self.k = pol, k
+
+    def reset(self, n):
+        self.pol.reset(n)
+
+    def __call__(self, b):
+        a = np.array(self.pol(b), np.float32)
+        a[:, 1] = np.where(a[:, 1] > 0, a[:, 1] * self.k, a[:, 1])
+        return a
+
+
+WHO_ID = dict(base=0, teacher=1, map=2, mapteacher=3, map_full=4, teacher_plus=5, e4=6, e4cap95=7, e4cap90=8, racer=9, e5=10, e6=11,
+              p48teacher=12, p48racer=13, p48e5=14, p48e7=15)
 
 
 def _drive(who, rep, course):
@@ -289,6 +324,21 @@ def analyse(src=(OUT,), summary=SUMMARY):
     print(json.dumps({k: v for k, v in out["corner_other"].items() if k != "rows"}, default=float))
 
 
+def race(src, out, laps=20, crash_s=7.0):
+    """Race time per driver: laps x median finished lap + laps x crash rate x crash_s, over every noisy pass."""
+    runs = [r for p in src for r in pickle.loads(Path(p).read_bytes())]
+    res = {}
+    for who in sorted({r["who"] for r in runs}, key=lambda w: WHO_ID[w]):
+        rs = [r for r in runs if r["who"] == who]
+        fin = [r["ep"]["l"] * 0.02 for r in rs if r["ep"]["finished"]]
+        crash = 1 - len(fin) / len(rs)
+        lap = float(np.median(fin)) if fin else float("nan")
+        res[who] = dict(runs=len(rs), finished=len(fin), crash_rate=round(crash, 4), lap_s=round(lap, 3),
+                        race_s=round(laps * lap + laps * crash * crash_s, 1))
+        print(who, res[who])
+    Path(out).write_text(json.dumps(res, indent=1))
+
+
 def main():
     """collect | analyse, or e3: the map car and the map-following teacher, analysed with the base/teacher runs."""
     cmd = sys.argv[1]
@@ -307,6 +357,28 @@ def main():
         if not pk.exists():
             collect((who,), pk)
         analyse((OUT, pk), Path(f"runs/p47-{cmd}-where.json"))
+    elif cmd == "e5":                           # E5: the RL racer and its sensor students
+        pk = Path("runs/p47-e5-where.pkl")
+        if not pk.exists():
+            collect(("racer", "e5"), pk)
+        analyse((OUT, pk), Path("runs/p47-e5-where.json"))
+    elif cmd == "e6":                           # E6: sensor students of the 4 m racer (E6a)
+        pk = Path("runs/p47-e6-where.pkl")
+        if not pk.exists():
+            collect(("e6",), pk)
+        analyse((OUT, pk), Path("runs/p47-e6-where.json"))
+    elif cmd == "p48":                          # full-size truggy (SDC_REAL=truggy2): python -m ... p48 who [who ...]
+        assert env_kw(True)["real"] == "truggy2", "set SDC_REAL=truggy2"
+        for who in sys.argv[2:]:
+            pk = Path(f"runs/p48-where-{who}.pkl")
+            if not pk.exists():
+                collect((who,), pk)
+        race(sorted(Path("runs").glob("p48-where-*.pkl")), Path("runs/p48-race.json"))
+    elif cmd == "e4cap":                        # after E4: does a lower speed limit trade the lap time back for finishes?
+        pk = Path("runs/p47-e4cap-where.pkl")
+        if not pk.exists():
+            collect(("e4cap95", "e4cap90"), pk)
+        analyse((OUT, pk), Path("runs/p47-e4cap-where.json"))
 
 
 if __name__ == "__main__":

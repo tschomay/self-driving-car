@@ -44,6 +44,7 @@ Collected as they come up (first batch: Phase 0, E1–E2). Apply them in every p
 - **Show controls visually, not as numbers.** Numbers are hard to read while a GIF plays. Lap GIFs draw steering and pedal as gauges under the map, and skid marks for tire slip (owner's request, Phase 3 E1).
 - **Never launch an experiment before the owner's prediction is in** (slipped once, Phase 3 E14). Hold back results, even validation numbers, that could sway a pending protocol or gate decision.
 - **Bring back findings from background reviews when the owner suspects something is off.** Their hunches about the sim (twitchy steering) led to real physics bugs (Phase 3 sim review).
+- **Ask guiding questions, not "explain this" (owner, Phase 4.7).** When asking for an explanation, don't just ask "why did this happen?". As in Phases 1–3, ask one or two pointed questions that lead the owner toward the mechanism: point at the telling number, contrast two cases, ask what they'd expect if a hypothesis were true. Questions should build understanding and sometimes suggest what to try next, even when the agent doesn't know the answer either.
 - **Phone-sized messages.** Short sections, tables for prediction vs. result, one question at a time where possible.
 
 ## Git workflow: merge when a body of work is done

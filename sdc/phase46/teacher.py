@@ -103,7 +103,7 @@ class LoopExpert(dr.ExpertDriver):
         e = target - s["v_fwd"]
         throttle = self.kv * e + self.kv_ff * target
         if self.tc is not None and throttle > 0:
-            spin = float(car.d.qvel[car.spin_dof].mean()) * cr.WHEEL_R - s["v_fwd"]
+            spin = float(car.d.qvel[car.spin_dof].mean()) * car.wheel_r - s["v_fwd"]
             throttle *= float(np.clip(1.0 - (spin - self.tc) / self.tc, 0.0, 1.0)) if spin > self.tc else 1.0
         if getattr(car, "expo", 0.0):   # the same steering angle through the car's expo curve
             steer = je.expo_inverse(float(steer), car.expo)
@@ -158,7 +158,7 @@ class OutLapDriver(LoopExpert):
         target = (self.V_RETRY if st["charge"] else self.V_JUMP) if on_jump else self.V
         thr = self.kv * (target - s["v_fwd"]) + self.kv_ff * target + 1.2 * np.sin(s["pitch"])
         if self.tc is not None and thr > 0:   # traction control, as the race teacher (truggy physics)
-            spin = float(car.d.qvel[car.spin_dof].mean()) * cr.WHEEL_R - s["v_fwd"]
+            spin = float(car.d.qvel[car.spin_dof].mean()) * car.wheel_r - s["v_fwd"]
             thr *= float(np.clip(1.0 - (spin - self.tc) / self.tc, 0.0, 1.0)) if spin > self.tc else 1.0
         a[1] = np.clip(thr, -0.1 if on_jump else -1, 1)
         if on_jump:

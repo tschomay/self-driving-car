@@ -19,6 +19,8 @@ import pickle
 import time
 from pathlib import Path
 
+import os
+
 import numpy as np
 import torch
 from torch import nn
@@ -36,8 +38,11 @@ CFG = dict(n_envs=8, n_steps=256, batch_size=256, n_epochs=10, lr=3e-4, gamma=0.
            drills=1, exam_every=100_000, eval_procs=1)   # drills=2: E2 (drills2.py, e2_prep.py)
 
 
+REAL = os.environ.get("SDC_REAL", "truggy")    # "truggy2": the air-control physics (docs/phases/air-control.md)
+
+
 def env_kw(val=False):
-    return student_env(False, val=val, real="truggy", expo=0.4)
+    return student_env(False, val=val, real=REAL, expo=0.4)
 
 
 def validate(base, actor_path, obs_dim, procs=1, courses=None, ref=REF_TRUGGY):

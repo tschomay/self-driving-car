@@ -84,7 +84,7 @@ Every experiment gets the owner's prediction before it runs.
   - **Selection gains didn't carry over:** the kept checkpoints scored 133 and 135 of 150 against the base car's 124, but 83 and 86 of 102 on the fresh loops against its 84. As in E1, best-of-six picking flatters the kept checkpoint.
   - **E1's faster laps didn't come back:** seed 0 was 0.4 s faster on the fresh loops, and seed 1 was 0.5 s slower.
   - **Prediction vs. result:** predicted 25% and 90; got 29–31% and 83–86. Both are within noise of the base car.
-- **Explanation (owner):** _pending_
+- **Explanation (owner):** "That was my gut reaction too - is it possible to recover? We seem to be in a situation where we're having a number of busts again." (reacting to the flat exam: the drills taught little, which led to the recoverability check below)
 
 ### After E2 — Can these crashes be recovered at all? (agent, owner's request)
 
@@ -163,7 +163,7 @@ Every experiment gets the owner's prediction before it runs.
     - _Corrected after the quick test below:_ this drift is not clearly the cause. Some of it builds up after the car has already left the lane (wheels spinning), and some laps finish with 13–16 m of drift.
   - Lap times differ by under 0.3 s. Medians are over the laps each car finished, so they aren't directly comparable.
   - **Prediction vs. result:** predicted 133 per pass and no time change. Got 106 (99–113) and about the same lap time.
-- **Explanation (owner):** _pending_
+- **Explanation (owner):** "A map only hurts if it's inaccurate."
 
 ### After E3 — Complete and accurate maps: the quick test (owner: "A map only hurts if it's inaccurate. Go ahead with that quick test")
 
@@ -203,7 +203,7 @@ Every experiment gets the owner's prediction before it runs.
   - Retraining on complete maps gained 5 a pass over E3 with complete maps (112 → 117), but the map car is still 13 below the base car.
   - Corner failures fell from 123 (E3) to 80, still more than twice the base car's 35. Doubles also got worse (83% landed against the base car's 92%).
   - On runs both finished, lap times match the base car's (median difference 0.0 s).
-- **Explanation (owner):** _pending_
+- **Explanation (owner):** "I don't know why 3b and 4 aren't helping."
 
 ### E4 — A teacher re-tuned for landings, copied by the base recipe (owner: "Try both in parallel now")
 
@@ -242,4 +242,251 @@ Every experiment gets the owner's prediction before it runs.
   - **Fewer finishes than the base car: 124 a pass against 130.** Not a success: the goal needs more finishes with no slower lap, or the same finishes with a faster lap.
   - **Faster:** on runs both finished, its laps are 0.5 s quicker than the base car's and the teacher's.
   - It lands doubles as often as the teacher (94.4%), but fails more at landings overall (40 against 16), mostly by rolling over (28 against 12), and enters corners faster than the base car (4.75 m/s against 4.59). Corner failures rose from 35 to 47.
+- **Explanation (owner):** "I don't know why 3b and 4 aren't helping." The owner asked to step back: research what would really move the needle toward a good racer, rather than chase small gains (see "Stepping back" below).
+
+### After E4 — A lower speed limit for the E4 students (owner: "Sure")
+
+- **Question:** the E4 students are 0.5 s a lap faster than the base car but finish 6 fewer a pass. Does a lower speed limit trade that time back for finishes? If it got back to 130 with a faster median lap, it would meet the goal's second half.
+- **Setup:** the E4 students with forward throttle scaled to 95% and to 90% (braking and steering unchanged), no retraining, scored on the 150 selection runs (`python -m sdc.phase47.where e4cap`).
+- **Prediction (owner):** "I predict it won't help."
+- **Result:**
+
+  | Driver | Finished per pass (of 150) | Mean | Corner entry speed | Median lap difference vs base car (shared runs) |
+  |---|---|---|---|---|
+  | Base car | 127, 133, 135, 126, 131 | 130 | 4.59 m/s | — |
+  | E4 car | 120, 127, 125, 125, 123 | 124 | 4.75 m/s | −0.50 s |
+  | E4 car, throttle 95% | 113, 118, 125, 127, 127 | 122 | 4.73 m/s | −0.32 s |
+  | E4 car, throttle 90% | 107, 126, 121, 120, 127 | 120 | 4.70 m/s | −0.06 s |
+
+  - It didn't help: less throttle gave back the lap time but no finishes (122 and 120, within noise of 124 or slightly worse).
+  - Corner entry speed barely moved (4.75 → 4.70 m/s): the extra corner speed doesn't come from too much throttle, so a throttle limit can't remove it.
+  - **Prediction vs. result:** predicted it won't help; it didn't.
 - **Explanation (owner):** _pending_
+
+## Stepping back (owner: "Take a step back… Are we putting too many restrictions in place? Are we stuck in a narrow paradigm?")
+
+The owner asked for research on what would really move the needle toward a good racer, instead of chasing small gains. Up to a day of the agent's own work before reporting back.
+
+### What the literature does (`docs/research/beyond-the-teacher-literature.md`)
+
+- Every system in the review that beat its baseline driver (GT Sophy, Swift drone racing, an F1TENTH car that beat expert human drivers, legged robots on rough terrain) trained by RL on a **dense progress reward** with **privileged information** (true state, track ahead).
+  - Where the deployed car had only sensors, that privileged policy was then distilled into it, or trained it through a critic that sees the true state.
+  - None capped itself by copying a hand-written driver. A copied teacher is a ceiling.
+- **Budget:** those runs used about 10^8 steps with 80k–150k steps per update. Every RL run in this project so far: 10^6 steps, 2,048 steps per update, one core.
+
+### Speeding up the sim
+
+- Profiling showed a third of the sim's time went to one small numpy call: the cross product in each tire's slip speed, run 40 times per control step.
+- Written out by hand, it gives bit-identical results and about 1.4× the speed.
+
+### Headroom: how fast can a driver that knows the track go? (`python -m sdc.phase47.headroom`)
+
+- **Setup:** the re-tuned teacher (E4) driven more aggressively on 50 practice loops × 3 starts, gate range, tiny action noise, 2 passes each. Jump approach speeds were left unchanged.
+  - "Corners" = the cornering and braking limit the teacher plans with (default 2.5 m/s²).
+  - "Cruise" = the speed away from jumps (default 7.4 m/s).
+
+  | Setting | Finished per pass (of 150) | Median lap | Lap vs teacher (shared runs) |
+  |---|---|---|---|
+  | Teacher (E4) | 135, 134 | 30.8 s | — |
+  | Cruise 9 | 134, 135 | 30.4 s | −0.4 s |
+  | Cruise 11 | 135, 132 | 30.3 s | −0.4 s |
+  | **Corners 3.5** | 135, 131 | **28.2 s** | **−2.6 s** |
+  | Corners 4.5 | 127, 125 | 26.9 s | −3.9 s |
+  | Corners 6 | 108, 105 | 26.3 s | −4.7 s |
+  | Corners 3.5, cruise 9 | 127, 133 | 27.4 s | −3.4 s |
+  | Corners 4.5, cruise 11 | 94, 92 | 25.7 s | −5.2 s |
+  | Corners 6, cruise 13 | 55, 46 | 24.9 s | −5.4 s |
+
+- **What it shows:**
+  - The teacher, and so every car copied from it, corners far below the tires' limit.
+  - Cornering at 3.5 m/s² is 2.6 s a lap faster (8%) at about the same finishes (133 against 134.5 a pass).
+  - Every car in Phases 4.6–4.7 has lapped in 30.5–31 s. All of them were copying this caution.
+  - Cruise speed matters little: the straights are short.
+- **What follows:** beating this teacher on time is easy for a driver that knows the track. Doing it from sensors alone is the hard part, because sharp corners are where the sensor car already fails (E3 analysis).
+
+### Pilot: an RL racer with privileged information (`python -m sdc.phase47.racer`)
+
+- **Question:** given the true state, the track ahead and the physics, and a reward for progress, does RL find driving better than the best hand-coded teacher?
+- **Setup:**
+  - **Inputs:** true state, curvature and height 30 m ahead, the next jump, grip, mass and motor.
+  - **Reward:** metres of progress, −50 for a crash, +50 for a finish.
+  - **Start:** a copy (4 DAgger rounds) of the teacher with 3.5 m/s² corners.
+  - **Training:** the critic first, then PPO with the owner's GAE and losses on 128 cars across 4 processes, 32k steps per update, 181 practice loops, training-range physics. 9 h.
+  - **Scoring:** every 3M steps on the 150 selection runs, 2 noisy passes.
+- **Prediction:** none asked (agent's research step, owner away).
+- **Result:** stopped at 9M steps (3.6 h). PPO finds speed the teacher can't, but it spends finishes to get it. The teacher's own trade-off on the same 150 selection runs is measured by making it corner harder (`runs/p47-frontier-select.json`).
+
+  | Driver | Finished per pass | Median lap |
+  |---|---|---|
+  | Teacher, corners 3.5 (the pilot's start) | 136 | 28.0 s |
+  | Teacher, corners 4.0 | 130 | 27.3 s |
+  | Teacher, corners 4.5 | 127.5 | 27.0 s |
+  | Teacher, corners 5.0 | 112.5 | 26.6 s |
+  | RL, copy of the teacher (0 steps) | 132.5 | 28.1 s |
+  | RL, 3M steps | 129 | 27.2 s |
+  | RL, 6M steps | 124.5 | 26.0 s |
+  | RL, 9M steps | 113 | 25.0 s |
+
+  - At 6M steps RL is 0.6 s faster than the teacher at corners 5.0 and finishes 12 more runs per pass. At 9M it finishes as often as that teacher and is 1.6 s faster. No teacher setting gets near 25 s at any finish rate (headroom table above).
+  - So the frontier moved outward. But the reward let RL pick a point on it the goal doesn't want: a crash cost 50 m of progress, about 7 s of driving.
+- **Crash price 200** (from the 6M checkpoint, `runs/p47-racer-s1`): 3M steps gave 130.5 at 25.9 s; 6M gave 120.5 at 25.3 s. Finishes came back at first, then the driver drifted toward speed again.
+- **Crash price 500, horizon about 20 s (γ 0.999)** (from s1's 3M checkpoint, `runs/p47-racer-s2`): 3M steps gave 125.5 at 25.4 s; 6M gave 121.5 at 25.1 s. Same drift. Stopped.
+- **Best driver, 5 passes** (s1 at 3M): 133, 137, 131, 135, 128, mean **132.8** at **25.9 s**. Against the teacher (137 at 30.8 s): 4 fewer finishes per pass, about 5 s faster. Not a success under the goal.
+- **Where it loses** (`python -m sdc.phase47.by_grip`, 1 pass):
+  - Not on low grip. On runs with friction 0.55–0.7, below anything seen in training, RL finished 20/25 and the teacher 22/25.
+  - Failures look like the teacher's, mostly off the lane (RL 9 off the lane, 3 rolled; teacher 10 and 4).
+- **Reading (agent):** speed pays a little on every step. A crash is rare and partly chaotic, so its cost reaches the learner as a weak, noisy signal, and a bigger price or a longer horizon didn't fix that.
+- **Next (running):** a dense warning instead of only the rare crash. A small cost on every step the car is more than 1.0 m off the centre line (the lane is 1.5 m each side). `--set margin=0.5 --set crash_pen=200`, from s1 at 3M (`runs/p47-racer-s3`).
+  - 3M steps: 129, 131, mean 130.0 at 25.5 s. Finishes flat, laps a little faster. Every reward tried so far (crash 50, 200, 500 with long horizon, lane margin) settles near 130 finishes per pass. Still running.
+
+### Owner's answers after the RL pilot
+
+- **Which car would you race?** "The faster one. The slow ones probably wins more but it isn't as exciting. And crashes are common in rc racing."
+- **What limits finishes?** "Crashing is a matter of luck and random chance at some point. Better driving can't prevent it."
+- **What survives on sensors?** "We would lose some route planning. But I'm thinking that driving is more dependent on ability to react rather than plan. It never learned or needed a racing line. I think it'll be a little less reliable on the jumps"
+
+### New goal (owner, after the RL pilot)
+
+- **Owner:** "Let's do total time for a 20 lap race. Crashes cost 7 seconds."
+- **Scoring:** race time = 20 × median lap + 20 × crash rate × 7 s, from the 5 noisy passes of the 150 selection runs (each run counts as one lap). Lower is better; success is a sensors-only car with a lower race time than the teacher.
+- **What it means (agent):** 1 s per lap is worth 20 s, about 3 crashes. A car can crash on 14 more laps in 100 for each second it gains per lap and still break even.
+
+  | Driver | Crashes per lap | Race |
+  |---|---|---|
+  | Base car | 0.133 | 633 s |
+  | Teacher | 0.087 | 628 s |
+  | Re-tuned teacher | 0.053 | 622 s |
+  | E4 students | 0.173 | 628 s |
+  | Teacher, corners 5.0 | 0.250 | 567 s |
+  | Best RL racer (privileged) | 0.115 | 534 s |
+  | RL racer, 9M steps (privileged) | 0.247 | 535 s |
+
+### E5 — Copy the RL racer onto sensors
+
+- **Setup:** the base recipe (`bc_loop --truggy --rounds 16 --expo 0.4`, 2 seeds averaged), with the privileged RL racer as the teacher (`--teacher-racer runs/p47-racer-s1/ckpt/3014656.pt`; `bash sdc/phase47/e5_runs.sh`).
+  - The racer was trained without steering expo. On the expo car it sees its last steering as the servo angle it asked for, and its steering goes through the expo inverse, as the hand-coded teacher's does (`racer.ExpoDriver`).
+  - Check, 1 pass on the selection runs with expo: 135 finished at 25.8 s (without expo, 5 passes: 132.8 at 25.9 s).
+  - Scoring: 5 noisy passes of the 150 selection runs, racer and students (`python -m sdc.phase47.where e5`).
+- **Prediction (owner):** "a little less reliable on the jumps"; driving depends more on reacting than planning, so most of the speed should carry over.
+- **Result:** a success under the owner's race rule. The sensors-only E5 car beats the teacher by 53 s over 20 laps. It keeps nearly all of the racer's speed, but crashes on 4 laps in 10. Scored over 5 passes × 150 selection runs; laps are paired against the teacher (`runs/p47-e5-where.json`).
+
+  | Driver | Finished per pass | Crashes per lap | Median lap | Lap vs teacher | 20-lap race |
+  |---|---|---|---|---|---|
+  | Base car | 127, 133, 135, 126, 131 | 0.131 | 30.7 s | −0.06 s | 633 s |
+  | Teacher | 139, 136, 141, 127, 142 | 0.087 | 30.8 s | — | 628 s |
+  | Re-tuned teacher | 136, 144, 142, 142, 144 | 0.056 | 30.5 s | −0.10 s | 618 s |
+  | E4 students | — (mean 124) | 0.173 | 30.4 s | −0.49 s | 631 s |
+  | RL racer (privileged) | 132, 136, 134, 130, 138 | 0.107 | 25.8 s | −4.92 s | 531 s |
+  | **E5 students** | 97, 89, 87, 89, 99 | 0.385 | 26.1 s | −4.78 s | **575 s** |
+
+  - **Speed carried over** almost whole: −4.78 s against the racer's −4.92 s.
+  - **Reliability did not.** E5 finished 92 per pass against the racer's 134. Its 289 failures (5 passes):
+    - 198 in corners (off the lane)
+    - 48 elsewhere off the lane
+    - 38 on landings
+  - **Jumps:** E5 landed 94.3% of all jumps (racer 96.3%, teacher 97.5%). Doubles were *better* (98.8%; racer 94.8%), drops worse (87.2%; racer 95.5%), tables about the same (97.9%; racer 98.3%).
+  - **Corner entry:** E5 enters corners at 6.12 m/s, faster than the racer it copies (5.77). E4's students did the same against their teacher (4.75 against 4.12).
+  - Validation (60 runs, start 0 and others): 40/60 and 31/60, against E4's 53 and 49.
+  - Owner's prediction: speed survives ("driving is more dependent on ability to react rather than plan"): **right**. "A little less reliable on the jumps": **partly**. It is less reliable, but by far more than a little, and mostly in corners rather than on jumps.
+- **Explanation (owner):**
+  1. "The sensor car doesn't know to brake in time because it can't see the corner coming. It's luck that it is still able to make corners, either by drastic maneuvers or because the teacher left some on the table. It also must learn to brake randomly after a long period of relative straight and acceleration. Or just to arbitrarily got the brakes sometimes."
+  2. "The sensor driver can't see through the corner, so it doesn't know how sharp or long the corner is."
+  3. "I like the idea of skipping the teacher, but we've always found that transfer learning from the teacher works better. Maybe a bigger network and more training would work? But yes having the teacher match the students knowledge send likely to help so that the student has clear reasons for actions."
+
+### After E5 — Checking the owner's explanation against the traces (`python -m sdc.phase47.corners`)
+
+Every sharp turn (|curvature| > 0.15 /m) each driver reached, from where.py's 0.1 s traces (5 passes × 150 selection runs). "Brake" means a command below −0.2.
+
+| | Teacher | Base | E4 | RL racer | E5 |
+|---|---|---|---|---|---|
+| Turns reached | 4728 | 4618 | 4510 | 4633 | 3902 |
+| Speed 8 m before (m/s) | 7.11 | 6.27 | 6.46 | 7.52 | 7.37 |
+| Speed at turn start (m/s) | 4.13 | 4.62 | 4.78 | 5.79 | 6.16 |
+| Slowest in turn (m/s) | 3.35 | 3.47 | 3.52 | 4.57 | 4.77 |
+| Braking starts (m before turn) | 0.1 | 2.3 | 2.7 | 2.6 | 1.8 |
+| Turns with no braking | 90% | 25% | 22% | 5% | 16% |
+| Entry speed, mild turns (peak ≤ 0.3 /m) | 4.15 | 4.61 | 4.77 | 5.83 | 6.11 |
+| Entry speed, sharp turns (peak > 0.3 /m) | 3.99 | 4.68 | 4.86 | 5.61 | 6.39 |
+| Run ended in a mild / sharp turn | 0.0% / 0.0% | 0.6% / 1.3% | 1.1% / 0.5% | 0.5% / 0.2% | 4.9% / 4.4% |
+| Largest steering in turn (median) | 0.44 | 0.60 | 0.62 | 0.30 | 0.46 |
+| Braking with no sharp turn in the next 15 m | 0% | 7.6% | 7.0% | 2.5% | 7.7% |
+| Braking with a sharp turn within 4 m | 97% | 87% | 87% | 96% | 90% |
+
+- **"Doesn't know to brake in time":** supported. E5 starts braking later than the racer (1.8 m before the turn against 2.6 m), skips braking three times as often (16% of turns against 5%), and enters 0.4 m/s faster.
+- **"Drastic maneuvers":** supported. E5 steers about 50% harder in turns (0.46 against 0.30).
+- **"Brake randomly / arbitrarily":** supported, but small. 7.7% of E5's braking has no sharp turn in the next 15 m, against the racer's 2.5%. The base car and E4 do the same (7–8%), so every sensor car does it. Most braking is still near turns.
+- **"Doesn't know how sharp the corner is":** supported for speed. Every driver that sees the track enters sharp turns slower than mild ones (racer −0.22 m/s, teacher −0.16). Every sensor car enters them *faster* (E5 +0.28, E4 +0.09, base +0.07), so they don't adjust to sharpness at all. But E5 doesn't crash more in sharp turns (4.4%) than in mild ones (4.9%): its corner crashes come from too much speed everywhere, not mainly in the sharp ones.
+- **The racer's braking:** 96% of it happens with the turn already within 4 m, inside the sensors' range. It brakes late and hard, knowing what's coming.
+
+### E6a — A teacher that sees only as far as the sensors
+
+- **Question:** how much of the racer's speed comes from seeing the track ahead? A teacher that sees only what the student can would give the student "clear reasons for actions" (owner).
+- **Setup:** the pilot's recipe (copy of the teacher, then PPO, crash cost 200, 9 h, `runs/p47-e6a`). The driver sees the track only 4 m ahead (`--set preview=4.0`): curvature at 0, 2 and 4 m, heights to 4 m, and the next jump only within 4 m. Beyond that the track reads as flat and straight. It keeps the true state and the physics.
+- **Prediction (owner):** "a little slower and a little safer. It's only fast now because it doesn't know to prepare for corners (ie it's reckless)"
+- **Result:** seeing 4 m instead of 30 m cost almost nothing. Training ran like the pilot's first run, eval for eval (2 passes each):
+
+  | Steps | E6a (sees 4 m) | Pilot s0 (sees 30 m) |
+  |---|---|---|
+  | 0 (copy of the teacher) | 136.5 at 28.1 s | 132.5 at 28.1 s |
+  | 3M | 126.0 at 27.1 s | 129.0 at 27.2 s |
+  | 6M | 123.0 at 26.0 s | 124.5 at 26.0 s |
+  | 9M | 114.0 at 25.2 s | 113.0 at 25.0 s |
+
+  - 5 passes, 6M checkpoint: 124.0 finished per pass (124, 123, 121, 126, 126) at 25.87 s, race **541.7 s**. The best full-sight racer: 134 at 25.82 s, race 531.3 s. Same speed, 10 more crashes in 1,000 laps, 10 s slower over 20 laps.
+  - Training was stopped after the 9M eval: like the full-sight runs, it was drifting toward speed and losing finishes.
+- **Next:** E6, copy E6a onto sensors (below).
+
+### E6 — Copy the 4 m racer onto sensors
+
+- **Setup:** as E5, with E6a's 6M checkpoint as the teacher (`bash sdc/phase47/e6_runs.sh`; `bc_loop --teacher-racer runs/p47-e6a/ckpt/6029312.pt --teacher-preview 4.0`), then `where e6`.
+- **Prediction (owner):** not given before the result came in.
+- **Result:** worse than E5. A teacher that sees only what the sensors see did not make it easier to copy.
+
+  | Car | Finished per pass | Crashes per lap | Median lap | Race |
+  |---|---|---|---|---|
+  | Teacher (hand-coded) | 137 | 0.087 | 30.78 s | 627.7 s |
+  | E5 (copies the 30 m racer) | 92.2 | 0.385 | 26.06 s | 575.1 s |
+  | E6 (copies the 4 m racer) | 78.8 (77, 83, 73, 81, 80) | 0.475 | 26.35 s | 593.5 s |
+
+  - Failures (5 passes): corners off the lane 251 (E5 198), other off the lane 54 (48), landings 50 (38).
+  - Students at the end of training (60 runs): E6 29 and 34 finished; E5 40 and 31.
+  - Still beats the teacher's race by 34 s, but E5 remains the best sensor car.
+- **Explanation (owner),** asked why copying loses crashes but hardly any speed: "Is there something in the setup? Like what you do now impacts how likely you are to crash a few moves ahead? I still haven't determined if we should be working towards a clean racing line that plans ahead or a scrappy racer that is good at reacting. I think we've tried both and neither has helped. Maybe we found the happy medium? I find that hard to believe."
+
+### E7 — Train the sensor car itself, with a coach that sees the whole track
+
+- **Question:** most of the loss is in the copying (racers crash on 11–17% of laps, their students on 39–48%). Can RL on the student's own driving win it back?
+- **Setup:** `python -m sdc.phase47.e7 --out runs/p47-e7` (9 h).
+  - Actor: E5's seed-0 student (GRU, sensors only), trained by PPO on 64-step sequences from its own memory.
+  - Critic: a separate network on the racer's privileged inputs, started from the racer's critic and warmed for 1M steps before the actor changes. It is used only in training.
+  - Reward as the racer (progress, crash 200, finish 50). Student env (truggy, expo 0.4), E2's train loops. Scored every 3M steps on the 150 selection runs (2 passes); best checkpoint then scored over 5 passes.
+- **Prediction (owner):** "Crash more but go faster. Won't beat e5."
+- **Result:** stopped on the old car, before its first score, when the owner switched to the full-size truggy (next section). Rerun there as E7 below.
+
+## The full-size truggy (`SDC_REAL=truggy2`; `docs/phases/air-control.md`, `docs/phases/truggy-size.md`)
+
+The owner saw too little air control in renders, and a chassis riding about 4 cm too high. Fixes: wheel spin inertia that couples to the body in the air (`wheels`), no rollover end while airborne (`groundroll`), and a full-size 1/8 truggy body, wheels, springs and motor (`size8`). Owner: "A, go with the full-size truggy." Everything after this section runs on it.
+
+- **Teacher retune** (`python -m sdc.phase47.air_teacher`): the old gains still work best; the double-jump speed goes from 7.4 to 7.8 m/s.
+- **RL racer** (`runs/p48-racer`, 9 h, crash price 200), 2-pass race estimates: 585 s at start, 553 at 9M, 538 at 15M, 560 at 18M, 535 at the end (19.7M, chosen).
+- **Sensor cars** (`runs/p48-e5-s0/s1`): the E5 recipe copying the chosen racer.
+
+Race over 5 noisy passes of the 150 selection runs (`python -m sdc.phase47.where p48 ...`, `runs/p48-race.json`):
+
+| Driver | Finished | Crash rate | Median lap | Race |
+|---|---|---|---|---|
+| Teacher | 672/750 | 10.4% | 28.41 s | 582.8 s |
+| RL racer (privileged) | 531/750 | 29.2% | 24.96 s | 540.1 s |
+| Sensor cars (E5 recipe) | 335/750 | 55.3% | 25.48 s | 587.1 s |
+| E7 (RL on the sensor car, below) | 362/750 | 51.7% | 24.56 s | **563.6 s** |
+
+The sensor cars lose to the teacher by 4.3 s. They lap only 0.5 s slower than the racer but crash almost twice as often (55% against 29%). On the old car the gap was 39–48% against 11–17%.
+
+### E7 on the full-size truggy (`sdc/phase47/p48_runs.sh e7`)
+
+Same setup as E7 above: actor `runs/p48-e5-s0`, critic from the chosen racer, 9 h.
+
+- 2-pass race estimates: 600 s at start, 601 at 3M, 588 at 6M, 591 at 9M, 579 at 12M, 571 at 15M, 568 at 18M, 561 at 21.1M (chosen; `runs/p48-e7`).
+- **Result:** over 5 noisy passes, 362/750 finished (crash rate 51.7%), median lap 24.56 s, **race 563.6 s**: 19.2 s ahead of the teacher (582.8 s) and 23.5 s ahead of the E5-recipe cars (587.1 s). **A sensors-only car beats the teacher.**
+- It wins on pace: it laps 3.85 s faster than the teacher and as fast as the RL racer (24.96 s), but still crashes on half its laps (teacher 10%, racer 29%).
+- Weights on the `car-weights` branch: `runs/p48-e7` (and `runs/p48-e5-s0/s1`). Run with `SDC_REAL=truggy2`.

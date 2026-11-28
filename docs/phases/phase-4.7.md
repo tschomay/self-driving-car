@@ -573,3 +573,5 @@ The teacher holds the centre line. RL moves off it, but not into a racing line: 
 Owner, on how far ahead they look: "I think I setup for the next corner immediately after leaving the previous one. But sensors can't see well for a long distance. 6m might be all we can hope for"
 
 Owner, on surfaces (2026-11-28): "On a real track, grip is mostly uniform apart from two things - areas that are bumpy and areas where cars have either made the dirt smooth or loose. We added some bumps already, but maybe need more right surface through out to be realistic? And we don't model track wear. Any ideas to add that? Or is it too complex and we should just cheat with a little grip noise rate than a map"
+
+Ideas offered: a per-tyre grip field (groove +10% on the common line, loose −15% off it and outside corners; each tyre's grip is already set every step for `slide`), braking bumps before corners and after landings, track wear over laps (later). Owner, on where the groove comes from: "The RL racer's line, since it's actually faster and where cars will race. But the ideal racing line plus some noise would work, too."

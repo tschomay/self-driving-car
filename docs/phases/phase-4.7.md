@@ -535,6 +535,22 @@ Owner, on testing grip: "I do kind of goose the throttle early. So I'll start wi
 
 4WD check (`truggy2`, full throttle from rest, flat ground): the one `motor` actuator puts the same torque on all four wheels (0.91 N·m each at 0.1 s, 0.48 at 1.2 s). At 1.2 s the car does 5.9 m/s while the wheels turn at 8.1–8.8 m/s: full throttle spins all four. Simplification: the motor gives each wheel equal torque whatever the others do. In a real open diff a wheel in the air takes almost no torque and its partner loses drive too; here the grounded wheels keep theirs (closer to a heavily oiled diff, as racing truggies run).
 
+Owner, on the test method: "I prefer the throttle test of you think it could work. Earlier we measured acceleration, but when I do this test the throttle is just meant to make the wheels slide but my feedback comes from how the car responds along with how easy it was to make them slide (because I have a reference for how hard it should be). Maybe that give us a method - drive the car on a few known surfaces (or roughly known) as part of training and build that expectation into memories. Or just simulate that from knowing torque and friction coefficients"
+
+Owner, on surfaces: "grip requires a grip map since it isn't uniform through the track. I'm not sure we ever fully settled that". In the Phase 4+ jump sim, grip is one number per run (`dr="gate"`: friction 0.55–1.25); Phase 3.5's dirt patches were not carried over.
+
+Straight-line tests on `truggy2` (flat, one run per grip). Brake: full brake from 7 m/s. Throttle: full throttle for 0.3 s from 3 m/s; wheelspin = wheel speed − car speed at the end.
+
+| Grip | Brake decel | Throttle accel | Wheelspin after kick |
+|---|---|---|---|
+| 0.55 | 4.3 m/s² | 4.0 m/s² | 3.9 m/s |
+| 0.75 | 6.0 | 6.1 | 1.2 |
+| 0.90 | 7.0 | 6.6 | 0.5 |
+| 1.05 | 7.1 | 6.8 | 0.2 |
+| 1.25 | 7.2 | 6.9 | 0.2 |
+
+Both tests read grip up to about 1.0, then saturate: the brake (capped at 0.65 of motor torque) and the motor can't break the tyres loose any more. Wheelspin is the clearest reading (20× from 0.55 to 0.9), the owner's "how easy it was to make them slide".
+
   Guessing the average grip every time gives an MSE of 0.041 (the variance of grip drawn evenly from 0.55–1.25). E7b reached 0.040, so its memory learned no grip at all; only the head's bias moved. Making the memory carry that target cost driving: finishes fell from 59.5 to 34. E7b was stopped at 3M to give E7c the CPU. E7c's probe is still above the average-guess level, so it shows no grip in the memory either.
 
 ### Owner on racing lines (2026-11-28)
